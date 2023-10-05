@@ -12,6 +12,31 @@ typedef Rectangle rect;
 #include "festival_string.h"
 #include "festival.h"
 
+int
+GetVirtualLineCount(program_state *ProgramState, buffer *Buffer, int TestViewPos)
+{
+    int MarginLeft = ProgramState->MarginLeft;
+    int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
+    int NumbersWidth = ProgramState->NumbersWidth;
+    int SubLineOffset = ProgramState->SubLineOffset;
+    int CharWidth = MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0).x;
+    int WrapPoint = CharsPerVirtualLine*CharWidth + NumbersWidth*CharWidth + MarginLeft;
+    
+    int LineCount = 1;
+    int x = NumbersWidth*CharWidth + MarginLeft;
+    for(int i = 0; i < Buffer->Lines[TestViewPos].Length; i++)
+    {
+        if(x+CharWidth >= WrapPoint)
+        {
+            x = NumbersWidth*CharWidth + MarginLeft + SubLineOffset*CharWidth;
+            LineCount++;
+        }
+        x += CharWidth;
+    }
+    
+    return LineCount;
+}
+
 extern "C"
 {
     PROGRAM_UPDATE_AND_RENDER(ProgramUpdateAndRender)
@@ -123,14 +148,43 @@ extern "C"
             if(ProgramState->FontSize < 6) ProgramState->FontSize = 6;
             if(ProgramState->FontSize > 100) ProgramState->FontSize = 100;
         }
-        else
-        {
-            f32 NewViewPos = Buffers[0].ViewPos - 0.3*GetMouseWheelMove();
-            Buffers[0].ViewPos = NewViewPos;
-        }
+        
         int FontSize = ProgramState->FontSize;
         // which char doesn't matter since it's a monospace font
         int CharWidth = MeasureTextEx(*FontMain, "_", FontSize, 0).x;
+        
+        if(!(IsAnyControlKeyDown))
+        {
+            f32 NewViewSubPos = Buffer->ViewSubPos - GetMouseWheelMove();
+            int NewViewPos = Buffer->ViewPos;
+            printf("%d: %d lines\n", NewViewPos, GetVirtualLineCount(ProgramState, Buffer, NewViewPos));
+            
+            if(NewViewPos == Buffer->Lines.Count - 1 && NewViewSubPos > 0)
+            {
+                NewViewSubPos = 0;
+            }
+            
+            if(NewViewSubPos < 0)
+            {
+                if(NewViewPos == 0)
+                {
+                    NewViewSubPos = 0;
+                }
+                else
+                {
+                    NewViewPos--;
+                    NewViewSubPos = GetVirtualLineCount(ProgramState, Buffer, NewViewPos)+NewViewSubPos;
+                }
+            }
+            if(NewViewSubPos >= GetVirtualLineCount(ProgramState, Buffer, NewViewPos))
+            {
+                NewViewPos++;
+                NewViewSubPos -= GetVirtualLineCount(ProgramState, Buffers, NewViewPos-1);
+            }
+            
+            Buffers->ViewPos = NewViewPos;
+            Buffers->ViewSubPos = NewViewSubPos;
+        }
         
         if(Buffers[0].ViewPos < 0) Buffers[0].ViewPos = 0;
         if(Buffers[0].ViewPos > Buffers[0].Lines.Count-1) Buffers[0].ViewPos = Buffers[0].Lines.Count-1;
@@ -140,9 +194,8 @@ extern "C"
         BeginDrawing();
         ClearBackground(RAYWHITE);
         
-        int StartLine = Buffer->ViewPos + Buffer->ViewSubPos;
-        int y = ((f32)StartLine - Buffer->ViewPos)*FontSize;
-        int x = 0;
+        f32 StartLine = (f32)Buffer->ViewPos + Buffer->ViewSubPos;
+        int y = (Buffer->ViewPos - StartLine)*FontSize;
         
         DrawRectangle(0, 0, 4*CharWidth, ProgramState->ScreenHeight, LIGHTGRAY);
         
@@ -155,9 +208,9 @@ extern "C"
             
             char NumberBuffer[6];
             sprintf(NumberBuffer, "%d", i);
-            DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(x, y), FontSize, 0, GRAY);
+            DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(0, y), FontSize, 0, GRAY);
             
-            x += NumbersWidth*CharWidth + MarginLeft;
+            int x = NumbersWidth*CharWidth + MarginLeft;
             
             for(int a = 0; a < Line->Length; a++)
             {
@@ -184,9 +237,15 @@ extern "C"
         EndShaderMode();
         
         DrawLine(WrapPoint, 0, WrapPoint, ProgramState->ScreenHeight, RED);
-        char buffer[6];
-        sprintf(buffer, "%d", CharsPerVirtualLine);
-        DrawText(buffer, CharsPerVirtualLine*CharWidth, 0, 20, RED);
+        char buffer[60];
+        sprintf(buffer, "%d", WrapPoint);
+        DrawText(buffer, WrapPoint, 0, 20, RED);
+        
+        sprintf(buffer, "Pos: %d", Buffer->ViewPos);
+        DrawText(buffer, WrapPoint, 30, 20, RED);
+        
+        sprintf(buffer, "Sub: %f", Buffer->ViewSubPos);
+        DrawText(buffer, WrapPoint, 60, 20, RED);
         
         EndDrawing();
     }

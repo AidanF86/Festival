@@ -13,9 +13,11 @@ DONE don't allow scrolling past the end of the file
 DONE convert buffer to a line system
 	start: 9:45 end: 10:30
 
-Current goal: wrapping around an arbitrary length and scrolling that lets you be on part of a wrapped line
+DONE wrapping around an arbitrary length and scrolling that lets you be on part of a wrapped line
 	sub: line numbers
 	sub: float viewpos
+
+Current goal: cursor that follows view (and view follows it)
 
 INFO
 ========================================

@@ -10,7 +10,7 @@ struct buffer
 {
     b32 IsOpen;
     
-    f32 ViewPos;
+    int ViewPos;
     f32 ViewSubPos;
     
     string_list Lines;
