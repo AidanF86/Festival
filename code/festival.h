@@ -4,12 +4,14 @@
 #define FESTIVAL_H
 
 #define IsAnyShiftKeyDown (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) 
+#define IsAnyControlKeyDown (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) 
 
 struct buffer
 {
     b32 IsOpen;
     
     f32 ViewPos;
+    f32 ViewSubPos;
     
     string_list Lines;
     
@@ -34,6 +36,12 @@ struct program_state
     Font FontMain;
     Font FontSDF;
     Shader ShaderSDF;
+    
+    int FontSize;
+    int CharsPerVirtualLine;
+    int SubLineOffset;
+    int MarginLeft;
+    int NumbersWidth;
     
     buffer Buffers[MAX_BUFFERS];
     int OpenBufferCount;

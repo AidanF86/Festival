@@ -132,4 +132,6 @@ Rect(f32 x, f32 y, f32 w, f32 h)
     return Result;
 }
 
+#define Clamp(Value, Min, Max) { if(Value < Min){Value = Min;} if(Value > Max){Value = Max;} }
+
 #endif //FESTIVAL_MATH_H
