@@ -11,6 +11,7 @@ struct string
 {
     int Length;
     char *Data;
+    inline char& operator[](size_t Index) { return Data[Index]; }
 };
 
 int
@@ -192,6 +193,101 @@ Print(FILE *File, const char *Format, ...)
     string Str = _String(Format, Args);
     PrintFile(File, Str);
     FreeString(Str);
+}
+
+
+inline bool
+operator==(string A, string B)
+{
+    if(A.Length != B.Length) return false;
+    for(int i = 0; i < A.Length; i++)
+    {
+        if(A[i] != B[i]) return false;
+    }
+    return true;
+}
+
+
+/*
+    Lists present:
+    - string
+*/
+
+#include <stdlib.h>
+
+#define ListDoubleSize(List) {\
+(List)->ArraySize *= 2;\
+(List)->Data = (typeof((List)->Data))realloc((List)->Data, sizeof((List)->Data[0]) * (List)->ArraySize);\
+}
+
+#define ListAdd(List, E) {\
+if((List)->Count + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
+(List)->Data[(List)->Count] = (E);\
+(List)->Count++;\
+}
+/*======= string List =======*/
+typedef struct string_list
+{
+    int Count;
+    int ArraySize;
+    string *Data;
+    inline string& operator[](size_t Index) { return Data[Index]; }
+    inline const string& operator[](size_t Index) const { return Data[Index]; }
+} string_list;
+
+string_list StringList()
+{
+    string_list Result;
+    Result.Count = 0;
+    Result.ArraySize = 20;
+    Result.Data = (string *)malloc(20 * sizeof(string));
+    return Result;
+}
+
+string_list StringList(int Size)
+{
+    string_list Result;
+    Result.Count = 0;
+    Result.ArraySize = Size;
+    Result.Data = (string *)malloc(Size * sizeof(string));
+    return Result;
+}
+
+int ListIndexOf(string_list *List, string E)
+{
+    int Result = -1;
+    for(int i = 0; i < List->Count; i++)
+    {
+        if(List->Data[i] == E)
+        {
+            Result = i;
+            break;
+        }
+    }
+    return Result;
+}
+
+int ListRemoveAt(string_list *List, int Index)
+{
+    if(Index >= 0 && Index < List->Count)
+    {
+        for(int i = Index; i < List->Count; i++)
+        {
+            List->Data[i] = List->Data[i+1];
+        }
+        List->Count--;
+        return 1;
+    }
+    return 0;
+}
+int ListRemove(string_list *List, string E)
+{
+    int Index = ListIndexOf(List, E);
+    if(Index != -1)
+    {
+        ListRemoveAt(List, Index);
+    }
+    return Index;
 }
 
 

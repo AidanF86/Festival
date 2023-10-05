@@ -11,6 +11,9 @@ struct buffer
     
     f32 ViewPos;
     
+    string_list Lines;
+    
+#if 0
     union {
         struct {
             int Length;
@@ -19,6 +22,7 @@ struct buffer
         string Text;
     };
     int LineCount;
+#endif
 };
 
 #define MAX_BUFFERS 30
