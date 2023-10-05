@@ -12,13 +12,21 @@ typedef Rectangle rect;
 #include "festival_string.h"
 #include "festival.h"
 
+void
+ComputeBuffer(buffer *Buffer) {
+    for(int i = 0; i < Buffer->Length; i++)
+    {
+        if(Buffer->Data[i] == '\n')
+            Buffer->LineCount++;
+    }
+}
 
 extern "C"
 {
     PROGRAM_UPDATE_AND_RENDER(ProgramUpdateAndRender)
     {
         program_state *ProgramState = (program_state *)Memory->Data;
-        string *Buffer = &ProgramState->Buffer;
+        buffer *Buffers = ProgramState->Buffers;
         Font *FontMain = &ProgramState->FontMain;
         Font *FontSDF = &ProgramState->FontSDF;
         
@@ -26,14 +34,20 @@ extern "C"
         {
             Memory->Initialized = true;
             
+            for(int i = 0; i < MAX_BUFFERS; i++) {
+                Buffers[i] = {0};
+            };
+            
             // TEXT FILE
             const char *Filename = "test.cpp";
             
             u32 FileSize = (u32)GetFileLength(Filename);
             char *FileData = LoadFileText(Filename);
             
-            ProgramState->Buffer = AllocString(FileSize);
-            strcpy(ProgramState->Buffer.Data, FileData);
+            Buffers[0].Text = AllocString(FileSize);
+            strcpy(Buffers[0].Data, FileData);
+            // TODO: recall this every edit
+            ComputeBuffer(&(Buffers[0]));
             
             UnloadFileText(FileData);
             
@@ -70,22 +84,35 @@ extern "C"
             Memory->IsRunning = false;
         }
         
+        Buffers[0].ViewPos -= GetMouseWheelMove();
+        if(Buffers[0].ViewPos < 0) Buffers[0].ViewPos = 0;
+        if(Buffers[0].ViewPos > Buffers[0].LineCount) Buffers[0].ViewPos = Buffers[0].LineCount;
+        
+        int StartLine = (int)Buffers[0].ViewPos;
+        int StartingPoint = 0;
+        int LinesPassed = 0;
+        for(StartingPoint = 0; StartingPoint < Buffers[0].Length && LinesPassed < StartLine; StartingPoint++)
+        {
+            if(Buffers[0].Data[StartingPoint] == '\n') {
+                LinesPassed++;
+            }
+        }
+        
+        
         
         BeginDrawing();
-        
         ClearBackground(RAYWHITE);
         
         int y = 0;
         int x = 0;
-        int FontDrawSize = 64;
+        int FontDrawSize = 22;
         
         BeginShaderMode(ProgramState->ShaderSDF);
-        for(int i = 0; i < Buffer->Length; i++)
+        for(int i = StartingPoint; i < Buffers[0].Length; i++)
         {
-            char NextChar[2] = {Buffer->Data[i], 0};
+            char NextChar[2] = {Buffers[0].Data[i], 0};
             
             DrawTextEx(ProgramState->FontSDF, NextChar, V2(x, y), FontDrawSize, 0, BLACK);
-            //DrawTextEx(ProgramState->FontMain, NextChar, V2(x, y), FontDrawSize, 0, BLACK);
             
             x += FontDrawSize/2;
             if(NextChar[0] == '\n')

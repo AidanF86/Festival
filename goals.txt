@@ -1,14 +1,16 @@
 WORKING NOTES
 ========================================
+Current goal:
 DONE be able to load a text file and display it (just ascii for now)
 	start: 11:30pm 10/4
 	end: 11:50pm
-
-DONE Current goal: display with a proper font and with decent spacing 
+DONE display with a proper font and with decent spacing 
 	progress (11:57): it works, but looks like ass
 	12:20: looking into SDFs
 	1:27: got SDFs working, took way too long because of a dumb typo
-
+DONE be able to scroll through the file.
+DONE don't allow scrolling past the end of the file
+wrapping around an arbitrary length and scrolling that lets you be on part of a wrapped line
 
 INFO
 ========================================
