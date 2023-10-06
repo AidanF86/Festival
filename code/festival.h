@@ -39,6 +39,9 @@ struct buffer
 {
     b32 IsOpen;
     
+    rect Rect;
+    rect TextRect;
+    
     int ViewPos;
     f32 ViewSubPos;
     
