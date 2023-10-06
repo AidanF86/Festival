@@ -134,4 +134,42 @@ Rect(f32 x, f32 y, f32 w, f32 h)
 
 #define Clamp(Value, Min, Max) { if(Value < Min){Value = Min;} if(Value > Max){Value = Max;} }
 
+struct buffer_pos {
+    // line, col
+    int l, c;
+};
+
+inline buffer_pos
+operator+(buffer_pos a, buffer_pos b)
+{
+    buffer_pos Result = {a.l + b.l, a.c + b.c};
+    return Result;
+}
+inline buffer_pos &
+operator+=(buffer_pos &a, buffer_pos b)
+{
+    a = a + b;
+    return a;
+}
+inline buffer_pos
+operator-(buffer_pos a, buffer_pos b)
+{
+    buffer_pos Result = {a.l - b.l, a.c - b.c};
+    return Result;
+}
+inline buffer_pos &
+operator-=(buffer_pos &a, buffer_pos b)
+{
+    a = a - b;
+    return a;
+}
+
+inline buffer_pos
+BufferPos(int l, int c) {
+    buffer_pos Result;
+    Result.l = l;
+    Result.c = c;
+    return Result;
+}
+
 #endif //FESTIVAL_MATH_H

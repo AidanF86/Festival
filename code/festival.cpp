@@ -1,7 +1,6 @@
 #include <stdio.h>
 
 #include "raylib.h"
-#include "raymath.h"
 
 typedef Vector2 v2;
 typedef Vector3 v3;
@@ -11,6 +10,111 @@ typedef Rectangle rect;
 #include "festival_math.h"
 #include "festival_string.h"
 #include "festival.h"
+#include "festival_lists.h"
+
+line_rect_data
+LineRectData() {
+    line_rect_data Result = {0};
+    Result.CharRects = RectList();
+    return Result;
+};
+
+int 
+CharsInLine(buffer *Buffer, int l)
+{
+    if(l < 0 || l >= Buffer->Lines.Count)
+        return 0;
+    return Buffer->Lines[l].Length;
+}
+
+rect
+RectAt(buffer *Buffer, int l, int c)
+{
+    // TODO: narrow this down, set upper bounds on rect generation & text rendering
+    if(l < Buffer->LineRectDataStart || l >= Buffer->Lines.Count ||
+       c < 0 || c >= Buffer->Lines[l].Length)
+        return {0};
+    return Buffer->LineRectDataList.Data[l - Buffer->LineRectDataStart].CharRects.Data[c];
+}
+
+char
+CharAt(buffer *Buffer, int l, int c)
+{
+    if(l < 0 || l >= Buffer->Lines.Count ||
+       c < 0 || c >= Buffer->Lines[l].Length)
+        return 0;
+    return Buffer->Lines[l].Data[c];
+}
+
+void
+FillLineRectData(buffer *Buffer, program_state *ProgramState)
+{
+    line_rect_data_list *DataList = &Buffer->LineRectDataList;
+    
+    int MarginLeft = ProgramState->MarginLeft;
+    int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
+    int NumbersWidth = ProgramState->NumbersWidth;
+    int SubLineOffset = ProgramState->SubLineOffset;
+    v2 FontDim = MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0);
+    int CharWidth = FontDim.x;
+    int CharHeight = FontDim.y;
+    MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0).x;
+    int WrapPoint = CharsPerVirtualLine*CharWidth + NumbersWidth*CharWidth + MarginLeft;
+    
+    
+    
+    // DeAllocation
+    if(DataList->IsAllocated);
+    {
+        // Deallocate all lists
+        for(int i = 0; i < DataList->Count; i++)
+        {
+            if(DataList->Data[i].CharRects.IsAllocated)
+            {
+                ListFree(&(DataList->Data[i].CharRects));
+            }
+            else
+            {
+                Print("Unallocated rect list???\n");
+            }
+            
+        }
+        ListFree(DataList);
+    }
+    // Allocation
+    *DataList = LineRectDataList();
+    
+    int StartLine = (f32)Buffer->ViewPos + Buffer->ViewSubPos;
+    Buffer->LineRectDataStart = StartLine;
+    int y = (Buffer->ViewPos - StartLine)*CharHeight;
+    
+    for(int i = 0; i < Buffer->Lines.Count; i++)
+    {
+        ListAdd(DataList, LineRectData());
+        line_rect_data *RectData = &(DataList->Data[i]);
+        
+        
+        string *Line = &Buffer->Lines[i];
+        
+        int x = NumbersWidth*CharWidth + MarginLeft;
+        
+        for(int a = 0; a < Line->Length; a++)
+        {
+            if(x+CharWidth >= WrapPoint)
+            {
+                x = NumbersWidth*CharWidth + MarginLeft + SubLineOffset*CharWidth;
+                y += CharHeight;
+            }
+            
+            ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
+            
+            //DrawRectangleLines(x, y, CharWidth, CharHeight, ORANGE);
+            
+            x += CharWidth;
+        }
+        y += CharHeight;
+    }
+}
 
 int
 GetVirtualLineCount(program_state *ProgramState, buffer *Buffer, int TestViewPos)
@@ -66,7 +170,7 @@ extern "C"
             for(int i = 0; i < FileSize; i++)
             {
                 int LineStart = i;
-                // need to add AllocString to easily do this
+                // TODO: need to add AppendString to easily do this
                 for(i; FileData[i] != '\n' && i < FileSize; i++)
                 {
                 }
@@ -88,31 +192,31 @@ extern "C"
             UnloadFileText(FileData);
             
             // FONT
-            //ProgramState->FontMain = LoadFontEx("LiberationMono-Regular.ttf", 128, NULL, 0);
-            
-            u32 FontFileSize = 0;
-            u8 *FontFileData = LoadFileData("LiberationMono-Regular.ttf", &FontFileSize);
-            
-            *FontMain = {0};
-            FontMain->baseSize = 16;
-            FontMain->glyphCount = 95;
-            FontMain->glyphs = LoadFontData(FontFileData, FontFileSize, 16, 0, 95, FONT_DEFAULT);
-            Image Atlas = GenImageFontAtlas(FontMain->glyphs, &FontMain->recs, 95, 16, 4, 0);
-            FontMain->texture = LoadTextureFromImage(Atlas);
-            UnloadImage(Atlas);
-            
-            *FontSDF = {0};
-            FontSDF->baseSize = 32;
-            FontSDF->glyphCount = 95;
-            FontSDF->glyphs = LoadFontData(FontFileData, FontFileSize, 32, 0, 0, FONT_SDF);
-            Atlas = GenImageFontAtlas(FontSDF->glyphs, &FontSDF->recs, 95, 32, 0, 1);
-            FontSDF->texture = LoadTextureFromImage(Atlas);
-            UnloadImage(Atlas);
-            
-            UnloadFileData(FontFileData);
-            
-            ProgramState->ShaderSDF = LoadShader(0, TextFormat("../data/shaders/glsl%i/sdf.fs", 330));
-            SetTextureFilter(FontSDF->texture, TEXTURE_FILTER_BILINEAR);
+            {
+                u32 FontFileSize = 0;
+                u8 *FontFileData = LoadFileData("LiberationMono-Regular.ttf", &FontFileSize);
+                
+                *FontMain = {0};
+                FontMain->baseSize = 16;
+                FontMain->glyphCount = 95;
+                FontMain->glyphs = LoadFontData(FontFileData, FontFileSize, 16, 0, 95, FONT_DEFAULT);
+                Image Atlas = GenImageFontAtlas(FontMain->glyphs, &FontMain->recs, 95, 16, 4, 0);
+                FontMain->texture = LoadTextureFromImage(Atlas);
+                UnloadImage(Atlas);
+                
+                *FontSDF = {0};
+                FontSDF->baseSize = 32;
+                FontSDF->glyphCount = 95;
+                FontSDF->glyphs = LoadFontData(FontFileData, FontFileSize, 32, 0, 0, FONT_SDF);
+                Atlas = GenImageFontAtlas(FontSDF->glyphs, &FontSDF->recs, 95, 32, 0, 1);
+                FontSDF->texture = LoadTextureFromImage(Atlas);
+                UnloadImage(Atlas);
+                
+                UnloadFileData(FontFileData);
+                
+                ProgramState->ShaderSDF = LoadShader(0, TextFormat("../data/shaders/glsl%i/sdf.fs", 330));
+                SetTextureFilter(FontSDF->texture, TEXTURE_FILTER_BILINEAR);
+            }
             
             
             ProgramState->FontSize = 22;
@@ -122,6 +226,7 @@ extern "C"
             ProgramState->NumbersWidth = 4;
             Buffer->ViewPos = 0;
             Buffer->ViewSubPos = 0;
+            Buffer->LineRectDataList = {0};
         }
         ProgramState->ScreenHeight = Memory->WindowHeight;
         ProgramState->ScreenWidth = Memory->WindowWidth;
@@ -190,51 +295,49 @@ extern "C"
         if(Buffers[0].ViewPos > Buffers[0].Lines.Count-1) Buffers[0].ViewPos = Buffers[0].Lines.Count-1;
         
         
+        FillLineRectData(Buffer, ProgramState);
+        
+        
         
         BeginDrawing();
         ClearBackground(RAYWHITE);
         
+        
+        
         f32 StartLine = (f32)Buffer->ViewPos + Buffer->ViewSubPos;
         int y = (Buffer->ViewPos - StartLine)*FontSize;
         
+        
+        for(int l = Buffer->LineRectDataStart; l < Buffer->LineRectDataStart + Buffer->LineRectDataList.Count; l++)
+        {
+            for(int c = 0; c < CharsInLine(Buffer, l); c++)
+            {
+                DrawRectangleLinesEx(RectAt(Buffer, l, c), 1, ORANGE);
+            }
+        }
+        
+        
         DrawRectangle(0, 0, 4*CharWidth, ProgramState->ScreenHeight, LIGHTGRAY);
         
-        int WrapPoint = CharsPerVirtualLine*CharWidth + NumbersWidth*CharWidth + MarginLeft;
-        
         BeginShaderMode(ProgramState->ShaderSDF);
-        for(int i = Buffer->ViewPos; i < Buffer->Lines.Count; i++)
+        for(int l = Buffer->ViewPos; l < Buffer->LineRectDataStart + Buffer->LineRectDataList.Count; l++)
         {
-            string *Line = &Buffer->Lines[i];
-            
             char NumberBuffer[6];
-            sprintf(NumberBuffer, "%d", i);
-            DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(0, y), FontSize, 0, GRAY);
+            sprintf(NumberBuffer, "%d", l);
+            DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(0, RectAt(Buffer, l, 0).y), FontSize, 0, GRAY);
             
-            int x = NumbersWidth*CharWidth + MarginLeft;
-            
-            for(int a = 0; a < Line->Length; a++)
+            for(int c = 0; c < CharsInLine(Buffer, l); c++)
             {
-                if(x+CharWidth >= WrapPoint)
-                {
-                    y += FontSize;
-                    x = NumbersWidth*CharWidth + MarginLeft + SubLineOffset*CharWidth;
-                }
-                
-                Color DrawColor = BLACK;
-                
-                char NextChar[2] = {Line->Data[a], 0};
-                if(NextChar[0] == ' '){ NextChar[0] = '_'; DrawColor = LIGHTGRAY; };
-                if(NextChar[0] == '\n') NextChar[0] = '|';
-                
-                DrawTextEx(ProgramState->FontSDF, NextChar, V2(x, y), FontSize, 0, DrawColor);
-                
-                x += CharWidth;
+                char CharBuffer[2] = {CharAt(Buffer, l, c), 0};
+                //DrawRectangleLinesEx(RectAt(Buffer, l, c), 1, ORANGE);
+                rect Rect = RectAt(Buffer, l, c);
+                DrawTextEx(ProgramState->FontSDF, CharBuffer, V2(Rect.x, Rect.y), FontSize, 0, BLACK);
             }
-            
-            y += FontSize;
-            x = 0;
         }
         EndShaderMode();
+        
+        
+        int WrapPoint = CharsPerVirtualLine*CharWidth + NumbersWidth*CharWidth + MarginLeft;
         
         DrawLine(WrapPoint, 0, WrapPoint, ProgramState->ScreenHeight, RED);
         char buffer[60];

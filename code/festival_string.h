@@ -225,6 +225,11 @@ if((List)->Count + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
 (List)->Data[(List)->Count] = (E);\
 (List)->Count++;\
 }
+
+#define ListFree(List) {\
+free((List)->Data);\
+}
+
 /*======= string List =======*/
 typedef struct string_list
 {
