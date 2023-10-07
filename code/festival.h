@@ -20,9 +20,8 @@ typedef struct rect_list
 struct line_rect_data
 {
     rect_list CharRects;
-    rect LineRect; // can span multiple lines for wrapping
-    // just to check if it's in the line, then move on to charrects
-    // for efficiency
+    rect LineRect;
+    int DisplayLines;
 };
 
 typedef struct line_rect_data_list
@@ -43,7 +42,7 @@ struct buffer
     rect TextRect;
     
     int ViewPos;
-    f32 ViewSubPos;
+    int ViewSubPos;
     
     buffer_pos CursorPos;
     
