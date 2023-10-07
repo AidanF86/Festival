@@ -20,6 +20,8 @@ DONE wrapping around an arbitrary length and scrolling that lets you be on part 
 Current goal: cursor that follows view (and view follows it)
 	sub: buffer_pos, convert to draw pos, draw rect storing (chars and lines)
 	sub: switch to view rect and only render what's needed
+	//current issue solution: fallback to calculating display lines, that way we still only have 1 function
+	NO! We will calculate geometry for the entire file :evil:
 
 
 INFO
