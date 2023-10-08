@@ -48,7 +48,7 @@ struct buffer
     
     string_list Lines;
     
-    int LineRectDataStart; // line start index
+    //int LineRectDataStart; // line start index
     // Make a list of this!
     line_rect_data_list LineRectDataList;
 };
@@ -71,6 +71,9 @@ struct program_state
     
     buffer Buffers[MAX_BUFFERS];
     int OpenBufferCount;
+    
+    b32 UserMovedCursor;
+    b32 UserMovedView;
 };
 
 #endif //FESTIVAL_H

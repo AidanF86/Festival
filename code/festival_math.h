@@ -139,6 +139,18 @@ struct buffer_pos {
     int l, c;
 };
 
+inline b32
+operator==(buffer_pos a, buffer_pos b)
+{
+    b32 Result = a.l == b.l && a.c == b.c;
+    return Result;
+}
+inline b32
+operator!=(buffer_pos a, buffer_pos b)
+{
+    b32 Result = !(a==b);
+    return Result;
+}
 inline buffer_pos
 operator+(buffer_pos a, buffer_pos b)
 {
