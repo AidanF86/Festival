@@ -121,6 +121,7 @@ int main()
         }
 #endif
 #if 0
+        
         if(IsKeyPressed(KEY_U))
         {
             if(ProgramCode.Code)
@@ -139,6 +140,9 @@ int main()
             printf("Loading code\n");
         }
 #endif
+        
+        Memory.WindowWidth = GetScreenWidth();
+        Memory.WindowHeight = GetScreenHeight();
         
         if(ProgramCode.UpdateAndRender)
         {

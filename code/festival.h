@@ -21,6 +21,7 @@ struct line_rect_data
 {
     rect_list CharRects;
     rect LineRect;
+    rect EndLineRect;
     int DisplayLines;
 };
 
@@ -42,7 +43,6 @@ struct buffer
     rect TextRect;
     
     int ViewPos;
-    int ViewSubPos;
     
     buffer_pos CursorPos;
     
