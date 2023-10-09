@@ -59,11 +59,34 @@ struct buffer
     line_data_list LineDataList;
 };
 
+struct key_data
+{
+    int KeyCode;
+    b32 JustPressed;
+    f32 PressTime;
+    f32 TimeTillNextRepeat;
+};
+
 #define MAX_BUFFERS 30
 struct program_state
 {
     f32 dTime;
     i32 ScreenWidth, ScreenHeight;
+    
+    f32 KeyFirstRepeatTime;
+    f32 KeyRepeatSpeed = 1;
+    
+    union
+    {
+        struct
+        {
+            key_data LeftKey;
+            key_data RightKey;
+            key_data UpKey;
+            key_data DownKey;
+        };
+        key_data KeyData[4];
+    };
     
     Font FontMain;
     Font FontSDF;
@@ -81,5 +104,7 @@ struct program_state
     b32 UserMovedCursor;
     b32 UserMovedView;
 };
+
+#define KeyShouldExecute(Key) ((Key).JustPressed || ((Key).PressTime >= ProgramState->KeyFirstRepeatTime && Key.TimeTillNextRepeat <= 0))
 
 #endif //FESTIVAL_H

@@ -170,10 +170,6 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
     { // Adjust based on cursor
         if(CursorRect.y < ViewPos)
         {
-            printf("Adjusting up from %d to %d\n", ViewPos, CursorRect.y);
-            printf("cursor at %d, %d\n", CursorPos.l, CursorPos.c);
-            printf("cursor rect: %f, %f\n", CursorRect.x, CursorRect.y);
-            printf("%d\n", CursorPos.l);
             ViewPos = CursorRect.y;
         }
         else if(CursorRect.y > ViewPos + Buffer->TextRect.h - CharHeight)
@@ -427,6 +423,20 @@ extern "C"
             }
             
             
+            ProgramState->KeyFirstRepeatTime = 0.4f;
+            ProgramState->KeyRepeatSpeed = 0.02f;
+            
+            for(int i = 0; i < sizeof(ProgramState->KeyData) / sizeof(key_data); i++)
+            {
+                ProgramState->KeyData[i] = {0};
+            }
+            ProgramState->LeftKey.KeyCode = KEY_LEFT;
+            ProgramState->RightKey.KeyCode = KEY_RIGHT;
+            ProgramState->UpKey.KeyCode = KEY_UP;
+            ProgramState->DownKey.KeyCode = KEY_DOWN;
+            //ProgramState->Key.KeyCode = KEY_;
+            //ProgramState->Key.KeyCode = KEY_;
+            
             ProgramState->FontSize = 22;
             ProgramState->CharsPerVirtualLine = 10;
             ProgramState->SubLineOffset = 40;
@@ -483,17 +493,57 @@ extern "C"
             NewViewPos -= GetMouseWheelMove()*20;
             
             Clamp(NewViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
-            printf("%d\n", Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
-            printf("Pos: %d\n", NewViewPos);
             
-            //NewCursorPos.l += IsKeyPressed(KEY_DOWN) - IsKeyPressed(KEY_UP);
-            //NewCursorPos.c += IsKeyPressed(KEY_RIGHT) - IsKeyPressed(KEY_LEFT);
-            NewCursorPos.l += IsKeyDown(KEY_DOWN) - IsKeyDown(KEY_UP);
+            for(int i = 0; i < sizeof(ProgramState->KeyData) / sizeof(key_data); i++)
+            {
+                key_data *Key = &ProgramState->KeyData[i];
+                if(IsKeyDown(Key->KeyCode))
+                {
+                    if(Key->PressTime == 0)
+                        Key->JustPressed = true;
+                    else
+                        Key->JustPressed = false;
+                    
+                    Key->PressTime += GetFrameTime();
+                }
+                else
+                {
+                    Key->PressTime = 0;
+                    Key->TimeTillNextRepeat = 0;
+                }
+                
+                if(Key->JustPressed || Key->PressTime >= ProgramState->KeyFirstRepeatTime)
+                {
+                    if(Key->TimeTillNextRepeat <= 0)
+                    {
+                        Key->TimeTillNextRepeat = ProgramState->KeyRepeatSpeed;
+                    }
+                    else
+                    {
+                        Key->TimeTillNextRepeat -= GetFrameTime();
+                    }
+                }
+                
+            }
             
-            int DeltaC = IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT);
-            if(DeltaC != 0)
+            if(KeyShouldExecute(ProgramState->LeftKey))
+            {
+                NewCursorPos.c--;
                 Buffer->IdealCursorChar = NewCursorPos.c;
-            NewCursorPos.c += DeltaC;
+            }
+            if(KeyShouldExecute(ProgramState->RightKey))
+            {
+                NewCursorPos.c++;
+                Buffer->IdealCursorChar = NewCursorPos.c;
+            }
+            if(KeyShouldExecute(ProgramState->UpKey))
+            {
+                NewCursorPos.l--;
+            }
+            if(KeyShouldExecute(ProgramState->DownKey))
+            {
+                NewCursorPos.l++;
+            }
             
             Clamp(NewCursorPos.l, 0, Buffer->Lines.Count-1);
             Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
