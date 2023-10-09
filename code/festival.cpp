@@ -489,12 +489,12 @@ extern "C"
         if(!(IsAnyControlKeyDown))
         {
             // TODO: mouse scrolling is kind of stuttery, especially up
-            int NewViewPos = Buffer->ViewPos;
+            int NewTargetViewPos = Buffer->TargetViewPos;
+            NewTargetViewPos -= GetMouseWheelMove()*20;
+            Clamp(NewTargetViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
+            
+            
             buffer_pos NewCursorPos = Buffer->CursorPos;
-            
-            NewViewPos -= GetMouseWheelMove()*20;
-            
-            Clamp(NewViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
             
             for(int i = 0; i < sizeof(ProgramState->KeyData) / sizeof(key_data); i++)
             {
@@ -559,7 +559,7 @@ extern "C"
             ProgramState->UserMovedView = false;
             ProgramState->UserMovedCursor = false;
             
-            if(NewViewPos != Buffer->ViewPos)
+            if(NewTargetViewPos != Buffer->TargetViewPos)
             {
                 ProgramState->UserMovedView = true;
             }
@@ -568,7 +568,7 @@ extern "C"
                 ProgramState->UserMovedCursor = true;
             }
             
-            Buffer->ViewPos = NewViewPos;
+            Buffer->TargetViewPos = NewTargetViewPos;
             Buffer->CursorPos = NewCursorPos;
         }
         
