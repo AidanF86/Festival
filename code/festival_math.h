@@ -60,6 +60,12 @@ operator>(v2 A, v2 B)
     return A.x > B.x && A.y > B.y;
 }
 
+inline bool
+operator==(rect a, rect b)
+{
+    bool Result = (a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h);
+    return Result;
+}
 inline rect
 operator+(rect R, v2 V)
 {
@@ -106,6 +112,7 @@ operator+=(rect &R, rect B)
     R = R + B;
     return R;
 }
+#if 0
 inline rect
 InterpolateRect(rect R, rect Target, f32 Speed)
 {
@@ -117,6 +124,8 @@ InterpolateRect(rect R, rect Target, f32 Speed)
     
     return Result;
 }
+#endif
+#define Interpolate(a, target, speed) ( ((speed) >= 1) ? (target) : ( (a) + ((target) - (a))*(speed) == (a) ? (target) : (a) + ((target) - (a))*(speed) ))
 
 inline v3
 V2ToV3(v2 V)

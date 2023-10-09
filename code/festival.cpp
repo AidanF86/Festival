@@ -162,6 +162,7 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
     int CharHeight = FontDim.y;
     buffer_pos CursorPos = Buffer->CursorPos;
     int ViewPos = Buffer->ViewPos;
+    int TargetViewPos = Buffer->TargetViewPos;
     
     rect CursorRect = RectAt(Buffer, CursorPos.l, CursorPos.c);
     //printf("cursor rect: %f, %f\n", CursorRect.x, CursorRect.y);
@@ -170,32 +171,32 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
     { // Adjust based on cursor
         if(CursorRect.y < ViewPos)
         {
-            ViewPos = CursorRect.y;
+            TargetViewPos = CursorRect.y;
         }
         else if(CursorRect.y > ViewPos + Buffer->TextRect.h - CharHeight)
         {
-            ViewPos = CursorRect.y - Buffer->TextRect.h + CharHeight;
+            TargetViewPos = CursorRect.y - Buffer->TextRect.h + CharHeight;
         }
     }
     else
     { // Adjust based on view
-        if(CursorRect.y < ViewPos)
+        if(CursorRect.y < TargetViewPos)
         {
             // adjust cursor pos to new rect?
-            Buffer->CursorPos.l = PosToLine(ProgramState, Buffer, ViewPos) + 3;
+            Buffer->CursorPos.l = PosToLine(ProgramState, Buffer, TargetViewPos) + 3;
         }
-        else if(CursorRect.y > ViewPos + Buffer->TextRect.h - CharHeight)
+        else if(CursorRect.y > TargetViewPos + Buffer->TextRect.h - CharHeight)
         {
             Buffer->CursorPos.l = PosToLine(ProgramState, Buffer, 
-                                            ViewPos + Buffer->TextRect.h) - 4;
+                                            TargetViewPos + Buffer->TextRect.h) - 4;
         }
     }
     
-    Buffer->ViewPos = ViewPos;
+    Buffer->TargetViewPos = TargetViewPos;
     
     // TODO: adjust either cursor or view depending on which the user moved
     
-    Clamp(Buffer->ViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
+    Clamp(Buffer->TargetViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
     Clamp(Buffer->CursorPos.l, 0, Buffer->Lines.Count-1);
     Clamp(Buffer->CursorPos.c, 0, LineLength(Buffer, Buffer->CursorPos.l));
 }
@@ -336,14 +337,15 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
             rect Rect = RectAt(Buffer, l, c);
             Rect.y -= Buffer->ViewPos;
             
-            //DrawRectangleRec(Rect, GRAY);
+            //DrawRectangleLinesEx(R(Rect), 1, GRAY);
             DrawTextEx(ProgramState->FontSDF, CharBuffer, V2(Rect.x, Rect.y), FontSize, 0, BLACK);
         }
     }
     EndShaderMode();
     
     
-    DrawRectangleLinesEx(R(Buffer->TextRect), 3, PURPLE);
+    //DrawRectangleLinesEx(R(Buffer->TextRect), 3, PURPLE);
+    int ViewPos = Buffer->ViewPos;
 }
 
 extern "C"
@@ -576,7 +578,8 @@ extern "C"
         
         
         Buffer->CursorTargetRect = RectAt(Buffer, Buffer->CursorPos.l, Buffer->CursorPos.c);
-        Buffer->CursorRect = InterpolateRect(Buffer->CursorRect, Buffer->CursorTargetRect, 0.5f);
+        Buffer->CursorRect = Interpolate(Buffer->CursorRect, Buffer->CursorTargetRect, 0.5f);
+        Buffer->ViewPos = Interpolate(Buffer->ViewPos, Buffer->TargetViewPos, 0.4f);
         
         
         BeginDrawing();

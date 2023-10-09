@@ -26,7 +26,10 @@ DONE have view and cursor movement work nicely together
 
 DONE SMOOTH CURSOR MOVEMENT!!!!
 
-Current goal: better cursor movement with keys
+DONE better cursor movement with keys
+DONE smooth view movement
+
+Current goal: simple editing with cursor
 
 
 

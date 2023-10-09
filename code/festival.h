@@ -45,6 +45,7 @@ struct buffer
     rect TextRect;
     
     int ViewPos;
+    int TargetViewPos;
     
     buffer_pos CursorPos;
     int IdealCursorChar;
