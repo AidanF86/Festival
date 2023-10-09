@@ -24,6 +24,9 @@ DONE cursor that follows view (and view follows it)
 DONE have view and cursor movement work nicely together
 	sub: change the system to make it more reliable (int rects) and easier to work with (easy view->bufferpos conversion)
 
+DONE SMOOTH CURSOR MOVEMENT!!!!
+
+Current goal: better cursor movement with keys
 
 
 

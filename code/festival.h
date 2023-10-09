@@ -46,8 +46,11 @@ struct buffer
     
     int ViewPos;
     
-    rect CursorRect;
     buffer_pos CursorPos;
+    int IdealCursorChar;
+    
+    rect CursorRect;
+    rect CursorTargetRect;
     
     string_list Lines;
     

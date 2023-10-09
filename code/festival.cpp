@@ -301,6 +301,7 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     //printf("%d\n", Buffer->LineDataList.Count);
     
     { // Draw cursor
+#if 0
         rect CursorRect;
         if(Buffer->CursorPos.c < LineLength(Buffer, Buffer->CursorPos.l))
         { // use a char rect
@@ -312,7 +313,8 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
             CursorRect = GetLineData(Buffer, Buffer->CursorPos.l).EndLineRect;
             CursorRect.y -= Buffer->ViewPos;
         }
-        DrawRectangleRec(R(CursorRect), RED);
+#endif
+        DrawRectangleRec(R(Buffer->CursorRect - V2(0, Buffer->ViewPos)), RED);
     }
     
     // Draw text
@@ -433,6 +435,7 @@ extern "C"
             Buffer->ViewPos = 0;
             Buffer->LineDataList = {0};
             Buffer->CursorPos = BufferPos(0, 0);
+            Buffer->IdealCursorChar = 0;
             
             
             ProgramState->ScreenHeight = Memory->WindowHeight;
@@ -486,10 +489,20 @@ extern "C"
             //NewCursorPos.l += IsKeyPressed(KEY_DOWN) - IsKeyPressed(KEY_UP);
             //NewCursorPos.c += IsKeyPressed(KEY_RIGHT) - IsKeyPressed(KEY_LEFT);
             NewCursorPos.l += IsKeyDown(KEY_DOWN) - IsKeyDown(KEY_UP);
-            NewCursorPos.c += IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT);
+            
+            int DeltaC = IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT);
+            if(DeltaC != 0)
+                Buffer->IdealCursorChar = NewCursorPos.c;
+            NewCursorPos.c += DeltaC;
             
             Clamp(NewCursorPos.l, 0, Buffer->Lines.Count-1);
             Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
+            
+            if(NewCursorPos.l != Buffer->CursorPos.l)
+                NewCursorPos.c = Buffer->IdealCursorChar;
+            
+            Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
+            
             
             ProgramState->UserMovedView = false;
             ProgramState->UserMovedCursor = false;
@@ -510,6 +523,10 @@ extern "C"
         ComputeBufferRects(ProgramState, Buffer);
         AdjustView(ProgramState, Buffer);
         FillLineData(Buffer, ProgramState);
+        
+        
+        Buffer->CursorTargetRect = RectAt(Buffer, Buffer->CursorPos.l, Buffer->CursorPos.c);
+        Buffer->CursorRect = InterpolateRect(Buffer->CursorRect, Buffer->CursorTargetRect, 0.5f);
         
         
         BeginDrawing();

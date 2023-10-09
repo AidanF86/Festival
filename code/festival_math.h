@@ -69,7 +69,8 @@ operator+(rect R, v2 V)
 inline rect
 operator-(rect R, v2 V)
 {
-    return R-V;
+    rect Result = {R.x - (int)V.x, R.y - (int)V.y, R.w, R.h};
+    return Result;
 }
 inline rect &
 operator+=(rect &R, v2 V)
@@ -77,7 +78,6 @@ operator+=(rect &R, v2 V)
     R = R + V;
     return R;
 }
-
 inline rect
 operator*(rect R, f32 Scalar)
 {
@@ -86,6 +86,35 @@ operator*(rect R, f32 Scalar)
     Result.y *= Scalar;
     Result.w *= Scalar;
     Result.h *= Scalar;
+    return Result;
+}
+inline rect
+operator+(rect A, rect B)
+{
+    rect Result = {A.x+B.x, A.y+B.y, A.w+B.w, A.h+B.h};
+    return Result;
+}
+inline rect
+operator-(rect A, rect B)
+{
+    rect Result = {A.x-B.x, A.y-B.y, A.w-B.w, A.h-B.h};
+    return Result;
+}
+inline rect &
+operator+=(rect &R, rect B)
+{
+    R = R + B;
+    return R;
+}
+inline rect
+InterpolateRect(rect R, rect Target, f32 Speed)
+{
+    rect Result = R;
+    if(Speed >= 1)
+        return Target;
+    
+    Result += (Target - R)*Speed;
+    
     return Result;
 }
 
