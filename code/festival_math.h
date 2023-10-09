@@ -63,14 +63,13 @@ operator>(v2 A, v2 B)
 inline rect
 operator+(rect R, v2 V)
 {
-    rect Result = {R.x + V.x, R.y + V.y, R.width, R.height};
+    rect Result = {R.x + (int)V.x, R.y + (int)V.y, R.w, R.h};
     return Result;
 }
 inline rect
 operator-(rect R, v2 V)
 {
-    rect Result = {R.x - V.x, R.y - V.y, R.width, R.height};
-    return Result;
+    return R-V;
 }
 inline rect &
 operator+=(rect &R, v2 V)
@@ -85,8 +84,8 @@ operator*(rect R, f32 Scalar)
     rect Result = R;
     Result.x *= Scalar;
     Result.y *= Scalar;
-    Result.width *= Scalar;
-    Result.height *= Scalar;
+    Result.w *= Scalar;
+    Result.h *= Scalar;
     return Result;
 }
 
@@ -122,13 +121,13 @@ v3 V3(f32 x, f32 y, f32 z)
 }
 
 inline rect
-Rect(f32 x, f32 y, f32 w, f32 h)
+Rect(int x, int y, int w, int h)
 {
     rect Result;
     Result.x = x;
     Result.y = y;
-    Result.width = w;
-    Result.height = h;
+    Result.w = w;
+    Result.h = h;
     return Result;
 }
 

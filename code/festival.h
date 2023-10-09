@@ -17,23 +17,25 @@ typedef struct rect_list
     inline const rect& operator[](size_t Index) const { return Data[Index]; }
 } rect_list;
 
-struct line_rect_data
+struct line_data
 {
     rect_list CharRects;
-    rect LineRect;
+    // TODO: merge EndLineRect into CharRects?
     rect EndLineRect;
+    rect LineRect;
+    
     int DisplayLines;
 };
 
-typedef struct line_rect_data_list
+typedef struct line_data_list
 {
     b32 IsAllocated;
     int Count;
     int ArraySize;
-    line_rect_data *Data;
-    inline line_rect_data& operator[](size_t Index) { return Data[Index]; }
-    inline const line_rect_data& operator[](size_t Index) const { return Data[Index]; }
-} line_rect_data_list;
+    line_data *Data;
+    inline line_data& operator[](size_t Index) { return Data[Index]; }
+    inline const line_data& operator[](size_t Index) const { return Data[Index]; }
+} line_data_list;
 
 struct buffer
 {
@@ -44,13 +46,14 @@ struct buffer
     
     int ViewPos;
     
+    rect CursorRect;
     buffer_pos CursorPos;
     
     string_list Lines;
     
-    //int LineRectDataStart; // line start index
+    //int LineDataStart; // line start index
     // Make a list of this!
-    line_rect_data_list LineRectDataList;
+    line_data_list LineDataList;
 };
 
 #define MAX_BUFFERS 30

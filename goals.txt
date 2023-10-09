@@ -17,9 +17,14 @@ DONE wrapping around an arbitrary length and scrolling that lets you be on part 
 	sub: line numbers
 	sub: float viewpos
 
-DONE Current goal: cursor that follows view (and view follows it)
+DONE cursor that follows view (and view follows it)
 	sub: buffer_pos, convert to draw pos, draw rect storing (chars and lines)
 	sub: switch to view rect and only render what's needed
+
+DONE have view and cursor movement work nicely together
+	sub: change the system to make it more reliable (int rects) and easier to work with (easy view->bufferpos conversion)
+
+
 
 
 INFO

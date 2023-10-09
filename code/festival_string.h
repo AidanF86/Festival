@@ -74,7 +74,7 @@ String(int *Contents)
     return Result;
 }
 
-char StringFormatBuffer[512];
+char StringFormatBuffer[1024];
 char StringVarBuffer[128];
 string
 _String(const char *Format, va_list Args)
@@ -122,6 +122,12 @@ _String(const char *Format, va_list Args)
                     case 'r':
                     {
                         rect Var = va_arg(Args, rect);
+                        sprintf(StringVarBuffer, "(%d, %d, %d, %d)",
+                                Var.x, Var.y, Var.w, Var.h);
+                    }
+                    case 'R':
+                    {
+                        Rectangle Var = va_arg(Args, Rectangle);
                         sprintf(StringVarBuffer, "(%.3f, %.3f, %.3f, %.3f)",
                                 Var.x, Var.y, Var.width, Var.height);
                     }

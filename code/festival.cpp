@@ -2,11 +2,21 @@
 
 #include "raylib.h"
 
+#include "festival_platform.h"
+
 typedef Vector2 v2;
 typedef Vector3 v3;
-typedef Rectangle rect;
+struct rect
+{
+    int x, y, w, h;
+};
+Rectangle
+R(rect a)
+{
+    Rectangle Result = {(f32)a.x, (f32)a.y, (f32)a.w, (f32)a.h};
+    return Result;
+}
 
-#include "festival_platform.h"
 #include "festival_math.h"
 #include "festival_string.h"
 #include "festival.h"
@@ -24,9 +34,9 @@ GetNanoseconds() {
 }
 
 
-line_rect_data
-LineRectData() {
-    line_rect_data Result = {0};
+line_data
+LineData() {
+    line_data Result = {0};
     Result.CharRects = RectList();
     return Result;
 };
@@ -44,20 +54,20 @@ RectAt(buffer *Buffer, int l, int c)
 {
 #if 0
     // TODO: narrow this down, set upper bounds on rect generation & text rendering
-    if(l < Buffer->LineRectDataStart || l >= Buffer->LineRectDataStart + Buffer->LineRectDataList.Count ||
+    if(l < Buffer->LineDataStart || l >= Buffer->LineDataStart + Buffer->LineDataList.Count ||
        c < 0 || c >= LineLength(Buffer, l))
         return {0};
-    rect Result = Buffer->LineRectDataList.Data[l - Buffer->LineRectDataStart].CharRects.Data[c];
+    rect Result = Buffer->LineDataList.Data[l - Buffer->LineDataStart].CharRects.Data[c];
     if(Result.x == 0)
     {
         printf("%d, %d\n", l, c);
-        printf("Effective: %d\n", l - Buffer->LineRectDataStart);
+        printf("Effective: %d\n", l - Buffer->LineDataStart);
     }
     return Result;
 #endif
     if(c == LineLength(Buffer, l))
-        return Buffer->LineRectDataList.Data[l].EndLineRect;
-    return Buffer->LineRectDataList.Data[l].CharRects.Data[c];
+        return Buffer->LineDataList.Data[l].EndLineRect;
+    return Buffer->LineDataList.Data[l].CharRects.Data[c];
     
 }
 
@@ -67,7 +77,7 @@ LineRect(buffer *Buffer, int l)
     // TODO: narrow this down, set upper bounds on rect generation & text rendering
     if(l < 0 || l >= Buffer->Lines.Count)
         return {0};
-    return Buffer->LineRectDataList.Data[l].LineRect;
+    return Buffer->LineDataList.Data[l].LineRect;
 }
 
 char
@@ -79,15 +89,15 @@ CharAt(buffer *Buffer, int l, int c)
     return Buffer->Lines[l].Data[c];
 }
 
-line_rect_data
-GetLineRectData(buffer *Buffer, int l)
+line_data
+GetLineData(buffer *Buffer, int l)
 {
     if(l < 0 || l >= Buffer->Lines.Count)
     {
-        printf("GetLineRectData: Out of bounds!\n");
+        printf("GetLineData: Out of bounds!\n");
         return {0};
     }
-    return Buffer->LineRectDataList.Data[l];
+    return Buffer->LineDataList.Data[l];
 }
 
 void
@@ -105,7 +115,43 @@ ComputeBufferRects(program_state *ProgramState, buffer *Buffer)
     f32 x = NumbersWidth*CharWidth + MarginLeft;
     f32 y = 0;
     Buffer->TextRect = Rect(x, y,
-                            Buffer->Rect.width - x, Buffer->Rect.height - y);
+                            Buffer->Rect.w - x, Buffer->Rect.h - y);
+}
+
+#if 0
+int
+GetBufferPosCol(buffer_pos Pos)
+{
+}
+#endif
+
+int
+PosToLine(program_state *ProgramState, buffer *Buffer, int Pos)
+{
+    v2 FontDim = MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0);
+    int CharWidth = FontDim.x;
+    int CharHeight = FontDim.y;
+    
+    int l;
+    int PrevLinePos = GetLineData(Buffer, 0).LineRect.y;
+    for(l = 1; l < Buffer->Lines.Count; l++)
+    {
+        line_data LineData = GetLineData(Buffer, l);
+        int LinePos = LineData.LineRect.y;
+        
+        if(LinePos > Pos)
+        {
+            l;
+            break;
+        }
+    }
+    
+    if(l >= Buffer->Lines.Count)
+        return Buffer->Lines.Count-1;
+    
+    return l;
+    
+    //return {0};
 }
 
 void
@@ -119,30 +165,49 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
     
     rect CursorRect = RectAt(Buffer, CursorPos.l, CursorPos.c);
     //printf("cursor rect: %f, %f\n", CursorRect.x, CursorRect.y);
-    if((int)CursorRect.y < ViewPos)
-    {
-        printf("Adjusting up from %d to %d\n", ViewPos, (int)CursorRect.y);
-        printf("cursor at %d, %d\n", CursorPos.l, CursorPos.c);
-        printf("cursor rect: %f, %f\n", CursorRect.x, CursorRect.y);
-        printf("%d\n", CursorPos.l);
-        ViewPos = CursorRect.y;
+    
+    if(ProgramState->UserMovedCursor)
+    { // Adjust based on cursor
+        if(CursorRect.y < ViewPos)
+        {
+            printf("Adjusting up from %d to %d\n", ViewPos, CursorRect.y);
+            printf("cursor at %d, %d\n", CursorPos.l, CursorPos.c);
+            printf("cursor rect: %f, %f\n", CursorRect.x, CursorRect.y);
+            printf("%d\n", CursorPos.l);
+            ViewPos = CursorRect.y;
+        }
+        else if(CursorRect.y > ViewPos + Buffer->TextRect.h - CharHeight)
+        {
+            ViewPos = CursorRect.y - Buffer->TextRect.h + CharHeight;
+        }
     }
-    else if((int)CursorRect.y > ViewPos + Buffer->TextRect.height - CharHeight)
-    {
-        ViewPos = CursorRect.y - Buffer->TextRect.height + CharHeight;
+    else
+    { // Adjust based on view
+        if(CursorRect.y < ViewPos)
+        {
+            // adjust cursor pos to new rect?
+            Buffer->CursorPos.l = PosToLine(ProgramState, Buffer, ViewPos) + 3;
+        }
+        else if(CursorRect.y > ViewPos + Buffer->TextRect.h - CharHeight)
+        {
+            Buffer->CursorPos.l = PosToLine(ProgramState, Buffer, 
+                                            ViewPos + Buffer->TextRect.h) - 4;
+        }
     }
     
     Buffer->ViewPos = ViewPos;
     
     // TODO: adjust either cursor or view depending on which the user moved
     
-    //Clamp(Buffer->ViewPos
+    Clamp(Buffer->ViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
+    Clamp(Buffer->CursorPos.l, 0, Buffer->Lines.Count-1);
+    Clamp(Buffer->CursorPos.c, 0, LineLength(Buffer, Buffer->CursorPos.l));
 }
 
 void
-FillLineRectData(buffer *Buffer, program_state *ProgramState)
+FillLineData(buffer *Buffer, program_state *ProgramState)
 {
-    line_rect_data_list *DataList = &Buffer->LineRectDataList;
+    line_data_list *DataList = &Buffer->LineDataList;
     
     int MarginLeft = ProgramState->MarginLeft;
     int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
@@ -152,7 +217,7 @@ FillLineRectData(buffer *Buffer, program_state *ProgramState)
     int CharWidth = FontDim.x;
     int CharHeight = FontDim.y;
     // TODO(cheryl): formalize char-exclusion-zone
-    int WrapPoint = Buffer->TextRect.x + Buffer->TextRect.width - CharWidth;
+    int WrapPoint = Buffer->TextRect.x + Buffer->TextRect.w - CharWidth;
     
     // DeAllocation
     if(DataList->IsAllocated);
@@ -173,26 +238,22 @@ FillLineRectData(buffer *Buffer, program_state *ProgramState)
         ListFree(DataList);
     }
     // Allocation
-    *DataList = LineRectDataList();
+    *DataList = LineDataList();
     
     
-    //int StartLine = Buffer->ViewPos;
-    //Buffer->LineRectDataStart = StartLine;
-    int y = 0;//*CharHeight;
+    int y = 0;
     
     for(int i = 0; i < Buffer->Lines.Count; i++)
     {
-        //if(y >= Buffer->TextRect.y + Buffer->TextRect.height){ break; }
+        ListAdd(DataList, LineData());
         
-        ListAdd(DataList, LineRectData());
-        
-        line_rect_data *RectData = &(DataList->Data[i]);
+        line_data *RectData = &(DataList->Data[i]);
         string *Line = &Buffer->Lines.Data[i];
         int x = Buffer->TextRect.x;
         
         RectData->LineRect.x = x;
         RectData->LineRect.y = y;
-        RectData->LineRect.width = Buffer->TextRect.width;
+        RectData->LineRect.w = Buffer->TextRect.w;
         RectData->DisplayLines = 1;
         
         for(int a = 0; a < Line->Length; a++)
@@ -215,7 +276,7 @@ FillLineRectData(buffer *Buffer, program_state *ProgramState)
         
         y += CharHeight;
         
-        RectData->LineRect.height = RectData->DisplayLines * CharHeight;
+        RectData->LineRect.h = RectData->DisplayLines * CharHeight;
     }
 }
 
@@ -237,7 +298,7 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     BeginShaderMode(ProgramState->ShaderSDF);
     
     
-    //printf("%d\n", Buffer->LineRectDataList.Count);
+    //printf("%d\n", Buffer->LineDataList.Count);
     
     { // Draw cursor
         rect CursorRect;
@@ -248,28 +309,28 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
         }
         else
         { // use end-of-line rect
-            CursorRect = GetLineRectData(Buffer, Buffer->CursorPos.l).EndLineRect;
+            CursorRect = GetLineData(Buffer, Buffer->CursorPos.l).EndLineRect;
             CursorRect.y -= Buffer->ViewPos;
         }
-        DrawRectangleRec(CursorRect, RED);
+        DrawRectangleRec(R(CursorRect), RED);
     }
     
     // Draw text
-    for(int l = 0; l < Buffer->LineRectDataList.Count; l++)
+    for(int l = 0; l < Buffer->LineDataList.Count; l++)
     {
         char NumberBuffer[6];
         sprintf(NumberBuffer, "%d", l);
         
         DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), FontSize, 0, GRAY);
         
-        line_rect_data LineRectData = GetLineRectData(Buffer, l);
+        line_data LineData = GetLineData(Buffer, l);
         
-        int LineY = LineRectData.LineRect.y;
-        if(LineY - Buffer->ViewPos > Buffer->TextRect.y + Buffer->TextRect.height) break;
+        int LineY = LineData.LineRect.y;
+        if(LineY - Buffer->ViewPos > Buffer->TextRect.y + Buffer->TextRect.h) break;
         
-        //DrawRectangleLinesEx(LineRectData.EndLineRect, 1, ORANGE);
+        //DrawRectangleLinesEx(LineData.EndLineRect, 1, ORANGE);
         
-        for(int c = 0; c < LineRectData.CharRects.Count; c++)
+        for(int c = 0; c < LineData.CharRects.Count; c++)
         {
             char CharBuffer[2] = {CharAt(Buffer, l, c), 0};
             if(CharBuffer[0] == 0 && l == 9) CharBuffer[0] = '|';
@@ -284,7 +345,7 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     EndShaderMode();
     
     
-    DrawRectangleLinesEx(Buffer->TextRect, 3, PURPLE);
+    DrawRectangleLinesEx(R(Buffer->TextRect), 3, PURPLE);
 }
 
 extern "C"
@@ -370,7 +431,7 @@ extern "C"
             ProgramState->MarginLeft = 10;
             ProgramState->NumbersWidth = 4;
             Buffer->ViewPos = 0;
-            Buffer->LineRectDataList = {0};
+            Buffer->LineDataList = {0};
             Buffer->CursorPos = BufferPos(0, 0);
             
             
@@ -379,7 +440,7 @@ extern "C"
             
             
             ComputeBufferRects(ProgramState, Buffer);
-            FillLineRectData(Buffer, ProgramState);
+            FillLineData(Buffer, ProgramState);
         }
         
         
@@ -401,7 +462,7 @@ extern "C"
         }
         
         // TODO: this probably doesn't account for a rect with x>0
-        Clamp(Buffer->TextRect.width, CharWidth, Buffer->Rect.width - Buffer->TextRect.x);
+        Clamp(Buffer->TextRect.w, CharWidth, Buffer->Rect.w - Buffer->TextRect.x);
         
         if(IsAnyControlKeyDown)
         {
@@ -418,16 +479,16 @@ extern "C"
             
             NewViewPos -= GetMouseWheelMove()*20;
             
-            Clamp(NewViewPos, 0, Buffer->LineRectDataList[Buffer->Lines.Count-1].EndLineRect.y);
+            Clamp(NewViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
+            printf("%d\n", Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
+            printf("Pos: %d\n", NewViewPos);
             
-#if 0
-            NewCursorPos.l += IsKeyDown(KEY_DOWN) - IsKeyDown(KEY_UP);
-#else
-            NewCursorPos.l += IsKeyPressed(KEY_DOWN) - IsKeyPressed(KEY_UP);
+            //NewCursorPos.l += IsKeyPressed(KEY_DOWN) - IsKeyPressed(KEY_UP);
             //NewCursorPos.c += IsKeyPressed(KEY_RIGHT) - IsKeyPressed(KEY_LEFT);
+            NewCursorPos.l += IsKeyDown(KEY_DOWN) - IsKeyDown(KEY_UP);
             NewCursorPos.c += IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT);
-#endif
-            Clamp(NewCursorPos.l, 0, Buffer->Lines.Count);
+            
+            Clamp(NewCursorPos.l, 0, Buffer->Lines.Count-1);
             Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
             
             ProgramState->UserMovedView = false;
@@ -448,7 +509,7 @@ extern "C"
         
         ComputeBufferRects(ProgramState, Buffer);
         AdjustView(ProgramState, Buffer);
-        FillLineRectData(Buffer, ProgramState);
+        FillLineData(Buffer, ProgramState);
         
         
         BeginDrawing();
