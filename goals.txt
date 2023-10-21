@@ -29,8 +29,11 @@ DONE SMOOTH CURSOR MOVEMENT!!!!
 DONE better cursor movement with keys
 DONE smooth view movement
 
-Current goal: simple editing with cursor
+DONE simple editing with cursor
+DONE Current goal: move up and down in wrapped lines
 
+more chars, backspace, enter
+investigate char entering free bug
 
 
 INFO
@@ -75,3 +78,4 @@ Watchlist-warranting
 Interactive chatbot w/ face that helps with stuff (integrate cheat.sh?) and shows emotions. Cute mascot?!?
 It could have its own buffer and a little pop-up interface?
 Could be displayed with ascii art, as that would go well with the text editor vibe
+Look into integrating cheat.sh

@@ -5,6 +5,21 @@
 
 #include "math.h"
 
+typedef Vector2 v2;
+typedef Vector3 v3;
+struct rect
+{
+    int x, y, w, h;
+};
+Rectangle
+R(rect a)
+{
+    Rectangle Result = {(f32)a.x, (f32)a.y, (f32)a.w, (f32)a.h};
+    return Result;
+}
+
+
+
 inline v2
 operator+(v2 A, v2 B)
 {

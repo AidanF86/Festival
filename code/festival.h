@@ -48,15 +48,13 @@ struct buffer
     int TargetViewPos;
     
     buffer_pos CursorPos;
-    int IdealCursorChar;
+    int IdealCursorCol;
     
     rect CursorRect;
     rect CursorTargetRect;
     
     string_list Lines;
     
-    //int LineDataStart; // line start index
-    // Make a list of this!
     line_data_list LineDataList;
 };
 
@@ -79,14 +77,62 @@ struct program_state
     
     union
     {
-        struct
+        union
         {
-            key_data LeftKey;
-            key_data RightKey;
-            key_data UpKey;
-            key_data DownKey;
+            struct
+            {
+                key_data LeftKey;
+                key_data RightKey;
+                key_data UpKey;
+                key_data DownKey;
+                
+                key_data AKey;
+                key_data BKey;
+                key_data CKey;
+                key_data DKey;
+                key_data EKey;
+                key_data FKey;
+                key_data GKey;
+                key_data HKey;
+                key_data IKey;
+                key_data JKey;
+                key_data KKey;
+                key_data LKey;
+                key_data MKey;
+                key_data NKey;
+                key_data OKey;
+                key_data PKey;
+                key_data QKey;
+                key_data RKey;
+                key_data SKey;
+                key_data TKey;
+                key_data UKey;
+                key_data VKey;
+                key_data WKey;
+                key_data XKey;
+                key_data YKey;
+                key_data ZKey;
+                
+                key_data Number1Key;
+                key_data Number2Key;
+                key_data Number3Key;
+                key_data Number4Key;
+                key_data Number5Key;
+                key_data Number6Key;
+                key_data Number7Key;
+                key_data Number8Key;
+                key_data Number9Key;
+                key_data Number0Key;
+                //key_data _Key;
+            };
+            struct
+            {
+                key_data ArrowKeys[4];
+                key_data LetterKeys[26];
+                key_data NumberKeys[10];
+            };
         };
-        key_data KeyData[4];
+        key_data KeyData[4+26+10];
     };
     
     Font FontMain;

@@ -4,19 +4,6 @@
 
 #include "festival_platform.h"
 
-typedef Vector2 v2;
-typedef Vector3 v3;
-struct rect
-{
-    int x, y, w, h;
-};
-Rectangle
-R(rect a)
-{
-    Rectangle Result = {(f32)a.x, (f32)a.y, (f32)a.w, (f32)a.h};
-    return Result;
-}
-
 #include "festival_math.h"
 #include "festival_string.h"
 #include "festival.h"
@@ -52,24 +39,13 @@ LineLength(buffer *Buffer, int l)
 rect
 RectAt(buffer *Buffer, int l, int c)
 {
-#if 0
-    // TODO: narrow this down, set upper bounds on rect generation & text rendering
-    if(l < Buffer->LineDataStart || l >= Buffer->LineDataStart + Buffer->LineDataList.Count ||
-       c < 0 || c >= LineLength(Buffer, l))
-        return {0};
-    rect Result = Buffer->LineDataList.Data[l - Buffer->LineDataStart].CharRects.Data[c];
-    if(Result.x == 0)
-    {
-        printf("%d, %d\n", l, c);
-        printf("Effective: %d\n", l - Buffer->LineDataStart);
-    }
-    return Result;
-#endif
     if(c == LineLength(Buffer, l))
         return Buffer->LineDataList.Data[l].EndLineRect;
     return Buffer->LineDataList.Data[l].CharRects.Data[c];
     
 }
+
+rect RectAt(buffer *Buffer, buffer_pos Pos) { return RectAt(Buffer, Pos.l, Pos.c); }
 
 rect
 LineRect(buffer *Buffer, int l)
@@ -119,29 +95,53 @@ ComputeBufferRects(program_state *ProgramState, buffer *Buffer)
 }
 
 #if 0
-int
-GetBufferPosCol(buffer_pos Pos)
+buffer_pos
+ClosestBufferPos(buffer *Buffer, rect Rect)
 {
+    buffer_pos ClosestPos = Buffer->CursorPos;
+    rect ClosestRect = RectAt(Buffer, Buffer->CursorPos);
+    
+    for(int l = Buffer->CursorPos.l; l >= Buffer->CursorPos.l - 1; l--)
+    {
+        for(int c = 0; c < Buffer->Lines[l].Length; c++)
+        {
+            rect TestRect = RectAt(Buffer, l, c);
+            rect Diff = TestRect - Rect;
+            rect CompareDiff = ClosestRect - Rect;
+            if(abs(Diff.y) < CompareDiff.y ||
+               (
+                !(abs(Diff.y) > abs(CompareDiff.y)) && abs(Diff.x) < abs(CompareDiff.x)
+                ))
+            {
+                ClosestRect = TestRect;
+                ClosestPos = BufferPos(l, c);
+            }
+        }
+    }
+    return ClosestPos;
 }
 #endif
 
 int
-PosToLine(program_state *ProgramState, buffer *Buffer, int Pos)
+PosToLine(buffer *Buffer, int Pos)
 {
+#if 0
     v2 FontDim = MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0);
     int CharWidth = FontDim.x;
     int CharHeight = FontDim.y;
+#endif
     
     int l;
     int PrevLinePos = GetLineData(Buffer, 0).LineRect.y;
-    for(l = 1; l < Buffer->Lines.Count; l++)
+    for(l = 0; l < Buffer->Lines.Count; l++)
     {
         line_data LineData = GetLineData(Buffer, l);
         int LinePos = LineData.LineRect.y;
         
         if(LinePos > Pos)
         {
-            l;
+            if(l > 0)
+                l--;
             break;
         }
     }
@@ -152,6 +152,50 @@ PosToLine(program_state *ProgramState, buffer *Buffer, int Pos)
     return l;
     
     //return {0};
+}
+
+int
+ColAt(program_state *ProgramState, buffer *Buffer, buffer_pos P)
+{
+    int Col = 0;
+    int PrevY = RectAt(Buffer, BufferPos(P.l, 0)).y;
+    
+    for(int c = 1; c < Buffer->Lines[P.l].Length && c <= P.c; c++)
+    {
+        Col++;
+        if(RectAt(Buffer, BufferPos(P.l, c)).y > PrevY)
+        {
+            Col = ProgramState->SubLineOffset;
+        }
+        PrevY = RectAt(Buffer, BufferPos(P.l, c)).y;
+    }
+    
+    return Col;
+}
+
+buffer_pos
+ClosestBufferPos(buffer *Buffer, rect Rect)
+{
+    int l = PosToLine(Buffer, Rect.y);
+    
+    buffer_pos ClosestPos = BufferPos(l, 0);
+    rect ClosestRect = RectAt(Buffer, Buffer->CursorPos);
+    
+    for(int c = 0; c < Buffer->Lines[l].Length; c++)
+    {
+        rect TestRect = RectAt(Buffer, l, c);
+        rect Diff = TestRect - Rect;
+        rect CompareDiff = ClosestRect - Rect;
+        if(abs(Diff.y) < abs(CompareDiff.y) ||
+           (
+            !(abs(Diff.y) > abs(CompareDiff.y)) && abs(Diff.x) < abs(CompareDiff.x)
+            ))
+        {
+            ClosestRect = TestRect;
+            ClosestPos = BufferPos(l, c);
+        }
+    }
+    return ClosestPos;
 }
 
 void
@@ -166,6 +210,7 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
     
     rect CursorRect = RectAt(Buffer, CursorPos.l, CursorPos.c);
     //printf("cursor rect: %f, %f\n", CursorRect.x, CursorRect.y);
+    b32 MovedCursorUpOrDown = false;
     
     if(ProgramState->UserMovedCursor)
     { // Adjust based on cursor
@@ -183,22 +228,33 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
         if(CursorRect.y < TargetViewPos)
         {
             // adjust cursor pos to new rect?
-            Buffer->CursorPos.l = PosToLine(ProgramState, Buffer, TargetViewPos) + 3;
+            Buffer->CursorPos.l = PosToLine(Buffer, TargetViewPos) + 3;
+            MovedCursorUpOrDown = true;
         }
         else if(CursorRect.y > TargetViewPos + Buffer->TextRect.h - CharHeight)
         {
-            Buffer->CursorPos.l = PosToLine(ProgramState, Buffer, 
+            Buffer->CursorPos.l = PosToLine(Buffer, 
                                             TargetViewPos + Buffer->TextRect.h) - 4;
+            MovedCursorUpOrDown = true;
         }
     }
     
     Buffer->TargetViewPos = TargetViewPos;
     
-    // TODO: adjust either cursor or view depending on which the user moved
-    
     Clamp(Buffer->TargetViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
     Clamp(Buffer->CursorPos.l, 0, Buffer->Lines.Count-1);
     Clamp(Buffer->CursorPos.c, 0, LineLength(Buffer, Buffer->CursorPos.l));
+    
+    
+    if(MovedCursorUpOrDown && ColAt(ProgramState, Buffer, Buffer->CursorPos) < Buffer->IdealCursorCol)
+    {
+        int Diff = Buffer->IdealCursorCol - ColAt(ProgramState, Buffer, Buffer->CursorPos);
+        int DistToEnd = Buffer->Lines[Buffer->CursorPos.l].Length - Buffer->CursorPos.c;
+        if(Diff > DistToEnd)
+            Diff = DistToEnd;
+        Buffer->CursorPos.c += Diff;
+    }
+    
 }
 
 void
@@ -257,7 +313,7 @@ FillLineData(buffer *Buffer, program_state *ProgramState)
         {
             if(x+CharWidth >= WrapPoint)
             {
-                x = Buffer->TextRect.x + SubLineOffset;
+                x = Buffer->TextRect.x + SubLineOffset*CharWidth;
                 y += CharHeight;
                 RectData->DisplayLines++;
             }
@@ -289,28 +345,12 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     int CharHeight = CharDim.y;
     
     
-    
     DrawRectangle(0, 0, 4*CharWidth, ProgramState->ScreenHeight, LIGHTGRAY);
     
     BeginShaderMode(ProgramState->ShaderSDF);
     
     
-    //printf("%d\n", Buffer->LineDataList.Count);
-    
     { // Draw cursor
-#if 0
-        rect CursorRect;
-        if(Buffer->CursorPos.c < LineLength(Buffer, Buffer->CursorPos.l))
-        { // use a char rect
-            CursorRect = RectAt(Buffer, Buffer->CursorPos.l, Buffer->CursorPos.c);
-            CursorRect.y -= Buffer->ViewPos;
-        }
-        else
-        { // use end-of-line rect
-            CursorRect = GetLineData(Buffer, Buffer->CursorPos.l).EndLineRect;
-            CursorRect.y -= Buffer->ViewPos;
-        }
-#endif
         DrawRectangleRec(R(Buffer->CursorRect - V2(0, Buffer->ViewPos)), RED);
     }
     
@@ -382,13 +422,11 @@ extern "C"
                 {
                 }
                 
-                printf("Adding line %d, size %d\n", Buffer->Lines.Count, i-LineStart);
                 ListAdd(&(Buffer->Lines), AllocString(i-LineStart));
                 
                 int InLine = 0;
                 for(int a = LineStart; a < i; a++)
                 {
-                    printf("char #%d\n", a-LineStart);
                     Buffer->Lines[Buffer->Lines.Count-1].Data[InLine] = FileData[a];
                     InLine++;
                 }
@@ -437,17 +475,43 @@ extern "C"
             ProgramState->UpKey.KeyCode = KEY_UP;
             ProgramState->DownKey.KeyCode = KEY_DOWN;
             //ProgramState->Key.KeyCode = KEY_;
+            ProgramState->AKey.KeyCode = KEY_A;
+            ProgramState->BKey.KeyCode = KEY_B;
+            ProgramState->CKey.KeyCode = KEY_C;
+            ProgramState->DKey.KeyCode = KEY_D;
+            ProgramState->EKey.KeyCode = KEY_E;
+            ProgramState->FKey.KeyCode = KEY_F;
+            ProgramState->GKey.KeyCode = KEY_G;
+            ProgramState->HKey.KeyCode = KEY_H;
+            ProgramState->IKey.KeyCode = KEY_I;
+            ProgramState->JKey.KeyCode = KEY_J;
+            ProgramState->KKey.KeyCode = KEY_K;
+            ProgramState->LKey.KeyCode = KEY_L;
+            ProgramState->MKey.KeyCode = KEY_M;
+            ProgramState->NKey.KeyCode = KEY_N;
+            ProgramState->OKey.KeyCode = KEY_O;
+            ProgramState->PKey.KeyCode = KEY_P;
+            ProgramState->QKey.KeyCode = KEY_Q;
+            ProgramState->RKey.KeyCode = KEY_R;
+            ProgramState->SKey.KeyCode = KEY_S;
+            ProgramState->TKey.KeyCode = KEY_T;
+            ProgramState->UKey.KeyCode = KEY_U;
+            ProgramState->VKey.KeyCode = KEY_V;
+            ProgramState->WKey.KeyCode = KEY_W;
+            ProgramState->XKey.KeyCode = KEY_X;
+            ProgramState->YKey.KeyCode = KEY_Y;
+            ProgramState->ZKey.KeyCode = KEY_Z;
             //ProgramState->Key.KeyCode = KEY_;
             
             ProgramState->FontSize = 22;
             ProgramState->CharsPerVirtualLine = 10;
-            ProgramState->SubLineOffset = 40;
+            ProgramState->SubLineOffset = 4;
             ProgramState->MarginLeft = 10;
             ProgramState->NumbersWidth = 4;
             Buffer->ViewPos = 0;
             Buffer->LineDataList = {0};
             Buffer->CursorPos = BufferPos(0, 0);
-            Buffer->IdealCursorChar = 0;
+            Buffer->IdealCursorCol = 0;
             
             
             ProgramState->ScreenHeight = Memory->WindowHeight;
@@ -486,6 +550,40 @@ extern "C"
             if(ProgramState->FontSize > 100) ProgramState->FontSize = 100;
         }
         
+        
+        for(int i = 0; i < sizeof(ProgramState->KeyData) / sizeof(key_data); i++)
+        {
+            key_data *Key = &ProgramState->KeyData[i];
+            if(IsKeyDown(Key->KeyCode))
+            {
+                if(Key->PressTime == 0)
+                    Key->JustPressed = true;
+                else
+                    Key->JustPressed = false;
+                
+                Key->PressTime += GetFrameTime();
+            }
+            else
+            {
+                Key->PressTime = 0;
+                Key->TimeTillNextRepeat = 0;
+            }
+            
+            if(Key->JustPressed || Key->PressTime >= ProgramState->KeyFirstRepeatTime)
+            {
+                if(Key->TimeTillNextRepeat <= 0)
+                {
+                    Key->TimeTillNextRepeat = ProgramState->KeyRepeatSpeed;
+                }
+                else
+                {
+                    Key->TimeTillNextRepeat -= GetFrameTime();
+                }
+            }
+            
+        }
+        
+        
         if(!(IsAnyControlKeyDown))
         {
             // TODO: mouse scrolling is kind of stuttery, especially up
@@ -496,62 +594,33 @@ extern "C"
             
             buffer_pos NewCursorPos = Buffer->CursorPos;
             
-            for(int i = 0; i < sizeof(ProgramState->KeyData) / sizeof(key_data); i++)
-            {
-                key_data *Key = &ProgramState->KeyData[i];
-                if(IsKeyDown(Key->KeyCode))
-                {
-                    if(Key->PressTime == 0)
-                        Key->JustPressed = true;
-                    else
-                        Key->JustPressed = false;
-                    
-                    Key->PressTime += GetFrameTime();
-                }
-                else
-                {
-                    Key->PressTime = 0;
-                    Key->TimeTillNextRepeat = 0;
-                }
-                
-                if(Key->JustPressed || Key->PressTime >= ProgramState->KeyFirstRepeatTime)
-                {
-                    if(Key->TimeTillNextRepeat <= 0)
-                    {
-                        Key->TimeTillNextRepeat = ProgramState->KeyRepeatSpeed;
-                    }
-                    else
-                    {
-                        Key->TimeTillNextRepeat -= GetFrameTime();
-                    }
-                }
-                
-            }
-            
             if(KeyShouldExecute(ProgramState->LeftKey))
             {
                 NewCursorPos.c--;
-                Buffer->IdealCursorChar = NewCursorPos.c;
+                Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, NewCursorPos);
             }
             if(KeyShouldExecute(ProgramState->RightKey))
             {
                 NewCursorPos.c++;
-                Buffer->IdealCursorChar = NewCursorPos.c;
+                Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, NewCursorPos);
             }
+            
+            b32 MovedUpOrDown = false;
             if(KeyShouldExecute(ProgramState->UpKey))
             {
-                NewCursorPos.l--;
+                rect UpRect = Buffer->CursorTargetRect - Rect(0, CharHeight, 0, 0);
+                NewCursorPos = ClosestBufferPos(Buffer, UpRect);
+                MovedUpOrDown = true;
             }
             if(KeyShouldExecute(ProgramState->DownKey))
             {
-                NewCursorPos.l++;
+                rect DownRect = Buffer->CursorTargetRect + Rect(0, CharHeight, 0, 0);
+                NewCursorPos = ClosestBufferPos(Buffer, DownRect);
+                MovedUpOrDown = true;
             }
             
             Clamp(NewCursorPos.l, 0, Buffer->Lines.Count-1);
             Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
-            
-            if(NewCursorPos.l != Buffer->CursorPos.l)
-                NewCursorPos.c = Buffer->IdealCursorChar;
             
             Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
             
@@ -568,9 +637,46 @@ extern "C"
                 ProgramState->UserMovedCursor = true;
             }
             
+            
+            // NOTE: Col > IdealCursorChar shouldn't be possible
+#if 1
+            if(MovedUpOrDown && ColAt(ProgramState, Buffer, NewCursorPos) < Buffer->IdealCursorCol)
+            {
+                int Diff = Buffer->IdealCursorCol - ColAt(ProgramState, Buffer, NewCursorPos);
+                int DistToEnd = Buffer->Lines[NewCursorPos.l].Length - NewCursorPos.c;
+                if(Diff > DistToEnd)
+                    Diff = DistToEnd;
+                NewCursorPos.c += Diff;
+            }
+#endif
+            
+            
+            
             Buffer->TargetViewPos = NewTargetViewPos;
             Buffer->CursorPos = NewCursorPos;
         }
+        
+        //printf("%d\n", ColAt(ProgramState, Buffer, Buffer->CursorPos));
+        
+        for(int i = 4; i < 30; i++)
+        {
+            if(KeyShouldExecute(ProgramState->KeyData[i]))
+            {
+                char CharToAdd;
+                if(IsAnyShiftKeyDown)
+                    CharToAdd = (i-4) + 65;
+                else
+                    CharToAdd = (i-4) + 97;
+                
+                Buffer->Lines[Buffer->CursorPos.l].InsertChar(Buffer->CursorPos.c, CharToAdd);
+                Buffer->CursorPos.c++;
+                Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, Buffer->CursorPos);
+            }
+        }
+        
+        Clamp(Buffer->CursorPos.l, 0, Buffer->Lines.Count-1);
+        Clamp(Buffer->CursorPos.c, 0, LineLength(Buffer, Buffer->CursorPos.l));
+        
         
         ComputeBufferRects(ProgramState, Buffer);
         AdjustView(ProgramState, Buffer);
@@ -580,7 +686,6 @@ extern "C"
         Buffer->CursorTargetRect = RectAt(Buffer, Buffer->CursorPos.l, Buffer->CursorPos.c);
         Buffer->CursorRect = Interpolate(Buffer->CursorRect, Buffer->CursorTargetRect, 0.5f);
         Buffer->ViewPos = Interpolate(Buffer->ViewPos, Buffer->TargetViewPos, 0.4f);
-        
         
         BeginDrawing();
         ClearBackground(RAYWHITE);

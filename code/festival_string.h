@@ -10,8 +10,29 @@
 struct string
 {
     int Length;
+    int ArraySize;
     char *Data;
     inline char& operator[](size_t Index) { return Data[Index]; }
+    
+    void InsertChar(int Index, char Char)
+    {
+        if(Index < 0 || Index > Length)
+            return;
+        
+        if(Length >= ArraySize)
+        { // realloc
+            Data = (char *)realloc(Data, ArraySize+16);
+        }
+        
+        // shift right
+        for(int i = Length; i > Index; i--)
+        {
+            Data[i] = Data[i-1];
+        }
+        
+        Data[Index] = Char;
+        Length++;
+    }
 };
 
 int
@@ -36,7 +57,8 @@ AllocString(int Length)
     string Result;
     
     Result.Length = Length;
-    Result.Data = (char *)malloc(sizeof(char) * Length);
+    Result.ArraySize = Length;
+    Result.Data = (char *)malloc(sizeof(char) * Result.ArraySize);
     
     return Result;
 }
@@ -46,7 +68,6 @@ FreeString(string String)
 {
     free(String.Data);
 }
-
 
 string
 _String(const char *Contents)
