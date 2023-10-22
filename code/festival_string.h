@@ -21,7 +21,9 @@ struct string
         
         if(Length >= ArraySize)
         { // realloc
-            Data = (char *)realloc(Data, ArraySize+16);
+            int NewSize = ArraySize+64;
+            Data = (char *)realloc(Data, NewSize);
+            ArraySize = NewSize;
         }
         
         // shift right
@@ -33,6 +35,38 @@ struct string
         Data[Index] = Char;
         Length++;
     }
+    
+    void RemoveChar(int Index)
+    {
+        if(Index < 0 || Index > Length)
+            return;
+        
+        // shift left
+        for(int i = Index; i < Length-1; i++)
+        {
+            Data[i] = Data[i+1];
+        }
+        
+        Length--;
+    }
+    
+    // inc, ex
+    void Slice(int Start, int End)
+    {
+        //if(Start == End)
+        //return;
+        
+        for(int i = 0; i < Start; i++)
+        {
+            RemoveChar(0);
+        }
+        //for(int i = End - Start; i < Length; i)
+        while(Length > End-Start)
+        {
+            RemoveChar(End - Start);
+        }
+    }
+    
 };
 
 int
@@ -61,6 +95,18 @@ AllocString(int Length)
     Result.Data = (char *)malloc(sizeof(char) * Result.ArraySize);
     
     return Result;
+}
+
+string
+CopyString(string S)
+{
+    string Copy = AllocString(S.Length);
+    
+    memcpy(Copy.Data, S.Data, Copy.Length);
+    Copy.Length = S.Length;
+    Copy.ArraySize = Copy.Length;
+    
+    return Copy;
 }
 
 void
@@ -251,6 +297,15 @@ operator==(string A, string B)
 if((List)->Count + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
 (List)->Data[(List)->Count] = (E);\
 (List)->Count++;\
+}
+
+#define ListInsert(List, Index, E) {\
+if((List)->Count + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
+for(int _i = (List)->Count; _i > Index; _i--)\
+{ /* shift right */\
+(List)->Data[_i] = (List)->Data[_i - 1];\
+}\
+(List)->Data[(Index)] = (E);\
 }
 
 #define ListFree(List) {\

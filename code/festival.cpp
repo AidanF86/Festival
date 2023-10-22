@@ -65,6 +65,12 @@ CharAt(buffer *Buffer, int l, int c)
     return Buffer->Lines[l].Data[c];
 }
 
+void
+InsertLine(buffer *Buffer, int l, string S)
+{
+    ListInsert(&Buffer->Lines, l, S);
+}
+
 line_data
 GetLineData(buffer *Buffer, int l)
 {
@@ -474,6 +480,8 @@ extern "C"
             ProgramState->RightKey.KeyCode = KEY_RIGHT;
             ProgramState->UpKey.KeyCode = KEY_UP;
             ProgramState->DownKey.KeyCode = KEY_DOWN;
+            ProgramState->PageUp_Key.KeyCode = KEY_PAGE_UP;
+            ProgramState->PageDown_Key.KeyCode = KEY_PAGE_DOWN;
             //ProgramState->Key.KeyCode = KEY_;
             ProgramState->AKey.KeyCode = KEY_A;
             ProgramState->BKey.KeyCode = KEY_B;
@@ -501,6 +509,37 @@ extern "C"
             ProgramState->XKey.KeyCode = KEY_X;
             ProgramState->YKey.KeyCode = KEY_Y;
             ProgramState->ZKey.KeyCode = KEY_Z;
+            //ProgramState->Key.KeyCode = KEY_;
+            ProgramState->Number0Key.KeyCode = KEY_ZERO;
+            ProgramState->Number1Key.KeyCode = KEY_ONE;
+            ProgramState->Number2Key.KeyCode = KEY_TWO;
+            ProgramState->Number3Key.KeyCode = KEY_THREE;
+            ProgramState->Number4Key.KeyCode = KEY_FOUR;
+            ProgramState->Number5Key.KeyCode = KEY_FIVE;
+            ProgramState->Number6Key.KeyCode = KEY_SIX;
+            ProgramState->Number7Key.KeyCode = KEY_SEVEN;
+            ProgramState->Number8Key.KeyCode = KEY_EIGHT;
+            ProgramState->Number9Key.KeyCode = KEY_NINE;
+            //ProgramState->Key.KeyCode = KEY_;
+            ProgramState->Grave_Key.KeyCode = KEY_GRAVE;
+            ProgramState->Minus_Key.KeyCode = KEY_MINUS;
+            ProgramState->Equals_Key.KeyCode = KEY_EQUAL;
+            ProgramState->LeftBracket_Key.KeyCode = KEY_LEFT_BRACKET;
+            ProgramState->RightBracket_Key.KeyCode = KEY_RIGHT_BRACKET;
+            ProgramState->Backslash_Key.KeyCode = KEY_BACKSLASH;
+            ProgramState->Semicolon_Key.KeyCode = KEY_SEMICOLON;
+            ProgramState->Quote_Key.KeyCode = KEY_APOSTROPHE;
+            ProgramState->Slash_Key.KeyCode = KEY_SLASH;
+            ProgramState->Comma_Key.KeyCode = KEY_COMMA;
+            ProgramState->Period_Key.KeyCode = KEY_PERIOD;
+            //ProgramState->Key.KeyCode = KEY_;
+            ProgramState->Space_Key.KeyCode = KEY_SPACE;
+            ProgramState->Backspace_Key.KeyCode = KEY_BACKSPACE;
+            ProgramState->Delete_Key.KeyCode = KEY_DELETE;
+            ProgramState->Tab_Key.KeyCode = KEY_TAB;
+            ProgramState->Return_Key.KeyCode = KEY_ENTER;
+            ProgramState->CapsLock_Key.KeyCode = KEY_CAPS_LOCK;
+            ProgramState->Escape_Key.KeyCode = KEY_ESCAPE;
             //ProgramState->Key.KeyCode = KEY_;
             
             ProgramState->FontSize = 22;
@@ -639,7 +678,6 @@ extern "C"
             
             
             // NOTE: Col > IdealCursorChar shouldn't be possible
-#if 1
             if(MovedUpOrDown && ColAt(ProgramState, Buffer, NewCursorPos) < Buffer->IdealCursorCol)
             {
                 int Diff = Buffer->IdealCursorCol - ColAt(ProgramState, Buffer, NewCursorPos);
@@ -648,29 +686,180 @@ extern "C"
                     Diff = DistToEnd;
                 NewCursorPos.c += Diff;
             }
-#endif
-            
-            
             
             Buffer->TargetViewPos = NewTargetViewPos;
             Buffer->CursorPos = NewCursorPos;
         }
         
-        //printf("%d\n", ColAt(ProgramState, Buffer, Buffer->CursorPos));
         
-        for(int i = 4; i < 30; i++)
+        for(int i = 0; i < 26; i++)
         {
-            if(KeyShouldExecute(ProgramState->KeyData[i]))
+            if(KeyShouldExecute(ProgramState->LetterKeys[i]))
             {
                 char CharToAdd;
                 if(IsAnyShiftKeyDown)
-                    CharToAdd = (i-4) + 65;
+                    CharToAdd = 'A' + i;
                 else
-                    CharToAdd = (i-4) + 97;
+                    CharToAdd = 'a' + i;
                 
                 Buffer->Lines[Buffer->CursorPos.l].InsertChar(Buffer->CursorPos.c, CharToAdd);
                 Buffer->CursorPos.c++;
                 Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, Buffer->CursorPos);
+            }
+        }
+        for(int i = 0; i < 10; i++)
+        {
+            if(KeyShouldExecute(ProgramState->NumberKeys[i]))
+            {
+                char CharToAdd;
+                if(IsAnyShiftKeyDown)
+                {
+                    if(i == 1)
+                        CharToAdd = '!';
+                    else if(i == 2)
+                        CharToAdd = '@';
+                    else if(i == 3)
+                        CharToAdd = '#';
+                    else if(i == 4)
+                        CharToAdd = '$';
+                    else if(i == 5)
+                        CharToAdd = '%';
+                    else if(i == 6)
+                        CharToAdd = '^';
+                    else if(i == 7)
+                        CharToAdd = '&';
+                    else if(i == 8)
+                        CharToAdd = '*';
+                    else if(i == 9)
+                        CharToAdd = '(';
+                    else
+                        CharToAdd = ')';
+                    
+                }
+                else
+                {
+                    CharToAdd = '0' + i;
+                }
+                
+                Buffer->Lines[Buffer->CursorPos.l].InsertChar(Buffer->CursorPos.c, CharToAdd);
+                Buffer->CursorPos.c++;
+                Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, Buffer->CursorPos);
+            }
+        }
+        for(int i = 0; i < 11; i++)
+        {
+            if(KeyShouldExecute(ProgramState->SymbolKeys[i]))
+            {
+                
+                char CharToAdd = ' ';
+                if(!IsAnyShiftKeyDown)
+                {
+                    if(i == 0)
+                        CharToAdd = '`';
+                    else if(i == 1)
+                        CharToAdd = '-';
+                    else if(i == 2)
+                        CharToAdd = '=';
+                    else if(i == 3)
+                        CharToAdd = '[';
+                    else if(i == 4)
+                        CharToAdd = ']';
+                    else if(i == 5)
+                        CharToAdd = '\\';
+                    else if(i == 6)
+                        CharToAdd = ';';
+                    else if(i == 7)
+                        CharToAdd = '\'';
+                    else if(i == 8)
+                        CharToAdd = '/';
+                    else if(i == 9)
+                        CharToAdd = ',';
+                    else if(i == 10)
+                        CharToAdd = '.';
+                }
+                else
+                {
+                    if(i == 0)
+                        CharToAdd = '~';
+                    else if(i == 1)
+                        CharToAdd = '_';
+                    else if(i == 2)
+                        CharToAdd = '+';
+                    else if(i == 3)
+                        CharToAdd = '{';
+                    else if(i == 4)
+                        CharToAdd = '}';
+                    else if(i == 5)
+                        CharToAdd = '|';
+                    else if(i == 6)
+                        CharToAdd = ':';
+                    else if(i == 7)
+                        CharToAdd = '"';
+                    else if(i == 8)
+                        CharToAdd = '?';
+                    else if(i == 9)
+                        CharToAdd = '<';
+                    else if(i == 10)
+                        CharToAdd = '>';
+                }
+                
+                Buffer->Lines[Buffer->CursorPos.l].InsertChar(Buffer->CursorPos.c, CharToAdd);
+                Buffer->CursorPos.c++;
+                Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, Buffer->CursorPos);
+            }
+        }
+        
+        for(int i = 0; i < 7; i++)
+        {
+            if(KeyShouldExecute(ProgramState->SpecialKeys[i]))
+            {
+                
+                char CharToAdd = ' ';
+                if(i == 0)
+                {// Space
+                    Buffer->Lines[Buffer->CursorPos.l].InsertChar(Buffer->CursorPos.c, ' ');
+                    Buffer->CursorPos.c++;
+                    Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, Buffer->CursorPos);
+                }
+                else if(i == 1)
+                { // Backspace
+                    if(Buffer->CursorPos.c > 0)
+                    {
+                        Buffer->Lines[Buffer->CursorPos.l].RemoveChar(Buffer->CursorPos.c-1);
+                        Buffer->CursorPos.c--;
+                        Clamp(Buffer->CursorPos.c, 0, LineLength(Buffer, Buffer->CursorPos.l));
+                    }
+                }
+                else if(i == 2)
+                { // Delete
+                    Buffer->Lines[Buffer->CursorPos.l].RemoveChar(Buffer->CursorPos.c);
+                }
+                else if(i == 3)
+                { // Tab
+                    for(int a = 0; a < 4; a++)
+                    {
+                        Buffer->Lines[Buffer->CursorPos.l].InsertChar(Buffer->CursorPos.c, ' ');
+                        Buffer->CursorPos.c++;
+                        Buffer->IdealCursorCol = ColAt(ProgramState, Buffer, Buffer->CursorPos);
+                    }
+                }
+                else if(i == 4)
+                { // Return
+                    InsertLine(Buffer, Buffer->CursorPos.l+1, CopyString(Buffer->Lines[Buffer->CursorPos.l]));
+                    Buffer->Lines[Buffer->CursorPos.l].Slice(0, Buffer->CursorPos.c);
+                    Buffer->Lines[Buffer->CursorPos.l+1].Slice(Buffer->CursorPos.c, Buffer->Lines[Buffer->CursorPos.l+1].Length);
+                    Buffer->CursorPos.l++;
+                    Buffer->CursorPos.c = 0;
+                    
+                    ProgramState->UserMovedCursor = true;
+                }
+                else if(i == 5)
+                { // Caps lock
+                }
+                else if(i == 6)
+                { // Escape
+                }
+                
             }
         }
         

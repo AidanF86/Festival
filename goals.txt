@@ -32,8 +32,9 @@ DONE smooth view movement
 DONE simple editing with cursor
 DONE Current goal: move up and down in wrapped lines
 
-more chars, backspace, enter
-investigate char entering free bug
+DONE investigate char entering free bug
+
+DONE more chars, backspace, del, enter
 
 
 INFO

@@ -85,6 +85,8 @@ struct program_state
                 key_data RightKey;
                 key_data UpKey;
                 key_data DownKey;
+                key_data PageUp_Key;
+                key_data PageDown_Key;
                 
                 key_data AKey;
                 key_data BKey;
@@ -113,6 +115,7 @@ struct program_state
                 key_data YKey;
                 key_data ZKey;
                 
+                key_data Number0Key;
                 key_data Number1Key;
                 key_data Number2Key;
                 key_data Number3Key;
@@ -122,17 +125,37 @@ struct program_state
                 key_data Number7Key;
                 key_data Number8Key;
                 key_data Number9Key;
-                key_data Number0Key;
                 //key_data _Key;
+                key_data Grave_Key;
+                key_data Minus_Key;
+                key_data Equals_Key;
+                key_data LeftBracket_Key;
+                key_data RightBracket_Key;
+                key_data Backslash_Key;
+                key_data Semicolon_Key;
+                key_data Quote_Key;
+                key_data Slash_Key;
+                key_data Comma_Key;
+                key_data Period_Key;
+                
+                key_data Space_Key;
+                key_data Backspace_Key;
+                key_data Delete_Key;
+                key_data Tab_Key;
+                key_data Return_Key;
+                key_data CapsLock_Key;
+                key_data Escape_Key;
             };
             struct
             {
-                key_data ArrowKeys[4];
+                key_data NavKeys[6];
                 key_data LetterKeys[26];
                 key_data NumberKeys[10];
+                key_data SymbolKeys[11];
+                key_data SpecialKeys[7];
             };
         };
-        key_data KeyData[4+26+10];
+        key_data KeyData[4+26+10+11+7];
     };
     
     Font FontMain;
