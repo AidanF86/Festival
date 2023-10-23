@@ -33,12 +33,13 @@ DONE simple editing with cursor
 DONE Current goal: move up and down in wrapped lines
 
 DONE investigate char entering free bug
-
 DONE more chars, backspace, del, enter
 
 DONE basic changeable colors
+DONE: Mouse click move cursor
 
-Current goal: Mouse click move cursor
+Fix up inconsistencies in textrect and char rects
+Adjust view based on cursor when typing
 
 
 INFO
