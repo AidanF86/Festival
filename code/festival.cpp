@@ -20,6 +20,15 @@ GetNanoseconds() {
     return (u64)ts.tv_sec * 1000000000L + ts.tv_nsec;
 }
 
+color
+RGB(int r, int g, int b) {
+    color Result;
+    Result.r = (u8)r;
+    Result.g = (u8)g;
+    Result.b = (u8)b;
+    Result.a = (u8)255;
+    return Result;
+}
 
 line_data
 LineData() {
@@ -40,8 +49,8 @@ rect
 RectAt(buffer *Buffer, int l, int c)
 {
     if(c == LineLength(Buffer, l))
-        return Buffer->LineDataList.Data[l].EndLineRect;
-    return Buffer->LineDataList.Data[l].CharRects.Data[c];
+        return Buffer->LineDataList[l].EndLineRect;
+    return Buffer->LineDataList[l].CharRects[c];
     
 }
 
@@ -324,10 +333,7 @@ FillLineData(buffer *Buffer, program_state *ProgramState)
                 RectData->DisplayLines++;
             }
             
-            //DrawRectangleLinesEx(Rect(x, y, CharWidth, CharHeight), 1, ORANGE);
-            
             ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
-            //ListAdd(&(RectData->CharRects), Rect(0, 0, CharWidth, CharHeight));
             
             x += CharWidth;
         }
@@ -351,13 +357,13 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     int CharHeight = CharDim.y;
     
     
-    DrawRectangle(0, 0, 4*CharWidth, ProgramState->ScreenHeight, LIGHTGRAY);
+    DrawRectangle(0, 0, 4*CharWidth, ProgramState->ScreenHeight, ProgramState->LineNumberBGColor);
     
     BeginShaderMode(ProgramState->ShaderSDF);
     
     
     { // Draw cursor
-        DrawRectangleRec(R(Buffer->CursorRect - V2(0, Buffer->ViewPos)), RED);
+        DrawRectangleRec(R(Buffer->CursorRect - V2(0, Buffer->ViewPos)), ProgramState->CursorBGColor);
     }
     
     // Draw text
@@ -366,14 +372,12 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
         char NumberBuffer[6];
         sprintf(NumberBuffer, "%d", l);
         
-        DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), FontSize, 0, GRAY);
+        DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), FontSize, 0, ProgramState->LineNumberFGColor);
         
         line_data LineData = GetLineData(Buffer, l);
         
         int LineY = LineData.LineRect.y;
         if(LineY - Buffer->ViewPos > Buffer->TextRect.y + Buffer->TextRect.h) break;
-        
-        //DrawRectangleLinesEx(LineData.EndLineRect, 1, ORANGE);
         
         for(int c = 0; c < LineData.CharRects.Count; c++)
         {
@@ -383,14 +387,17 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
             rect Rect = RectAt(Buffer, l, c);
             Rect.y -= Buffer->ViewPos;
             
-            //DrawRectangleLinesEx(R(Rect), 1, GRAY);
-            DrawTextEx(ProgramState->FontSDF, CharBuffer, V2(Rect.x, Rect.y), FontSize, 0, BLACK);
+            color CharColor = ProgramState->FGColor;
+            if(BufferPos(l, c) == Buffer->CursorPos)
+            {
+                CharColor = ProgramState->CursorFGColor;
+            }
+            
+            DrawTextEx(ProgramState->FontSDF, CharBuffer, V2(Rect.x, Rect.y), FontSize, 0, CharColor);
         }
     }
     EndShaderMode();
     
-    
-    //DrawRectangleLinesEx(R(Buffer->TextRect), 3, PURPLE);
     int ViewPos = Buffer->ViewPos;
 }
 
@@ -547,11 +554,20 @@ extern "C"
             ProgramState->SubLineOffset = 4;
             ProgramState->MarginLeft = 10;
             ProgramState->NumbersWidth = 4;
+            
+            {// Colors
+                ProgramState->BGColor = RGB(255, 255, 255);
+                ProgramState->FGColor = RGB(0, 0, 0);
+                ProgramState->LineNumberBGColor = LIGHTGRAY;
+                ProgramState->LineNumberFGColor = GRAY;
+                ProgramState->CursorBGColor = ProgramState->FGColor;
+                ProgramState->CursorFGColor = ProgramState->BGColor;
+            }
+            
             Buffer->ViewPos = 0;
             Buffer->LineDataList = {0};
             Buffer->CursorPos = BufferPos(0, 0);
             Buffer->IdealCursorCol = 0;
-            
             
             ProgramState->ScreenHeight = Memory->WindowHeight;
             ProgramState->ScreenWidth = Memory->WindowWidth;
@@ -877,7 +893,8 @@ extern "C"
         Buffer->ViewPos = Interpolate(Buffer->ViewPos, Buffer->TargetViewPos, 0.4f);
         
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(ProgramState->BGColor);
+        //ClearBackground(RAYWHITE);
         
         DrawBuffer(ProgramState, Buffer);
         //u64 BeforeTime = GetNanoseconds();

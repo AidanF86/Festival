@@ -76,4 +76,38 @@ int ListRemoveAt(line_data_list *List, int Index)
 
 
 
+
+
+color_list ColorList()
+{
+    color_list Result;
+    Result.Count = 0;
+    Result.ArraySize = 20;
+    Result.Data = (color *)malloc(20 * sizeof(color));
+    return Result;
+}
+
+color_list ColorList(int Size)
+{
+    color_list Result;
+    Result.Count = 0;
+    Result.ArraySize = Size;
+    Result.Data = (color *)malloc(Size * sizeof(color));
+    return Result;
+}
+
+int ListRemoveAt(color_list *List, int Index)
+{
+    if(Index >= 0 && Index < List->Count)
+    {
+        for(int i = Index; i < List->Count; i++)
+        {
+            List->Data[i] = List->Data[i+1];
+        }
+        List->Count--;
+        return 1;
+    }
+    return 0;
+}
+
 #endif //FESTIVAL_LISTS_H

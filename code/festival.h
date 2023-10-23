@@ -17,9 +17,21 @@ typedef struct rect_list
     inline const rect& operator[](size_t Index) const { return Data[Index]; }
 } rect_list;
 
+typedef Color color;
+typedef struct color_list
+{
+    int Count;
+    int ArraySize;
+    color *Data;
+    inline color& operator[](size_t Index) { return Data[Index]; }
+    inline const color& operator[](size_t Index) const { return Data[Index]; }
+} color_list;
+
+
 struct line_data
 {
     rect_list CharRects;
+    color_list CharColors;
     // TODO: merge EndLineRect into CharRects?
     rect EndLineRect;
     rect LineRect;
@@ -74,6 +86,32 @@ struct program_state
     
     f32 KeyFirstRepeatTime;
     f32 KeyRepeatSpeed = 1;
+    
+    Font FontMain;
+    Font FontSDF;
+    Shader ShaderSDF;
+    
+    int FontSize;
+    int CharsPerVirtualLine;
+    int SubLineOffset;
+    int MarginLeft;
+    int NumbersWidth;
+    
+    buffer Buffers[MAX_BUFFERS];
+    int OpenBufferCount;
+    
+    b32 UserMovedCursor;
+    b32 UserMovedView;
+    
+    struct
+    {
+        color BGColor;
+        color FGColor;
+        color LineNumberBGColor;
+        color LineNumberFGColor;
+        color CursorBGColor;
+        color CursorFGColor;
+    };
     
     union
     {
@@ -157,22 +195,6 @@ struct program_state
         };
         key_data KeyData[4+26+10+11+7];
     };
-    
-    Font FontMain;
-    Font FontSDF;
-    Shader ShaderSDF;
-    
-    int FontSize;
-    int CharsPerVirtualLine;
-    int SubLineOffset;
-    int MarginLeft;
-    int NumbersWidth;
-    
-    buffer Buffers[MAX_BUFFERS];
-    int OpenBufferCount;
-    
-    b32 UserMovedCursor;
-    b32 UserMovedView;
 };
 
 #define KeyShouldExecute(Key) ((Key).JustPressed || ((Key).PressTime >= ProgramState->KeyFirstRepeatTime && Key.TimeTillNextRepeat <= 0))

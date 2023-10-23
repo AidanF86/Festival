@@ -36,6 +36,10 @@ DONE investigate char entering free bug
 
 DONE more chars, backspace, del, enter
 
+DONE basic changeable colors
+
+Current goal: Mouse click move cursor
+
 
 INFO
 ========================================
