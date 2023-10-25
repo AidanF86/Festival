@@ -5,8 +5,10 @@
 
 #include "math.h"
 
-typedef Vector2 v2;
-typedef Vector3 v3;
+struct v2
+{
+    int x, y;
+};
 struct rect
 {
     int x, y, w, h;
@@ -45,7 +47,8 @@ operator-=(v2 &A, v2 B)
 inline v2
 operator*(v2 V, f32 Scalar)
 {
-    return {V.x * Scalar, V.y * Scalar};
+    v2 Result = {(int)(V.x * Scalar), (int)(V.y * Scalar)};
+    return Result;
 }
 inline v2 &
 operator*=(v2 &A, f32 B)
@@ -56,7 +59,8 @@ operator*=(v2 &A, f32 B)
 inline v2
 operator/(v2 V, f32 Scalar)
 {
-    return {V.x / Scalar, V.y / Scalar};
+    v2 Result = {(int)(V.x / Scalar), (int)(V.y / Scalar)};
+    return Result;
 }
 inline v2 &
 operator/=(v2 &A, f32 B)
@@ -84,13 +88,13 @@ operator==(rect a, rect b)
 inline rect
 operator+(rect R, v2 V)
 {
-    rect Result = {R.x + (int)V.x, R.y + (int)V.y, R.w, R.h};
+    rect Result = {R.x + V.x, R.y + V.y, R.w, R.h};
     return Result;
 }
 inline rect
 operator-(rect R, v2 V)
 {
-    rect Result = {R.x - (int)V.x, R.y - (int)V.y, R.w, R.h};
+    rect Result = {R.x - V.x, R.y - V.y, R.w, R.h};
     return Result;
 }
 inline rect &
@@ -127,49 +131,30 @@ operator+=(rect &R, rect B)
     R = R + B;
     return R;
 }
-#if 0
-inline rect
-InterpolateRect(rect R, rect Target, f32 Speed)
-{
-    rect Result = R;
-    if(Speed >= 1)
-        return Target;
-    
-    Result += (Target - R)*Speed;
-    
-    return Result;
-}
-#endif
+
 #define Interpolate(a, target, speed) ( ((speed) >= 1) ? (target) : ( (a) + ((target) - (a))*(speed) == (a) ? (target) : (a) + ((target) - (a))*(speed) ))
 
-inline v3
-V2ToV3(v2 V)
-{
-    v3 Result;
-    Result.x = V.x;
-    Result.y = V.y;
-    Result.z = 0;
-    return Result;
-}
-
 inline v2
-V3ToV2(v3 V)
-{
-    v2 Result;
-    Result.x = V.x;
-    Result.y = V.y;
-    return Result;
-}
-
-v2 V2(f32 x, f32 y)
+V2(int x, int y)
 {
     v2 Result = {x,y};
     return Result;
 }
-
-v3 V3(f32 x, f32 y, f32 z)
+inline v2
+V2(rect R)
 {
-    v3 Result = {x,y,z};
+    return V2(R.x, R.y);
+}
+inline v2
+V2(Vector2 V)
+{
+    return V2(V.x, V.y);
+}
+
+inline Vector2
+V(v2 P)
+{
+    Vector2 Result = {(f32)P.x, (f32)P.y};
     return Result;
 }
 

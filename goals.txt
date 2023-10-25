@@ -38,6 +38,21 @@ DONE more chars, backspace, del, enter
 DONE basic changeable colors
 DONE: Mouse click move cursor
 
+Current goal: Clean things up
+                get Print working again
+                solidify text rect and char rect concepts
+              Unicode (int chars)
+              Multiple buffers
+
+File writing
+File open
+    Lister
+        Like 4coder
+        auto-complete (fuzzy-finding?)
+    Command system
+        struct maybe consists of a name and a function?
+    For both of these: solidify key input system
+
 Fix up inconsistencies in textrect and char rects
 Adjust view based on cursor when typing
 

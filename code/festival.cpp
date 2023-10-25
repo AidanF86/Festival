@@ -20,20 +20,24 @@ GetNanoseconds() {
     return (u64)ts.tv_sec * 1000000000L + ts.tv_nsec;
 }
 
-v2
-RectToV2(rect R)
-{
-    return V2(R.x, R.y);
-}
-
 color
-RGB(int r, int g, int b) {
+RGBA(int r, int g, int b, int a) {
     color Result;
     Result.r = (u8)r;
     Result.g = (u8)g;
     Result.b = (u8)b;
-    Result.a = (u8)255;
+    Result.a = (u8)a;
     return Result;
+}
+
+color
+RGB(int r, int g, int b) {
+    return RGBA(r, g, b, 255);
+}
+
+v2 GetCharDim(program_state *ProgramState)
+{
+    return V2(MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0));
 }
 
 line_data
@@ -100,13 +104,12 @@ GetLineData(buffer *Buffer, int l)
 void
 ComputeBufferRects(program_state *ProgramState, buffer *Buffer)
 {
-    int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
-    int SubLineOffset = ProgramState->SubLineOffset;
     int MarginLeft = ProgramState->MarginLeft;
     int NumbersWidth = ProgramState->NumbersWidth;
-    v2 FontDim = MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0);
-    int CharWidth = FontDim.x;
-    int CharHeight = FontDim.y;
+    
+    v2 CharDim = GetCharDim(ProgramState);
+    int CharWidth = CharDim.x;
+    int CharHeight = CharDim.y;
     
     Buffer->Rect = Rect(0, 0, ProgramState->ScreenWidth, ProgramState->ScreenHeight);
     f32 x = NumbersWidth*CharWidth + MarginLeft;
@@ -196,9 +199,9 @@ ClosestBufferPos(buffer *Buffer, rect Rect)
 void
 AdjustView(program_state *ProgramState, buffer *Buffer)
 {
-    v2 FontDim = MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0);
-    int CharWidth = FontDim.x;
-    int CharHeight = FontDim.y;
+    v2 CharDim = GetCharDim(ProgramState);
+    int CharWidth = CharDim.x;
+    int CharHeight = CharDim.y;
     buffer_pos CursorPos = Buffer->CursorPos;
     int ViewPos = Buffer->ViewPos;
     int TargetViewPos = Buffer->TargetViewPos;
@@ -260,9 +263,9 @@ FillLineData(buffer *Buffer, program_state *ProgramState)
     int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
     int NumbersWidth = ProgramState->NumbersWidth;
     int SubLineOffset = ProgramState->SubLineOffset;
-    v2 FontDim = MeasureTextEx(ProgramState->FontMain, "_", ProgramState->FontSize, 0);
-    int CharWidth = FontDim.x;
-    int CharHeight = FontDim.y;
+    v2 CharDim = GetCharDim(ProgramState);
+    int CharWidth = CharDim.x;
+    int CharHeight = CharDim.y;
     // TODO(cheryl): formalize char-exclusion-zone
     int WrapPoint = Buffer->TextRect.x + Buffer->TextRect.w - CharWidth;
     
@@ -325,13 +328,47 @@ FillLineData(buffer *Buffer, program_state *ProgramState)
 }
 
 
+void
+DrawChar(program_state *ProgramState, int Char, v2 Pos, color FGColor, color BGColor)
+{
+    v2 CharDim = GetCharDim(ProgramState);
+    if(BGColor.a != 0)
+    {
+        DrawRectangleV(V(Pos), V(CharDim), BGColor);
+    }
+    char CharBuffer[2] = {(char)Char, 0};
+    DrawTextEx(ProgramState->FontSDF, CharBuffer, V(Pos), ProgramState->FontSize, 0, FGColor);
+}
+
+void
+DrawChar(program_state *ProgramState, int Char, v2 Pos, color FGColor)
+{
+    DrawChar(ProgramState, Char, Pos, FGColor, RGBA(0, 0, 0, 0));
+}
+
+void
+DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor, color BGColor)
+{
+    v2 CharDim = GetCharDim(ProgramState);
+    for(int i = 0; i < String.Length; i++)
+    {
+        DrawChar(ProgramState, String[i], Pos, FGColor, BGColor);
+        Pos.x += CharDim.x;
+    }
+}
+
+void
+DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor)
+{
+    DrawString(ProgramState, String, Pos, FGColor, RGBA(0, 0, 0, 0));
+}
 
 void
 DrawBuffer(program_state *ProgramState, buffer *Buffer)
 {
     Font *FontMain = &ProgramState->FontMain;
-    int FontSize = ProgramState->FontSize;
-    v2 CharDim = MeasureTextEx(*FontMain, "_", FontSize, 0);
+    //int FontSize = ProgramState->FontSize;
+    v2 CharDim = GetCharDim(ProgramState);
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
     
@@ -351,7 +388,10 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
         char NumberBuffer[6];
         sprintf(NumberBuffer, "%d", l);
         
-        DrawTextEx(ProgramState->FontSDF, NumberBuffer, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), FontSize, 0, ProgramState->LineNumberFGColor);
+        //DrawString(ProgramState, NumberString, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), ProgramState->LineNumberFGColor);
+#if 1
+        DrawTextEx(ProgramState->FontSDF, NumberBuffer, V(V2(0, LineRect(Buffer, l).y-Buffer->ViewPos)), ProgramState->FontSize, 0, ProgramState->LineNumberFGColor);
+#endif
         
         line_data LineData = GetLineData(Buffer, l);
         
@@ -360,9 +400,6 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
         
         for(int c = 0; c < LineData.CharRects.Count; c++)
         {
-            char CharBuffer[2] = {CharAt(Buffer, l, c), 0};
-            if(CharBuffer[0] == 0 && l == 9) CharBuffer[0] = '|';
-            
             rect Rect = RectAt(Buffer, l, c);
             Rect.y -= Buffer->ViewPos;
             
@@ -372,7 +409,7 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
                 CharColor = ProgramState->CursorFGColor;
             }
             
-            DrawTextEx(ProgramState->FontSDF, CharBuffer, V2(Rect.x, Rect.y), FontSize, 0, CharColor);
+            DrawChar(ProgramState, CharAt(Buffer, l, c), V2(Rect), CharColor);
         }
     }
     EndShaderMode();
@@ -565,7 +602,7 @@ extern "C"
         int MarginLeft = ProgramState->MarginLeft;
         int NumbersWidth = ProgramState->NumbersWidth;
         
-        v2 CharDim = MeasureTextEx(*FontMain, "_", ProgramState->FontSize, 0);
+        v2 CharDim = GetCharDim(ProgramState);
         int CharWidth = CharDim.x;
         int CharHeight = CharDim.y;
         
@@ -861,7 +898,7 @@ extern "C"
         
         if(IsMouseButtonDown(0))
         {
-            v2 AdjustedMousePos = GetMousePosition();
+            v2 AdjustedMousePos = V2(GetMousePosition());
             AdjustedMousePos.y += Buffer->TextRect.y;
             AdjustedMousePos.y += Buffer->ViewPos;
             
