@@ -111,6 +111,7 @@ FreeString(string String)
     free(String.Data);
 }
 
+#if 0
 string
 _String(const char *Contents)
 {
@@ -123,9 +124,10 @@ _String(const char *Contents)
     
     return Result;
 }
+#endif
 
 string
-_String(u32 *Contents)
+__String(u32 *Contents)
 {
     string Result = AllocString(NullTerminatedStringLength(Contents));
     
@@ -145,10 +147,12 @@ int
 _U32_Sprintf(u32 *Dest, const char *Format, va_list Args)
 {
     int Length = vsprintf(SprintfBuffer, Format, Args);
-    for(int i = 0; i < Length; i++)
+    int i;
+    for(i = 0; i < Length; i++)
     {
         Dest[i] = (int)SprintfBuffer[i];
     }
+    Dest[i] = 0;
     return Length;
 }
 
@@ -221,11 +225,13 @@ _String(const char *Format, va_list Args)
                 }
                 //strcpy(&(StringFormatBuffer[Index]), StringVarBuffer);
                 Index += Length;//NullTerminatedStringLength(StringVarBuffer);
+                StringFormatBuffer[Index] = 0;
             }
             else
             {
                 StringFormatBuffer[Index] = (u32)(*Format);
                 Index++;
+                StringFormatBuffer[Index] = 0;
             }
             
             NextIsVariable = false;
@@ -234,7 +240,7 @@ _String(const char *Format, va_list Args)
         Format++;
     }
     
-    return _String(StringFormatBuffer);
+    return __String(StringFormatBuffer);
 }
 
 string

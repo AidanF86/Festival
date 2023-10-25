@@ -385,13 +385,8 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     // Draw text
     for(int l = 0; l < Buffer->LineDataList.Count; l++)
     {
-        char NumberBuffer[6];
-        sprintf(NumberBuffer, "%d", l);
-        
-        //DrawString(ProgramState, NumberString, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), ProgramState->LineNumberFGColor);
-#if 1
-        DrawTextEx(ProgramState->FontSDF, NumberBuffer, V(V2(0, LineRect(Buffer, l).y-Buffer->ViewPos)), ProgramState->FontSize, 0, ProgramState->LineNumberFGColor);
-#endif
+        string NumberString = String("%d", l);
+        DrawString(ProgramState, NumberString, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), ProgramState->LineNumberFGColor);
         
         line_data LineData = GetLineData(Buffer, l);
         

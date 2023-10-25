@@ -38,11 +38,13 @@ DONE more chars, backspace, del, enter
 DONE basic changeable colors
 DONE: Mouse click move cursor
 
+DONE Unicode (UTF-32)
+
 Current goal: Clean things up
                 DONE get Print working again
                 solidify text rect and char rect concepts
-              DONE Unicode (UTF-32)
-              Multiple buffers
+
+Multiple buffers
 
 File writing
 File open
