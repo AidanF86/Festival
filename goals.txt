@@ -39,9 +39,9 @@ DONE basic changeable colors
 DONE: Mouse click move cursor
 
 Current goal: Clean things up
-                get Print working again
+                DONE get Print working again
                 solidify text rect and char rect concepts
-              Unicode (int chars)
+              DONE Unicode (UTF-32)
               Multiple buffers
 
 File writing
@@ -80,6 +80,7 @@ LS: c/c++ (probably no advanced stuff)
 
 Less important
 --------------------
+Unicode
 Have a nice system for switching between buffers, unlike every other text editor (no just entering the name)
 // Like maybe show a preview?
 Nice highlighting for file (and buffer?) lists

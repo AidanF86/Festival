@@ -6,23 +6,23 @@
 #include <cstdarg>
 #include <cstring>
 
-// UTF string
+// UTF-32 string
 struct string
 {
     int Length;
     int ArraySize;
-    char *Data;
-    inline char& operator[](size_t Index) { return Data[Index]; }
+    u32 *Data;
+    inline u32& operator[](size_t Index) { return Data[Index]; }
     
-    void InsertChar(int Index, char Char)
+    void InsertChar(int Index, u32 Char)
     {
         if(Index < 0 || Index > Length)
             return;
         
         if(Length >= ArraySize)
         { // realloc
-            int NewSize = ArraySize+64;
-            Data = (char *)realloc(Data, NewSize);
+            int NewSize = (ArraySize+64)*sizeof(32);
+            Data = (u32 *)realloc(Data, NewSize);
             ArraySize = NewSize;
         }
         
@@ -53,14 +53,10 @@ struct string
     // inc, ex
     void Slice(int Start, int End)
     {
-        //if(Start == End)
-        //return;
-        
         for(int i = 0; i < Start; i++)
         {
             RemoveChar(0);
         }
-        //for(int i = End - Start; i < Length; i)
         while(Length > End-Start)
         {
             RemoveChar(End - Start);
@@ -78,7 +74,7 @@ NullTerminatedStringLength(const char *Contents)
 }
 
 int
-NullTerminatedStringLength(int *Contents)
+NullTerminatedStringLength(u32 *Contents)
 {
     int Result = 0;
     while(*Contents++) { Result++; }
@@ -92,7 +88,7 @@ AllocString(int Length)
     
     Result.Length = Length;
     Result.ArraySize = Length;
-    Result.Data = (char *)malloc(sizeof(char) * Result.ArraySize);
+    Result.Data = (u32 *)malloc(sizeof(u32) * Result.ArraySize);
     
     return Result;
 }
@@ -122,33 +118,51 @@ _String(const char *Contents)
     
     for(int i = 0; i < Result.Length; i++)
     {
-        Result.Data[i] = (char)(Contents[i]);
+        Result.Data[i] = (u32)(Contents[i]);
     }
     
     return Result;
 }
 
 string
-String(int *Contents)
+_String(u32 *Contents)
 {
     string Result = AllocString(NullTerminatedStringLength(Contents));
     
     for(int i = 0; i < Result.Length; i++)
     {
-        Result.Data[i] = (char)(Contents[i]);
+        Result.Data[i] = (u32)(Contents[i]);
     }
     
     return Result;
 }
 
-char StringFormatBuffer[1024];
-char StringVarBuffer[128];
+u32 StringFormatBuffer[1024];
+u32 StringVarBuffer[128];
+char SprintfBuffer[1024];
+
+int
+_U32_Sprintf(u32 *Dest, const char *Format, va_list Args)
+{
+    int Length = vsprintf(SprintfBuffer, Format, Args);
+    for(int i = 0; i < Length; i++)
+    {
+        Dest[i] = (int)SprintfBuffer[i];
+    }
+    return Length;
+}
+
+int
+Sprintf(u32 *Dest, const char *Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    return _U32_Sprintf(Dest, Format, Args);
+}
+
 string
 _String(const char *Format, va_list Args)
 {
-    //va_list Args;
-    //va_start(Args, Format);
-    
     int Index = 0;
     
     b32 NextIsVariable = false;
@@ -163,49 +177,54 @@ _String(const char *Format, va_list Args)
             if(NextIsVariable)
             {
                 // Do proper printing
+                int Length = 0;
                 switch(*Format)
                 {
                     case 'd':
                     {
                         int Var = va_arg(Args, int);
-                        sprintf(StringVarBuffer, "%d", Var);
+                        Length = Sprintf(StringVarBuffer, "%d", Var);
                     }break;
                     case 'f':
                     {
                         f64 Var = va_arg(Args, f64);
-                        sprintf(StringVarBuffer, "%.3f", Var);
+                        Length = Sprintf(StringVarBuffer, "%.3f", Var);
                     }break;
                     case 's':
                     {
                         char *Var = va_arg(Args, char *);
-                        sprintf(StringVarBuffer, "%s", Var);
+                        Length = Sprintf(StringVarBuffer, "%s", Var);
                     }break;
                     // TODO(cheryl): add our string (%S)
                     case 'v':
                     {
                         v2 Var = va_arg(Args, v2);
-                        sprintf(StringVarBuffer, "(%.3f, %.3f)", Var.x, Var.y);
+                        Length = Sprintf(StringVarBuffer, "(%.3f, %.3f)", Var.x, Var.y);
                     }break;
                     case 'r':
                     {
                         rect Var = va_arg(Args, rect);
-                        sprintf(StringVarBuffer, "(%d, %d, %d, %d)",
-                                Var.x, Var.y, Var.w, Var.h);
+                        Length = Sprintf(StringVarBuffer, "(%d, %d, %d, %d)",
+                                         Var.x, Var.y, Var.w, Var.h);
                     }
                     case 'R':
                     {
                         Rectangle Var = va_arg(Args, Rectangle);
-                        sprintf(StringVarBuffer, "(%.3f, %.3f, %.3f, %.3f)",
-                                Var.x, Var.y, Var.width, Var.height);
+                        Length = Sprintf(StringVarBuffer, "(%.3f, %.3f, %.3f, %.3f)",
+                                         Var.x, Var.y, Var.width, Var.height);
                     }
                 }
                 
-                strcpy(&(StringFormatBuffer[Index]), StringVarBuffer);
-                Index += NullTerminatedStringLength(StringVarBuffer);
+                for(int i = 0; i < Length; i++)
+                {
+                    StringFormatBuffer[Index+i] = StringVarBuffer[i];
+                }
+                //strcpy(&(StringFormatBuffer[Index]), StringVarBuffer);
+                Index += Length;//NullTerminatedStringLength(StringVarBuffer);
             }
             else
             {
-                StringFormatBuffer[Index] = *Format;
+                StringFormatBuffer[Index] = (u32)(*Format);
                 Index++;
             }
             
