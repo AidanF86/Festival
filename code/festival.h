@@ -51,21 +51,25 @@ typedef struct line_data_list
 
 struct buffer
 {
-    b32 IsOpen;
+    //b32 IsOpen;
+    string_list Lines;
+};
+
+struct view
+{
+    buffer *Buffer;
     
     rect Rect;
     rect TextRect;
     
-    int ViewY;
-    int TargetViewY;
+    int Y;
+    int TargetY;
     
     buffer_pos CursorPos;
     int IdealCursorCol;
     
     rect CursorRect;
     rect CursorTargetRect;
-    
-    string_list Lines;
     
     line_data_list LineDataList;
 };
@@ -78,7 +82,7 @@ struct key_data
     f32 TimeTillNextRepeat;
 };
 
-#define MAX_BUFFERS 30
+#define MAX_BUFFERS 50
 struct program_state
 {
     f32 dTime;
@@ -99,6 +103,17 @@ struct program_state
     
     buffer Buffers[MAX_BUFFERS];
     int OpenBufferCount;
+    
+    union
+    {
+        struct 
+        {
+            view LeftView;
+            view RightView;
+        };
+        view Views[2];
+    };
+    view *SelectedView; // selected view
     
     b32 UserMovedCursor;
     b32 UserMovedView;

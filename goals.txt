@@ -43,7 +43,8 @@ DONE get Print working again
 DONE fix mouse clicking (1/2 off both axes)
 DONE(hopefully) Solidify text rect and char rect concepts
 
-Current goal: Multiple buffers
+Current goal: Views & Multiple buffers
+                DONE sub: separate buffer into purely text/file data, move spatial data into view struct
 
 File writing
 File open
@@ -54,7 +55,6 @@ File open
         struct maybe consists of a name and a function?
     For both of these: solidify key input system
 
-Fix up inconsistencies in textrect and char rects
 Adjust view based on cursor when typing
 
 
