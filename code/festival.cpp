@@ -56,23 +56,70 @@ LineLength(buffer *Buffer, int l)
 }
 
 rect
-RectAt(buffer *Buffer, int l, int c)
+CharRectAt(buffer *Buffer, int l, int c)
 {
     if(c == LineLength(Buffer, l))
         return Buffer->LineDataList[l].EndLineRect;
     return Buffer->LineDataList[l].CharRects[c];
-    
 }
 
-rect RectAt(buffer *Buffer, buffer_pos Pos) { return RectAt(Buffer, Pos.l, Pos.c); }
+rect CharRectAt(buffer *Buffer, buffer_pos Pos) { return CharRectAt(Buffer, Pos.l, Pos.c); }
 
 rect
 LineRect(buffer *Buffer, int l)
 {
-    // TODO: narrow this down, set upper bounds on rect generation & text rendering
     if(l < 0 || l >= Buffer->Lines.Count)
         return {0};
     return Buffer->LineDataList.Data[l].LineRect;
+}
+
+v2
+CharToScreenSpace(buffer *Buffer, v2 CharRect)
+{
+    v2 Result = CharRect;
+    Result.x += Buffer->TextRect.x;
+    Result.y += Buffer->TextRect.y;
+    Result.y -= Buffer->ViewY;
+    return Result;
+}
+v2
+ScreenToCharSpace(buffer *Buffer, v2 ScreenRect)
+{
+    v2 Result = ScreenRect;
+    Result.y += Buffer->ViewY;
+    Result.y -= Buffer->TextRect.y;
+    Result.x -= Buffer->TextRect.x;
+    return Result;
+}
+rect
+CharToScreenSpace(buffer *Buffer, rect CharRect)
+{
+    rect Result = CharRect;
+    v2 V = CharToScreenSpace(Buffer, V2(CharRect));
+    Result.x = V.x;
+    Result.y = V.y;
+    return Result;
+}
+rect
+ScreenToCharSpace(buffer *Buffer, rect ScreenRect)
+{
+    rect Result = ScreenRect;
+    v2 V = ScreenToCharSpace(Buffer, V2(ScreenRect));
+    Result.x = V.x;
+    Result.y = V.y;
+    return Result;
+}
+
+rect
+ScreenRectAt(buffer *Buffer, int l, int c)
+{
+    return CharToScreenSpace(Buffer, CharRectAt(Buffer, l, c));
+}
+
+rect
+ScreenRectAt(buffer *Buffer, buffer_pos Pos)
+{
+    return ScreenRectAt(Buffer, Pos.l, Pos.c);
 }
 
 char
@@ -119,16 +166,16 @@ ComputeBufferRects(program_state *ProgramState, buffer *Buffer)
 }
 
 int
-PosToLine(buffer *Buffer, int Pos)
+YToLine(buffer *Buffer, int Y)
 {
     int l;
-    int PrevLinePos = GetLineData(Buffer, 0).LineRect.y;
+    int PrevLineY = GetLineData(Buffer, 0).LineRect.y;
     for(l = 0; l < Buffer->Lines.Count; l++)
     {
         line_data LineData = GetLineData(Buffer, l);
-        int LinePos = LineData.LineRect.y;
+        int LineY = LineData.LineRect.y;
         
-        if(LinePos > Pos)
+        if(LineY > Y)
         {
             if(l > 0)
                 l--;
@@ -146,16 +193,16 @@ int
 ColAt(program_state *ProgramState, buffer *Buffer, buffer_pos P)
 {
     int Col = 0;
-    int PrevY = RectAt(Buffer, BufferPos(P.l, 0)).y;
+    int PrevY = CharRectAt(Buffer, BufferPos(P.l, 0)).y;
     
     for(int c = 1; c < Buffer->Lines[P.l].Length && c <= P.c; c++)
     {
         Col++;
-        if(RectAt(Buffer, BufferPos(P.l, c)).y > PrevY)
+        if(CharRectAt(Buffer, BufferPos(P.l, c)).y > PrevY)
         {
             Col = ProgramState->SubLineOffset;
         }
-        PrevY = RectAt(Buffer, BufferPos(P.l, c)).y;
+        PrevY = CharRectAt(Buffer, BufferPos(P.l, c)).y;
     }
     
     return Col;
@@ -164,17 +211,17 @@ ColAt(program_state *ProgramState, buffer *Buffer, buffer_pos P)
 
 buffer_pos
 ClosestBufferPos(buffer *Buffer, v2 P)
-{
-    int l = PosToLine(Buffer, P.y);
+{ // P is in char space
+    int l = YToLine(Buffer, P.y);
     
-    buffer_pos ClosestBufferPos = BufferPos(l, 0);
-    rect ClosestRect = RectAt(Buffer, ClosestBufferPos);
-    v2 ClosestP = V2(ClosestRect.x, ClosestRect.y);
+    buffer_pos ClosestBufferP = BufferPos(l, 0);
+    rect ClosestRect = CharRectAt(Buffer, ClosestBufferP);
+    v2 ClosestP = V2(ClosestRect.x+ClosestRect.w/2, ClosestRect.y+ClosestRect.h/2);
     
-    for(int c = 0; c < Buffer->Lines[l].Length; c++)
+    for(int c = 0; c <= Buffer->Lines[l].Length; c++)
     {
-        rect TestRect = RectAt(Buffer, l, c);
-        v2 TestP = V2(TestRect.x, TestRect.y);
+        rect TestRect = CharRectAt(Buffer, l, c);
+        v2 TestP = V2(TestRect.x+TestRect.w/2, TestRect.y+TestRect.h/2);
         
         v2 Diff = TestP - P;
         v2 CompareDiff = ClosestP - P;
@@ -184,16 +231,17 @@ ClosestBufferPos(buffer *Buffer, v2 P)
             ))
         {
             ClosestP = TestP;
-            ClosestBufferPos = BufferPos(l, c);
+            ClosestBufferP = BufferPos(l, c);
         }
     }
-    return ClosestBufferPos;
+    
+    return ClosestBufferP;
 }
 
 buffer_pos
 ClosestBufferPos(buffer *Buffer, rect Rect)
 {
-    return ClosestBufferPos(Buffer, V2(Rect.x, Rect.y));
+    return ClosestBufferPos(Buffer, V2(Rect.x+Rect.w/2, Rect.y+Rect.h/2));
 }
 
 void
@@ -203,42 +251,42 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
     buffer_pos CursorPos = Buffer->CursorPos;
-    int ViewPos = Buffer->ViewPos;
-    int TargetViewPos = Buffer->TargetViewPos;
+    int ViewY = Buffer->ViewY;
+    int TargetViewY = Buffer->TargetViewY;
     
-    rect CursorRect = RectAt(Buffer, CursorPos.l, CursorPos.c);
+    rect CursorRect = CharRectAt(Buffer, CursorPos.l, CursorPos.c);
     b32 MovedCursorUpOrDown = false;
     
     if(ProgramState->UserMovedCursor)
     { // Adjust based on cursor
-        if(CursorRect.y < ViewPos)
+        if(CursorRect.y < ViewY)
         {
-            TargetViewPos = CursorRect.y;
+            TargetViewY = CursorRect.y;
         }
-        else if(CursorRect.y > ViewPos + Buffer->TextRect.h - CharHeight)
+        else if(CursorRect.y > ViewY + Buffer->TextRect.h - CharHeight)
         {
-            TargetViewPos = CursorRect.y - Buffer->TextRect.h + CharHeight;
+            TargetViewY = CursorRect.y - Buffer->TextRect.h + CharHeight;
         }
     }
     else
     { // Adjust based on view
-        if(CursorRect.y < TargetViewPos)
+        if(CursorRect.y < TargetViewY)
         {
             // adjust cursor pos to new rect?
-            Buffer->CursorPos.l = PosToLine(Buffer, TargetViewPos) + 3;
+            Buffer->CursorPos.l = YToLine(Buffer, TargetViewY) + 3;
             MovedCursorUpOrDown = true;
         }
-        else if(CursorRect.y > TargetViewPos + Buffer->TextRect.h - CharHeight)
+        else if(CursorRect.y > TargetViewY + Buffer->TextRect.h - CharHeight)
         {
-            Buffer->CursorPos.l = PosToLine(Buffer, 
-                                            TargetViewPos + Buffer->TextRect.h) - 4;
+            Buffer->CursorPos.l = YToLine(Buffer, 
+                                          TargetViewY + Buffer->TextRect.h) - 4;
             MovedCursorUpOrDown = true;
         }
     }
     
-    Buffer->TargetViewPos = TargetViewPos;
+    Buffer->TargetViewY = TargetViewY;
     
-    Clamp(Buffer->TargetViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
+    Clamp(Buffer->TargetViewY, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
     Clamp(Buffer->CursorPos.l, 0, Buffer->Lines.Count-1);
     Clamp(Buffer->CursorPos.c, 0, LineLength(Buffer, Buffer->CursorPos.l));
     
@@ -251,7 +299,6 @@ AdjustView(program_state *ProgramState, buffer *Buffer)
             Diff = DistToEnd;
         Buffer->CursorPos.c += Diff;
     }
-    
 }
 
 void
@@ -267,7 +314,7 @@ FillLineData(buffer *Buffer, program_state *ProgramState)
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
     // TODO(cheryl): formalize char-exclusion-zone
-    int WrapPoint = Buffer->TextRect.x + Buffer->TextRect.w - CharWidth;
+    int WrapPoint = Buffer->TextRect.w - CharWidth;
     
     // DeAllocation
     if(DataList->IsAllocated);
@@ -299,7 +346,7 @@ FillLineData(buffer *Buffer, program_state *ProgramState)
         
         line_data *RectData = &(DataList->Data[i]);
         string *Line = &Buffer->Lines.Data[i];
-        int x = Buffer->TextRect.x;
+        int x = 0;
         
         RectData->LineRect.x = x;
         RectData->LineRect.y = y;
@@ -308,9 +355,12 @@ FillLineData(buffer *Buffer, program_state *ProgramState)
         
         for(int a = 0; a < Line->Length; a++)
         {
+            // Rect is within the space of textrect
+            // so when drawing, offset by textrect.x and textrect.y
+            // as well as buffer viewpos
             if(x+CharWidth >= WrapPoint)
             {
-                x = Buffer->TextRect.x + SubLineOffset*CharWidth;
+                x = SubLineOffset*CharWidth;
                 y += CharHeight;
                 RectData->DisplayLines++;
             }
@@ -366,8 +416,7 @@ DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor)
 void
 DrawBuffer(program_state *ProgramState, buffer *Buffer)
 {
-    Font *FontMain = &ProgramState->FontMain;
-    //int FontSize = ProgramState->FontSize;
+    //Font *FontMain = &ProgramState->FontMain;
     v2 CharDim = GetCharDim(ProgramState);
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
@@ -379,24 +428,23 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     
     
     { // Draw cursor
-        DrawRectangleRec(R(Buffer->CursorRect - V2(0, Buffer->ViewPos)), ProgramState->CursorBGColor);
+        DrawRectangleRec(R(CharToScreenSpace(Buffer, Buffer->CursorRect)), ProgramState->CursorBGColor);
     }
     
     // Draw text
     for(int l = 0; l < Buffer->LineDataList.Count; l++)
     {
         string NumberString = String("%d", l);
-        DrawString(ProgramState, NumberString, V2(0, LineRect(Buffer, l).y-Buffer->ViewPos), ProgramState->LineNumberFGColor);
+        DrawString(ProgramState, NumberString, V2(0, LineRect(Buffer, l).y-Buffer->ViewY), ProgramState->LineNumberFGColor);
         
         line_data LineData = GetLineData(Buffer, l);
         
         int LineY = LineData.LineRect.y;
-        if(LineY - Buffer->ViewPos > Buffer->TextRect.y + Buffer->TextRect.h) break;
+        if(LineY - Buffer->ViewY > Buffer->TextRect.y + Buffer->TextRect.h) break;
         
         for(int c = 0; c < LineData.CharRects.Count; c++)
         {
-            rect Rect = RectAt(Buffer, l, c);
-            Rect.y -= Buffer->ViewPos;
+            rect Rect = ScreenRectAt(Buffer, l, c);
             
             color CharColor = ProgramState->FGColor;
             if(BufferPos(l, c) == Buffer->CursorPos)
@@ -409,7 +457,10 @@ DrawBuffer(program_state *ProgramState, buffer *Buffer)
     }
     EndShaderMode();
     
-    int ViewPos = Buffer->ViewPos;
+    int ViewPos = Buffer->ViewY;
+    
+    
+    DrawRectangleLinesEx(R(Buffer->TextRect), 5, PURPLE);
 }
 
 extern "C"
@@ -575,7 +626,7 @@ extern "C"
                 ProgramState->CursorFGColor = ProgramState->BGColor;
             }
             
-            Buffer->ViewPos = 0;
+            Buffer->ViewY = 0;
             Buffer->LineDataList = {0};
             Buffer->CursorPos = BufferPos(0, 0);
             Buffer->IdealCursorCol = 0;
@@ -588,6 +639,7 @@ extern "C"
             FillLineData(Buffer, ProgramState);
         }
         
+        BeginDrawing();
         
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
@@ -653,9 +705,9 @@ extern "C"
         if(!(IsAnyControlKeyDown))
         {
             // TODO: mouse scrolling is kind of stuttery, especially up
-            int NewTargetViewPos = Buffer->TargetViewPos;
-            NewTargetViewPos -= GetMouseWheelMove()*20;
-            Clamp(NewTargetViewPos, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
+            int NewTargetViewY = Buffer->TargetViewY;
+            NewTargetViewY -= GetMouseWheelMove()*20;
+            Clamp(NewTargetViewY, 0, Buffer->LineDataList[Buffer->Lines.Count-1].EndLineRect.y);
             
             
             buffer_pos NewCursorPos = Buffer->CursorPos;
@@ -674,27 +726,25 @@ extern "C"
             b32 MovedUpOrDown = false;
             if(KeyShouldExecute(ProgramState->UpKey))
             {
-                rect UpRect = Buffer->CursorTargetRect - Rect(0, CharHeight, 0, 0);
+                rect UpRect = Buffer->CursorTargetRect - V2(0, CharHeight);
                 NewCursorPos = ClosestBufferPos(Buffer, UpRect);
                 MovedUpOrDown = true;
             }
             if(KeyShouldExecute(ProgramState->DownKey))
             {
-                rect DownRect = Buffer->CursorTargetRect + Rect(0, CharHeight, 0, 0);
+                rect DownRect = Buffer->CursorTargetRect + V2(0, CharHeight);
                 NewCursorPos = ClosestBufferPos(Buffer, DownRect);
                 MovedUpOrDown = true;
             }
             
+            
             Clamp(NewCursorPos.l, 0, Buffer->Lines.Count-1);
             Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
-            
-            Clamp(NewCursorPos.c, 0, LineLength(Buffer, NewCursorPos.l));
-            
             
             ProgramState->UserMovedView = false;
             ProgramState->UserMovedCursor = false;
             
-            if(NewTargetViewPos != Buffer->TargetViewPos)
+            if(NewTargetViewY != Buffer->TargetViewY)
             {
                 ProgramState->UserMovedView = true;
             }
@@ -703,9 +753,8 @@ extern "C"
                 ProgramState->UserMovedCursor = true;
             }
             
-            
             // NOTE: Col > IdealCursorChar shouldn't be possible
-            if(MovedUpOrDown && ColAt(ProgramState, Buffer, NewCursorPos) < Buffer->IdealCursorCol)
+            if(MovedUpOrDown && ColAt(ProgramState, Buffer, NewCursorPos) < Buffer->IdealCursorCol && NewCursorPos.l != Buffer->CursorPos.l)
             {
                 int Diff = Buffer->IdealCursorCol - ColAt(ProgramState, Buffer, NewCursorPos);
                 int DistToEnd = Buffer->Lines[NewCursorPos.l].Length - NewCursorPos.c;
@@ -714,9 +763,21 @@ extern "C"
                 NewCursorPos.c += Diff;
             }
             
-            Buffer->TargetViewPos = NewTargetViewPos;
+            Buffer->TargetViewY = NewTargetViewY;
             Buffer->CursorPos = NewCursorPos;
         }
+        
+        if(IsMouseButtonDown(0))
+        {
+            v2 MousePos = V2(GetMousePosition());
+            
+            buffer_pos MouseBufferPos = ClosestBufferPos(Buffer, ScreenToCharSpace(Buffer, MousePos));
+            Buffer->CursorPos = MouseBufferPos;
+            Buffer->IdealCursorCol = Buffer->CursorPos.c;
+        }
+        
+        
+        
         
         
         for(int i = 0; i < 26; i++)
@@ -891,17 +952,7 @@ extern "C"
         }
         
         
-        if(IsMouseButtonDown(0))
-        {
-            v2 AdjustedMousePos = V2(GetMousePosition());
-            AdjustedMousePos.y += Buffer->TextRect.y;
-            AdjustedMousePos.y += Buffer->ViewPos;
-            
-            buffer_pos MouseBufferPos = ClosestBufferPos(Buffer, AdjustedMousePos);
-            //printf("%d, %d\n", MouseBufferPos.l, MouseBufferPos.c);
-            Buffer->CursorPos = MouseBufferPos;
-            Buffer->IdealCursorCol = Buffer->CursorPos.c;
-        }
+        
         
         
         Clamp(Buffer->CursorPos.l, 0, Buffer->Lines.Count-1);
@@ -912,21 +963,16 @@ extern "C"
         FillLineData(Buffer, ProgramState);
         
         
-        Buffer->CursorTargetRect = RectAt(Buffer, Buffer->CursorPos.l, Buffer->CursorPos.c);
+        Buffer->CursorTargetRect = CharRectAt(Buffer, Buffer->CursorPos.l, Buffer->CursorPos.c);
         Buffer->CursorRect = Interpolate(Buffer->CursorRect, Buffer->CursorTargetRect, 0.5f);
-        Buffer->ViewPos = Interpolate(Buffer->ViewPos, Buffer->TargetViewPos, 0.4f);
+        Buffer->ViewY = Interpolate(Buffer->ViewY, Buffer->TargetViewY, 0.4f);
         
-        BeginDrawing();
         ClearBackground(ProgramState->BGColor);
-        //ClearBackground(RAYWHITE);
         
         DrawBuffer(ProgramState, Buffer);
         //u64 BeforeTime = GetNanoseconds();
         //printf("Fill time: %lu\n", (GetNanoseconds() - BeforeTime) /1000000);
         
-        
-#if 1
-#endif
         
         EndDrawing();
     }

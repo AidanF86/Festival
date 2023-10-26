@@ -39,12 +39,11 @@ DONE basic changeable colors
 DONE: Mouse click move cursor
 
 DONE Unicode (UTF-32)
+DONE get Print working again
+DONE fix mouse clicking (1/2 off both axes)
+DONE(hopefully) Solidify text rect and char rect concepts
 
-Current goal: Clean things up
-                DONE get Print working again
-                solidify text rect and char rect concepts
-
-Multiple buffers
+Current goal: Multiple buffers
 
 File writing
 File open
