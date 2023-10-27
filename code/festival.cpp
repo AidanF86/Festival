@@ -461,7 +461,8 @@ DrawView(program_state *ProgramState, view *View)
     }
     EndShaderMode();
     
-    DrawRectangleLinesEx(R(View->TextRect), 5, PURPLE);
+    DrawRectangleLinesEx(R(View->Rect), 5, ORANGE);
+    DrawRectangleLinesEx(R(View->TextRect), 2, BLUE);
 }
 
 extern "C"
@@ -469,10 +470,12 @@ extern "C"
     PROGRAM_UPDATE_AND_RENDER(ProgramUpdateAndRender)
     {
         program_state *ProgramState = (program_state *)Memory->Data;
+        ProgramState->ScreenWidth = Memory->WindowWidth;
+        ProgramState->ScreenHeight = Memory->WindowHeight;
         buffer *Buffers = ProgramState->Buffers;
-        view *View = &ProgramState->LeftView;
-        View->Buffer = &Buffers[0];
-        buffer *Buffer = View->Buffer;
+        view *Views = ProgramState->Views;
+        view *View = &ProgramState->Views[0];
+        buffer *Buffer = &ProgramState->Buffers[0];
         Font *FontMain = &ProgramState->FontMain;
         Font *FontSDF = &ProgramState->FontSDF;
         
@@ -629,13 +632,35 @@ extern "C"
                 ProgramState->CursorFGColor = ProgramState->BGColor;
             }
             
-            View->Y = 0;
-            View->LineDataList = {0};
-            View->CursorPos = BufferPos(0, 0);
-            View->IdealCursorCol = 0;
+            
             
             ProgramState->ScreenHeight = Memory->WindowHeight;
             ProgramState->ScreenWidth = Memory->WindowWidth;
+            
+            for(int i = 1; i < 6; i++)
+            {
+                ProgramState->Views[i].Active = false;
+            }
+            
+            ProgramState->Views[0].Active = true;
+            ProgramState->Views[0].Row = 0;
+            ProgramState->Views[0].Col = 0;
+            ProgramState->Views[0].Y = 0;
+            ProgramState->Views[0].LineDataList = {0};
+            ProgramState->Views[0].CursorPos = BufferPos(0, 0);
+            ProgramState->Views[0].IdealCursorCol = 0;
+            ProgramState->Views[0].Buffer = &Buffers[0];
+            ProgramState->Views[0].Rect.h = ProgramState->ScreenWidth;
+            
+            ProgramState->Views[1].Active = true;
+            ProgramState->Views[1].Row = 0;
+            ProgramState->Views[1].Col = 1;
+            ProgramState->Views[1].Y = 0;
+            ProgramState->Views[1].LineDataList = {0};
+            ProgramState->Views[1].CursorPos = BufferPos(0, 0);
+            ProgramState->Views[1].IdealCursorCol = 0;
+            ProgramState->Views[1].Buffer = &Buffers[0];
+            ProgramState->Views[1].Rect.h = ProgramState->ScreenHeight;
             
             FillLineData(View, ProgramState);
         }
@@ -964,29 +989,112 @@ extern "C"
         //v2 CharDim = GetCharDim(ProgramState);
         //int CharWidth = CharDim.x;
         //int CharHeight = CharDim.y;
-        view *LeftView = &ProgramState->LeftView;
-        view *RightView = &ProgramState->RightView;
-        
-        {
-            LeftView->Rect = Rect(0, 0, ProgramState->ScreenWidth/2, ProgramState->ScreenHeight);
-            int x = LeftView->Rect.x + NumbersWidth*CharWidth+MarginLeft;
-            int y = LeftView->Rect.y;
-            LeftView->TextRect = Rect(x, y,
-                                      LeftView->Rect.w - x, RightView->Rect.h - y);
-        }
-        
-        {
-            RightView->Rect = Rect(ProgramState->ScreenWidth/2, 0,
-                                   ProgramState->ScreenWidth/2, ProgramState->ScreenHeight);
-            int x = LeftView->Rect.x + NumbersWidth*CharWidth+MarginLeft;
-            int y = LeftView->Rect.y;
-            RightView->TextRect = Rect(x, y,
-                                       RightView->Rect.w - x, RightView->Rect.h - y);
-        }
-        
         
         AdjustView(ProgramState, View);
-        FillLineData(View, ProgramState);
+        
+        ProgramState->LeftW = ProgramState->ScreenWidth/2;
+        int LeftViews = 0;
+        int RightViews = 0;
+        for(int i = 0; i < 6; i++)
+        {
+            if(Views[i].Active)
+            {
+                if(Views[i].Col == 0)
+                    LeftViews++;
+                else
+                    RightViews++;
+            }
+        }
+        
+        if(LeftViews + RightViews == 1)
+        { // Just one
+            view *View;
+            for(int i = 0; i < 6; i++)
+            {
+                if(Views[i].Active)
+                    View = &Views[i];
+            }
+            
+            View->Rect = Rect(0, 0, ProgramState->ScreenWidth, ProgramState->ScreenHeight);
+            int x = View->Rect.x + NumbersWidth*CharWidth+MarginLeft;
+            int y = View->Rect.y;
+            View->TextRect = Rect(x, y, View->Rect.w - x, View->Rect.h - y);
+        }
+        else if(LeftViews > 0 && RightViews > 0)
+        { // >=1 on both sides, Complex case
+            
+            // position left side
+            {
+                int ViewIndices[3];
+                int ViewIndicesIndex = 0;
+                for(int a = 0; a < LeftViews; a++)
+                {
+                    for(int i = 0; i < 6; i++)
+                    {
+                        if(Views[i].Active && Views[i].Col == 0 && Views[i].Row == a)
+                        {
+                            ViewIndices[ViewIndicesIndex] = i;
+                            ViewIndicesIndex++;
+                        }
+                    }
+                }
+                
+                int y = 0;
+                for(int i = 0; i < LeftViews; i++)
+                {
+                    view *View = &ProgramState->Views[ViewIndices[i]];
+                    View->Rect.y = y;
+                    View->Rect.w = ProgramState->LeftW;
+                    if(i == LeftViews)
+                        View->Rect.h = ProgramState->ScreenHeight - y;
+                    y += View->Rect.h;
+                }
+            }
+            
+            
+            // position right side
+            {
+                int ViewIndices[3];
+                int ViewIndicesIndex = 0;
+                for(int a = 0; a < RightViews; a++)
+                {
+                    for(int i = 0; i < 6; i++)
+                    {
+                        if(Views[i].Active && Views[i].Col == 1 && Views[i].Row == a)
+                        {
+                            ViewIndices[ViewIndicesIndex] = i;
+                            ViewIndicesIndex++;
+                        }
+                    }
+                }
+                
+                int y = 0;
+                for(int i = 0; i < RightViews; i++)
+                {
+                    view *View = &ProgramState->Views[ViewIndices[i]];
+                    View->Rect.y = y;
+                    View->Rect.x = ProgramState->LeftW;
+                    View->Rect.w = ProgramState->ScreenWidth - ProgramState->LeftW;
+                    if(i == RightViews)
+                        View->Rect.h = ProgramState->ScreenHeight - y;
+                    y += View->Rect.h;
+                }
+            }
+        }
+        else if(LeftViews+RightViews)
+        { // All on one side
+        }
+        
+        //ComputeViewRects(ProgramState);
+        for(int i = 0; i < 6; i++)
+        {
+            view *View = &ProgramState->Views[i];
+            View->TextRect.x = View->Rect.x + NumbersWidth*CharWidth + MarginLeft;
+            View->TextRect.y = View->Rect.y;
+            View->TextRect.w = View->Rect.w - (NumbersWidth*CharWidth + MarginLeft);
+            View->TextRect.h = View->Rect.h;
+        }
+        
         
         
         View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
@@ -995,7 +1103,16 @@ extern "C"
         
         ClearBackground(ProgramState->BGColor);
         
-        DrawView(ProgramState, View);
+        for(int i = 0; i < 6; i++)
+        {
+            view *View = &ProgramState->Views[i];
+            if(View->Active)
+            {
+                Print("%r", View->Rect);
+                FillLineData(View, ProgramState);
+                DrawView(ProgramState, View);
+            }
+        }
         //u64 BeforeTime = GetNanoseconds();
         //printf("Fill time: %lu\n", (GetNanoseconds() - BeforeTime) /1000000);
         

@@ -55,9 +55,16 @@ struct buffer
     string_list Lines;
 };
 
+
+
 struct view
 {
     buffer *Buffer;
+    
+    b32 Active;
+    
+    int Row; // [0,2]
+    int Col; // [0,1]
     
     rect Rect;
     rect TextRect;
@@ -74,6 +81,7 @@ struct view
     line_data_list LineDataList;
 };
 
+
 struct key_data
 {
     int KeyCode;
@@ -81,6 +89,7 @@ struct key_data
     f32 PressTime;
     f32 TimeTillNextRepeat;
 };
+
 
 #define MAX_BUFFERS 50
 struct program_state
@@ -104,16 +113,10 @@ struct program_state
     buffer Buffers[MAX_BUFFERS];
     int OpenBufferCount;
     
-    union
-    {
-        struct 
-        {
-            view LeftView;
-            view RightView;
-        };
-        view Views[2];
-    };
+    view Views[6];
     view *SelectedView; // selected view
+    u32 LeftW;
+    
     
     b32 UserMovedCursor;
     b32 UserMovedView;

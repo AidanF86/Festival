@@ -214,7 +214,7 @@ _String(const char *Format, va_list Args)
                     case 'R':
                     {
                         Rectangle Var = va_arg(Args, Rectangle);
-                        Length = Sprintf(StringVarBuffer, "(%.3f, %.3f, %.3f, %.3f)",
+                        Length = Sprintf(StringVarBuffer, "(%d, %d, %d, %d)",
                                          Var.x, Var.y, Var.width, Var.height);
                     }
                 }
