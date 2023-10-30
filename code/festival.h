@@ -4,6 +4,7 @@
 #define FESTIVAL_H
 
 #define IsAnyShiftKeyDown (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) 
+#define IsAnyAltKeyDown (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) 
 #define IsAnyControlKeyDown (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) 
 
 
@@ -80,6 +81,17 @@ struct view
     
     line_data_list LineDataList;
 };
+
+typedef struct view_list
+{
+    int Count;
+    int ArraySize;
+    view *Data;
+    inline view& operator[](size_t Index) { return Data[Index]; }
+    inline const view& operator[](size_t Index) const { return Data[Index]; }
+} view_list;
+
+
 
 
 struct key_data

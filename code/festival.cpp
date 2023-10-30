@@ -426,19 +426,23 @@ DrawView(program_state *ProgramState, view *View)
     int CharHeight = CharDim.y;
     
     
-    DrawRectangle(0, 0, 4*CharWidth, ProgramState->ScreenHeight, ProgramState->LineNumberBGColor);
+    DrawRectangle(View->Rect.x, View->Rect.y, 4*CharWidth, ProgramState->ScreenHeight, ProgramState->LineNumberBGColor);
     
     BeginShaderMode(ProgramState->ShaderSDF);
     
     
     // Draw cursor
-    DrawRectangleRec(R(CharToScreenSpace(View, View->CursorRect)), ProgramState->CursorBGColor);
+    rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
+    if(View == ProgramState->SelectedView)
+        DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+    else
+        DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
     
     // Draw text
     for(int l = 0; l < LineCount(View); l++)
     {
         string NumberString = String("%d", l);
-        DrawString(ProgramState, NumberString, V2(0, LineRect(View, l).y - View->Y), ProgramState->LineNumberFGColor);
+        DrawString(ProgramState, NumberString, V2(View->Rect.x, LineRect(View, l).y - View->Y), ProgramState->LineNumberFGColor);
         
         line_data LineData = LineDataAt(View, l);
         
@@ -451,7 +455,7 @@ DrawView(program_state *ProgramState, view *View)
             rect Rect = ScreenRectAt(View, l, c);
             
             color CharColor = ProgramState->FGColor;
-            if(BufferPos(l, c) == View->CursorPos)
+            if(View == ProgramState->SelectedView && BufferPos(l, c) == View->CursorPos)
             {
                 CharColor = ProgramState->CursorFGColor;
             }
@@ -474,7 +478,6 @@ extern "C"
         ProgramState->ScreenHeight = Memory->WindowHeight;
         buffer *Buffers = ProgramState->Buffers;
         view *Views = ProgramState->Views;
-        view *View = &ProgramState->Views[0];
         buffer *Buffer = &ProgramState->Buffers[0];
         Font *FontMain = &ProgramState->FontMain;
         Font *FontSDF = &ProgramState->FontSDF;
@@ -544,6 +547,7 @@ extern "C"
             }
             
             
+            view *View = ProgramState->SelectedView;
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;
             
@@ -637,11 +641,12 @@ extern "C"
             ProgramState->ScreenHeight = Memory->WindowHeight;
             ProgramState->ScreenWidth = Memory->WindowWidth;
             
-            for(int i = 1; i < 6; i++)
+            for(int i = 0; i < 6; i++)
             {
                 ProgramState->Views[i].Active = false;
             }
             
+            ProgramState->Views[0] = {0};
             ProgramState->Views[0].Active = true;
             ProgramState->Views[0].Row = 0;
             ProgramState->Views[0].Col = 0;
@@ -652,6 +657,7 @@ extern "C"
             ProgramState->Views[0].Buffer = &Buffers[0];
             ProgramState->Views[0].Rect.h = ProgramState->ScreenWidth;
             
+            ProgramState->Views[1] = {0};
             ProgramState->Views[1].Active = true;
             ProgramState->Views[1].Row = 0;
             ProgramState->Views[1].Col = 1;
@@ -662,11 +668,19 @@ extern "C"
             ProgramState->Views[1].Buffer = &Buffers[0];
             ProgramState->Views[1].Rect.h = ProgramState->ScreenHeight;
             
-            FillLineData(View, ProgramState);
+            ProgramState->SelectedView = &ProgramState->Views[0];
+            
+            for(int i = 0; i < 6; i++)
+            {
+                view *View = &ProgramState->Views[i];
+                if(View->Active)
+                    FillLineData(View, ProgramState);
+            }
         }
         
         BeginDrawing();
         
+        view *View = ProgramState->SelectedView;
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
         
@@ -949,12 +963,33 @@ extern "C"
                 }
                 else if(i == 3)
                 { // Tab
+                    // Switch views
+                    int row = View->Row;
+                    int col = View->Col;
+                    view *NextView = View;
+                    for(int i = 0; i < 6; i++)
+                    {
+                        view *TestView = &ProgramState->Views[i];
+                        if(TestView != View && TestView->Active)
+                        {
+                            if((TestView->Col == View->Col && TestView->Row > View->Row && TestView->Row < NextView->Row) ||
+                               (TestView->Col != NextView->Col) ||
+                               (TestView->Col == NextView->Col && TestView->Row < NextView->Row))
+                            {
+                                NextView = TestView;
+                            }
+                        }
+                    }
+                    ProgramState->SelectedView = NextView;
+                    View = ProgramState->SelectedView;
+#if 0
                     for(int a = 0; a < 4; a++)
                     {
                         Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
                         View->CursorPos.c++;
                         View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
                     }
+#endif
                 }
                 else if(i == 4)
                 { // Return
@@ -990,7 +1025,6 @@ extern "C"
         //int CharWidth = CharDim.x;
         //int CharHeight = CharDim.y;
         
-        AdjustView(ProgramState, View);
         
         ProgramState->LeftW = ProgramState->ScreenWidth/2;
         int LeftViews = 0;
@@ -1045,7 +1079,7 @@ extern "C"
                     view *View = &ProgramState->Views[ViewIndices[i]];
                     View->Rect.y = y;
                     View->Rect.w = ProgramState->LeftW;
-                    if(i == LeftViews)
+                    if(i == LeftViews-1)
                         View->Rect.h = ProgramState->ScreenHeight - y;
                     y += View->Rect.h;
                 }
@@ -1075,7 +1109,7 @@ extern "C"
                     View->Rect.y = y;
                     View->Rect.x = ProgramState->LeftW;
                     View->Rect.w = ProgramState->ScreenWidth - ProgramState->LeftW;
-                    if(i == RightViews)
+                    if(i == RightViews-1)
                         View->Rect.h = ProgramState->ScreenHeight - y;
                     y += View->Rect.h;
                 }
@@ -1095,6 +1129,7 @@ extern "C"
             View->TextRect.h = View->Rect.h;
         }
         
+        AdjustView(ProgramState, View);
         
         
         View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
@@ -1108,7 +1143,6 @@ extern "C"
             view *View = &ProgramState->Views[i];
             if(View->Active)
             {
-                Print("%r", View->Rect);
                 FillLineData(View, ProgramState);
                 DrawView(ProgramState, View);
             }

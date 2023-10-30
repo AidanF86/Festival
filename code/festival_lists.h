@@ -110,4 +110,38 @@ int ListRemoveAt(color_list *List, int Index)
     return 0;
 }
 
+
+/*======= view List =======*/
+view_list ViewList()
+{
+    view_list Result;
+    Result.Count = 0;
+    Result.ArraySize = 20;
+    Result.Data = (view *)malloc(20 * sizeof(view));
+    return Result;
+}
+
+view_list ViewList(int Size)
+{
+    view_list Result;
+    Result.Count = 0;
+    Result.ArraySize = Size;
+    Result.Data = (view *)malloc(Size * sizeof(view));
+    return Result;
+}
+
+int ListRemoveAt(view_list *List, int Index)
+{
+    if(Index >= 0 && Index < List->Count)
+    {
+        for(int i = Index; i < List->Count; i++)
+        {
+            List->Data[i] = List->Data[i+1];
+        }
+        List->Count--;
+        return 1;
+    }
+    return 0;
+}
+
 #endif //FESTIVAL_LISTS_H
