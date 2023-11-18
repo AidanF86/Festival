@@ -709,6 +709,8 @@ extern "C"
             ProgramState->Views = ViewList();
             ListAdd(Views, View(ProgramState, &Buffers[0], -1, Location_Below));
             ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[0].Id, Location_Right));
+            //ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[0].Id, Location_Below));
+            ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[1].Id, Location_Below));
             
             ProgramState->SelectedViewIndex = 0;
             
@@ -1090,7 +1092,7 @@ extern "C"
             for(int i = 0; i < Views->Count; i++)
             {
                 view *View = &Views->Data[i];
-                if((NextChild == NULL && View->ParentId == 0) || (View->ParentId == 0 && !View->ComputedFromParentThisFrame && View->BirthOrdinal < LowestBirthOrdinal))
+                if((NextChild == NULL && View->ParentId == 0 && !View->ComputedFromParentThisFrame) || (View->ParentId == 0 && !View->ComputedFromParentThisFrame && View->BirthOrdinal < LowestBirthOrdinal))
                 {
                     NextChild = View;
                     LowestBirthOrdinal = NextChild->BirthOrdinal;
@@ -1107,21 +1109,33 @@ extern "C"
             view *Parent = RootView;
             view *Child = NextChild;
             f32 Ratio = Child->Area;
-            Ratio = 0.1f;
+            //Ratio = 0.5f;
             printf("id: %d\n", Child->Id);
             printf("%f\n", Ratio);
             
-            // TODO: this is for horizontal splitting, need to add vertical
-            Child->Rect.x = Parent->Rect.x + Parent->Rect.w * (1.0f-Ratio);
-            Child->Rect.y = Parent->Rect.y;
-            Child->Rect.w = Parent->Rect.w * Ratio;
-            Child->Rect.h = Parent->Rect.h;
-            ComputeTextRect(ProgramState, Child);
+            if(Child->SpawnLocation == Location_Right)
+            {
+                // horizontal splitting
+                Child->Rect.x = Parent->Rect.x + Parent->Rect.w * (1.0f-Ratio);
+                Child->Rect.y = Parent->Rect.y;
+                Child->Rect.w = Parent->Rect.w * Ratio;
+                Child->Rect.h = Parent->Rect.h;
+                Parent->Rect.w = Parent->Rect.w * (1.0f-Ratio);
+            }
+            else
+            {
+                // vertical splitting
+                Child->Rect.x = Parent->Rect.x;
+                Child->Rect.y = Parent->Rect.y + Parent->Rect.h * (1.0f-Ratio);
+                Child->Rect.w = Parent->Rect.w;
+                Child->Rect.h = Parent->Rect.h * Ratio;
+                Parent->Rect.h = Parent->Rect.h * (1.0f-Ratio);
+            }
             
-            Parent->Rect.w = Parent->Rect.w * (1.0f-Ratio);
+            ComputeTextRect(ProgramState, Child);
             ComputeTextRect(ProgramState, Parent);
             
-            NextChild->ComputedFromParentThisFrame = false;
+            NextChild->ComputedFromParentThisFrame = true;
         }
         
         
