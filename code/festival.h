@@ -5,7 +5,7 @@
 
 #define IsAnyShiftKeyDown (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) 
 #define IsAnyAltKeyDown (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) 
-#define IsAnyControlKeyDown (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) 
+#define IsAnyControlKeyDown (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
 
 
 typedef struct rect_list
@@ -58,14 +58,23 @@ struct buffer
 
 
 
+enum view_spawn_location {
+    Location_Below,
+    Location_Right,
+};
 struct view
 {
     buffer *Buffer;
     
-    b32 Active;
-    
-    int Row; // [0,2]
-    int Col; // [0,1]
+#if 1
+    // Rect-spawn data
+    int Id;
+    int ParentId; // -1 means this is root view
+    view_spawn_location SpawnLocation;
+    int BirthOrdinal; // [this]-th child. Determines placement and parental succession
+    // Family consists of this and child views
+    f32 Area; // fraction of parent
+#endif
     
     rect Rect;
     rect TextRect;
@@ -125,10 +134,8 @@ struct program_state
     buffer Buffers[MAX_BUFFERS];
     int OpenBufferCount;
     
-    view Views[6];
-    view *SelectedView; // selected view
-    u32 LeftW;
-    
+    view_list Views;
+    int SelectedViewIndex;
     
     b32 UserMovedCursor;
     b32 UserMovedView;

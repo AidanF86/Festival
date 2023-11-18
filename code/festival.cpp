@@ -433,10 +433,10 @@ DrawView(program_state *ProgramState, view *View)
     
     // Draw cursor
     rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
-    if(View == ProgramState->SelectedView)
-        DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
-    else
-        DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
+    //if(View == ProgramState->SelectedView)
+    DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+    //else
+    //DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
     
     // Draw text
     for(int l = 0; l < LineCount(View); l++)
@@ -455,7 +455,7 @@ DrawView(program_state *ProgramState, view *View)
             rect Rect = ScreenRectAt(View, l, c);
             
             color CharColor = ProgramState->FGColor;
-            if(View == ProgramState->SelectedView && BufferPos(l, c) == View->CursorPos)
+            if(/*View == ProgramState->SelectedView && */BufferPos(l, c) == View->CursorPos)
             {
                 CharColor = ProgramState->CursorFGColor;
             }
@@ -469,6 +469,62 @@ DrawView(program_state *ProgramState, view *View)
     DrawRectangleLinesEx(R(View->TextRect), 2, BLUE);
 }
 
+view
+View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation, f32 Area)
+{
+    view View = {0};
+    View.Buffer = Buffer;
+    View.ParentId = ParentId;
+    View.LineDataList = {0};//LineDataList();
+    
+    if(ParentId == -1)
+    {
+        // TODO(cheryl): check if there are any views in existence (there shouldn't be)
+        View.Id = 0;
+        View.Area = 1;
+        View.SpawnLocation = Location_Below;
+        View.BirthOrdinal = 0;
+    }
+    else
+    {
+        // TODO(cheryl): test :3
+        
+        // Get a unique Id
+        int Id = 0;
+        for(Id; Id <= ProgramState->Views.Count; Id++)
+        {
+            b32 IsIdTaken = false;
+            for(int a = 0; a < ProgramState->Views.Count; a++)
+            {
+                if(ProgramState->Views[a].Id == Id)
+                    IsIdTaken = true;
+            }
+            if(IsIdTaken)
+                break;
+        }
+        
+        View.Id = Id;
+        View.SpawnLocation = SpawnLocation;
+        View.Area = 0.5f; // Default
+        
+        int SiblingCount = 0;
+        for(int i = 0; i < ProgramState->Views.Count; i++)
+        {
+            if(ProgramState->Views[i].ParentId == ParentId)
+                SiblingCount++;
+        }
+        
+        View.BirthOrdinal = SiblingCount;
+    }
+    
+    return View;
+}
+
+view View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation)
+{
+    return View(ProgramState, Buffer, ParentId, SpawnLocation, 0.5f);
+}
+
 extern "C"
 {
     PROGRAM_UPDATE_AND_RENDER(ProgramUpdateAndRender)
@@ -477,7 +533,7 @@ extern "C"
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
         buffer *Buffers = ProgramState->Buffers;
-        view *Views = ProgramState->Views;
+        view_list *Views = &ProgramState->Views;
         buffer *Buffer = &ProgramState->Buffers[0];
         Font *FontMain = &ProgramState->FontMain;
         Font *FontSDF = &ProgramState->FontSDF;
@@ -546,8 +602,6 @@ extern "C"
                 SetTextureFilter(FontSDF->texture, TEXTURE_FILTER_BILINEAR);
             }
             
-            
-            view *View = ProgramState->SelectedView;
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;
             
@@ -637,50 +691,20 @@ extern "C"
             }
             
             
-            
             ProgramState->ScreenHeight = Memory->WindowHeight;
             ProgramState->ScreenWidth = Memory->WindowWidth;
             
-            for(int i = 0; i < 6; i++)
-            {
-                ProgramState->Views[i].Active = false;
-            }
+            ProgramState->Views = ViewList();
+            ListAdd(Views, View(ProgramState, &Buffers[0], -1, Location_Below));
             
-            ProgramState->Views[0] = {0};
-            ProgramState->Views[0].Active = true;
-            ProgramState->Views[0].Row = 0;
-            ProgramState->Views[0].Col = 0;
-            ProgramState->Views[0].Y = 0;
-            ProgramState->Views[0].LineDataList = {0};
-            ProgramState->Views[0].CursorPos = BufferPos(0, 0);
-            ProgramState->Views[0].IdealCursorCol = 0;
-            ProgramState->Views[0].Buffer = &Buffers[0];
-            ProgramState->Views[0].Rect.h = ProgramState->ScreenWidth;
+            ProgramState->SelectedViewIndex = 0;
             
-            ProgramState->Views[1] = {0};
-            ProgramState->Views[1].Active = true;
-            ProgramState->Views[1].Row = 0;
-            ProgramState->Views[1].Col = 1;
-            ProgramState->Views[1].Y = 0;
-            ProgramState->Views[1].LineDataList = {0};
-            ProgramState->Views[1].CursorPos = BufferPos(0, 0);
-            ProgramState->Views[1].IdealCursorCol = 0;
-            ProgramState->Views[1].Buffer = &Buffers[0];
-            ProgramState->Views[1].Rect.h = ProgramState->ScreenHeight;
-            
-            ProgramState->SelectedView = &ProgramState->Views[0];
-            
-            for(int i = 0; i < 6; i++)
-            {
-                view *View = &ProgramState->Views[i];
-                if(View->Active)
-                    FillLineData(View, ProgramState);
-            }
+            FillLineData(&ProgramState->Views[0], ProgramState);
         }
         
         BeginDrawing();
         
-        view *View = ProgramState->SelectedView;
+        view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
         
@@ -964,32 +988,12 @@ extern "C"
                 else if(i == 3)
                 { // Tab
                     // Switch views
-                    int row = View->Row;
-                    int col = View->Col;
-                    view *NextView = View;
-                    for(int i = 0; i < 6; i++)
-                    {
-                        view *TestView = &ProgramState->Views[i];
-                        if(TestView != View && TestView->Active)
-                        {
-                            if((TestView->Col == View->Col && TestView->Row > View->Row && TestView->Row < NextView->Row) ||
-                               (TestView->Col != NextView->Col) ||
-                               (TestView->Col == NextView->Col && TestView->Row < NextView->Row))
-                            {
-                                NextView = TestView;
-                            }
-                        }
-                    }
-                    ProgramState->SelectedView = NextView;
-                    View = ProgramState->SelectedView;
-#if 0
                     for(int a = 0; a < 4; a++)
                     {
                         Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
                         View->CursorPos.c++;
                         View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
                     }
-#endif
                 }
                 else if(i == 4)
                 { // Return
@@ -1018,116 +1022,35 @@ extern "C"
         Clamp(View->CursorPos.l, 0, LineCount(View)-1);
         Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
         
-        //ComputeViewRects(ProgramState, Views);
-        //int MarginLeft = ProgramState->MarginLeft;
-        //int NumbersWidth = ProgramState->NumbersWidth;
-        //v2 CharDim = GetCharDim(ProgramState);
-        //int CharWidth = CharDim.x;
-        //int CharHeight = CharDim.y;
         
         
-        ProgramState->LeftW = ProgramState->ScreenWidth/2;
-        int LeftViews = 0;
-        int RightViews = 0;
-        for(int i = 0; i < 6; i++)
+        // Compute view rects
+        // SUPER TODO
+        
+        // Root view is at top left
+        // Compute root view
+        b32 FoundRootView;
+        view *RootView;
+        for(int i = 0; i < Views->Count; i++)
         {
-            if(Views[i].Active)
+            if(Views->Data[i].Id == 0)
             {
-                if(Views[i].Col == 0)
-                    LeftViews++;
-                else
-                    RightViews++;
+                FoundRootView = true;
+                RootView = &(Views->Data[i]);
             }
         }
+        if(!FoundRootView)
+            printf("MAJOR ERROR: CAN'T FIND ROOT VIEW\n");
         
-        if(LeftViews + RightViews == 1)
-        { // Just one
-            view *View;
-            for(int i = 0; i < 6; i++)
-            {
-                if(Views[i].Active)
-                    View = &Views[i];
-            }
-            
-            View->Rect = Rect(0, 0, ProgramState->ScreenWidth, ProgramState->ScreenHeight);
-            int x = View->Rect.x + NumbersWidth*CharWidth+MarginLeft;
-            int y = View->Rect.y;
-            View->TextRect = Rect(x, y, View->Rect.w - x, View->Rect.h - y);
-        }
-        else if(LeftViews > 0 && RightViews > 0)
-        { // >=1 on both sides, Complex case
-            
-            // position left side
-            {
-                int ViewIndices[3];
-                int ViewIndicesIndex = 0;
-                for(int a = 0; a < LeftViews; a++)
-                {
-                    for(int i = 0; i < 6; i++)
-                    {
-                        if(Views[i].Active && Views[i].Col == 0 && Views[i].Row == a)
-                        {
-                            ViewIndices[ViewIndicesIndex] = i;
-                            ViewIndicesIndex++;
-                        }
-                    }
-                }
-                
-                int y = 0;
-                for(int i = 0; i < LeftViews; i++)
-                {
-                    view *View = &ProgramState->Views[ViewIndices[i]];
-                    View->Rect.y = y;
-                    View->Rect.w = ProgramState->LeftW;
-                    if(i == LeftViews-1)
-                        View->Rect.h = ProgramState->ScreenHeight - y;
-                    y += View->Rect.h;
-                }
-            }
-            
-            
-            // position right side
-            {
-                int ViewIndices[3];
-                int ViewIndicesIndex = 0;
-                for(int a = 0; a < RightViews; a++)
-                {
-                    for(int i = 0; i < 6; i++)
-                    {
-                        if(Views[i].Active && Views[i].Col == 1 && Views[i].Row == a)
-                        {
-                            ViewIndices[ViewIndicesIndex] = i;
-                            ViewIndicesIndex++;
-                        }
-                    }
-                }
-                
-                int y = 0;
-                for(int i = 0; i < RightViews; i++)
-                {
-                    view *View = &ProgramState->Views[ViewIndices[i]];
-                    View->Rect.y = y;
-                    View->Rect.x = ProgramState->LeftW;
-                    View->Rect.w = ProgramState->ScreenWidth - ProgramState->LeftW;
-                    if(i == RightViews-1)
-                        View->Rect.h = ProgramState->ScreenHeight - y;
-                    y += View->Rect.h;
-                }
-            }
-        }
-        else if(LeftViews+RightViews)
-        { // All on one side
-        }
+        RootView->Rect.x = 0;
+        RootView->Rect.y = 0;
+        RootView->Rect.w = ProgramState->ScreenWidth;
+        RootView->Rect.h = ProgramState->ScreenHeight;
+        RootView->TextRect.x = RootView->Rect.x + NumbersWidth*CharWidth + MarginLeft;
+        RootView->TextRect.y = RootView->Rect.y;
+        RootView->TextRect.w = RootView->Rect.w - (RootView->TextRect.x - RootView->Rect.x);
+        RootView->TextRect.h = RootView->Rect.h;
         
-        //ComputeViewRects(ProgramState);
-        for(int i = 0; i < 6; i++)
-        {
-            view *View = &ProgramState->Views[i];
-            View->TextRect.x = View->Rect.x + NumbersWidth*CharWidth + MarginLeft;
-            View->TextRect.y = View->Rect.y;
-            View->TextRect.w = View->Rect.w - (NumbersWidth*CharWidth + MarginLeft);
-            View->TextRect.h = View->Rect.h;
-        }
         
         AdjustView(ProgramState, View);
         
@@ -1138,15 +1061,8 @@ extern "C"
         
         ClearBackground(ProgramState->BGColor);
         
-        for(int i = 0; i < 6; i++)
-        {
-            view *View = &ProgramState->Views[i];
-            if(View->Active)
-            {
-                FillLineData(View, ProgramState);
-                DrawView(ProgramState, View);
-            }
-        }
+        FillLineData(View, ProgramState);
+        DrawView(ProgramState, RootView);
         //u64 BeforeTime = GetNanoseconds();
         //printf("Fill time: %lu\n", (GetNanoseconds() - BeforeTime) /1000000);
         
