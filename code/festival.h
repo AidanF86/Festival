@@ -74,6 +74,8 @@ struct view
     int BirthOrdinal; // [this]-th child. Determines placement and parental succession
     // Family consists of this and child views
     f32 Area; // fraction of parent
+    b32 ComputedFromParentThisFrame;
+    b32 ChildrenComputedThisFrame;
 #endif
     
     rect Rect;
