@@ -421,12 +421,14 @@ DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor)
 void
 DrawView(program_state *ProgramState, view *View)
 {
+    
     v2 CharDim = GetCharDim(ProgramState);
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
     
+    DrawRectangleRec(R(View->Rect), ProgramState->BGColor);
     
-    DrawRectangle(View->Rect.x, View->Rect.y, 4*CharWidth, ProgramState->ScreenHeight, ProgramState->LineNumberBGColor);
+    DrawRectangle(View->Rect.x, View->Rect.y, 4*CharWidth, View->Rect.h, ProgramState->LineNumberBGColor);
     
     BeginShaderMode(ProgramState->ShaderSDF);
     
@@ -711,6 +713,8 @@ extern "C"
             ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[0].Id, Location_Right));
             //ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[0].Id, Location_Below));
             ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[1].Id, Location_Below));
+            ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[2].Id, Location_Below));
+            ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[3].Id, Location_Right));
             
             ProgramState->SelectedViewIndex = 0;
             
@@ -1072,70 +1076,77 @@ extern "C"
         ComputeTextRect(ProgramState, RootView);
         RootView->ComputedFromParentThisFrame = true;
         
-        // Compute child count
-        int ChildCount = 0;
-        for(int i = 0; i < Views->Count; i++)
-        {
-            if(Views->Data[i].ParentId == 0)
-                ChildCount++;
-        }
         
-        // Compute children
-        
-        // Operate on children in birth order
-        for(int child = 0; child < ChildCount; child++)
+        for(int ViewIndex = 0; ViewIndex < Views->Count; ViewIndex++)
         {
-            printf("Yeah\n");
-            view *NextChild = NULL;
-            int LowestBirthOrdinal = 1000000;
-            // get next child to operate on
+            int Id = Views->Data[ViewIndex].Id;
+            // Compute child count
+            int ChildCount = 0;
             for(int i = 0; i < Views->Count; i++)
             {
-                view *View = &Views->Data[i];
-                if((NextChild == NULL && View->ParentId == 0 && !View->ComputedFromParentThisFrame) || (View->ParentId == 0 && !View->ComputedFromParentThisFrame && View->BirthOrdinal < LowestBirthOrdinal))
+                if(Views->Data[i].ParentId == Id)
+                    ChildCount++;
+            }
+            if(ChildCount == 0)
+                continue;
+            
+            // Compute children
+            
+            // Operate on children in birth order
+            for(int child = 0; child < ChildCount; child++)
+            {
+                printf("Yeah\n");
+                view *NextChild = NULL;
+                int LowestBirthOrdinal = 1000000;
+                // get next child to operate on
+                for(int i = 0; i < Views->Count; i++)
                 {
-                    NextChild = View;
-                    LowestBirthOrdinal = NextChild->BirthOrdinal;
+                    view *View = &Views->Data[i];
+                    if((NextChild == NULL && View->ParentId == Id && !View->ComputedFromParentThisFrame) || (View->ParentId == Id && !View->ComputedFromParentThisFrame && View->BirthOrdinal < LowestBirthOrdinal))
+                    {
+                        NextChild = View;
+                        LowestBirthOrdinal = NextChild->BirthOrdinal;
+                    }
                 }
+                if(NextChild == NULL)
+                {
+                    printf("ERROR: Couldn't find next child!\n");
+                    break;
+                }
+                
+                // Compute child
+                
+                view *Parent = &Views->Data[ViewIndex];
+                view *Child = NextChild;
+                f32 Ratio = Child->Area;
+                //Ratio = 0.5f;
+                printf("id: %d\n", Child->Id);
+                printf("%f\n", Ratio);
+                
+                if(Child->SpawnLocation == Location_Right)
+                {
+                    // horizontal splitting
+                    Child->Rect.x = Parent->Rect.x + Parent->Rect.w * (1.0f-Ratio);
+                    Child->Rect.y = Parent->Rect.y;
+                    Child->Rect.w = Parent->Rect.w * Ratio;
+                    Child->Rect.h = Parent->Rect.h;
+                    Parent->Rect.w = Parent->Rect.w * (1.0f-Ratio);
+                }
+                else
+                {
+                    // vertical splitting
+                    Child->Rect.x = Parent->Rect.x;
+                    Child->Rect.y = Parent->Rect.y + Parent->Rect.h * (1.0f-Ratio);
+                    Child->Rect.w = Parent->Rect.w;
+                    Child->Rect.h = Parent->Rect.h * Ratio;
+                    Parent->Rect.h = Parent->Rect.h * (1.0f-Ratio);
+                }
+                
+                ComputeTextRect(ProgramState, Child);
+                ComputeTextRect(ProgramState, Parent);
+                
+                NextChild->ComputedFromParentThisFrame = true;
             }
-            if(NextChild == NULL)
-            {
-                printf("ERROR: Couldn't find next child!\n");
-                break;
-            }
-            
-            // Compute child
-            
-            view *Parent = RootView;
-            view *Child = NextChild;
-            f32 Ratio = Child->Area;
-            //Ratio = 0.5f;
-            printf("id: %d\n", Child->Id);
-            printf("%f\n", Ratio);
-            
-            if(Child->SpawnLocation == Location_Right)
-            {
-                // horizontal splitting
-                Child->Rect.x = Parent->Rect.x + Parent->Rect.w * (1.0f-Ratio);
-                Child->Rect.y = Parent->Rect.y;
-                Child->Rect.w = Parent->Rect.w * Ratio;
-                Child->Rect.h = Parent->Rect.h;
-                Parent->Rect.w = Parent->Rect.w * (1.0f-Ratio);
-            }
-            else
-            {
-                // vertical splitting
-                Child->Rect.x = Parent->Rect.x;
-                Child->Rect.y = Parent->Rect.y + Parent->Rect.h * (1.0f-Ratio);
-                Child->Rect.w = Parent->Rect.w;
-                Child->Rect.h = Parent->Rect.h * Ratio;
-                Parent->Rect.h = Parent->Rect.h * (1.0f-Ratio);
-            }
-            
-            ComputeTextRect(ProgramState, Child);
-            ComputeTextRect(ProgramState, Parent);
-            
-            NextChild->ComputedFromParentThisFrame = true;
         }
         
         
