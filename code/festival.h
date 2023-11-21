@@ -66,7 +66,6 @@ struct view
 {
     buffer *Buffer;
     
-#if 1
     // Rect-spawn data
     int Id;
     int ParentId; // -1 means this is root view
@@ -75,8 +74,6 @@ struct view
     // Family consists of this and child views
     f32 Area; // fraction of parent
     b32 ComputedFromParentThisFrame;
-    b32 ChildrenComputedThisFrame;
-#endif
     
     rect Rect;
     rect TextRect;
@@ -103,8 +100,6 @@ typedef struct view_list
 } view_list;
 
 
-
-
 struct key_data
 {
     int KeyCode;
@@ -112,7 +107,6 @@ struct key_data
     f32 PressTime;
     f32 TimeTillNextRepeat;
 };
-
 
 #define MAX_BUFFERS 50
 struct program_state

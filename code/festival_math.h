@@ -7,7 +7,17 @@
 
 struct v2
 {
-    int x, y;
+    union
+    {
+        struct
+        {
+            int x, y;
+        };
+        struct
+        {
+            int w, h;
+        };
+    };
 };
 struct rect
 {

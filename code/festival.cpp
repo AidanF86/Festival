@@ -421,26 +421,39 @@ DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor)
 void
 DrawView(program_state *ProgramState, view *View)
 {
-    
     v2 CharDim = GetCharDim(ProgramState);
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
+    b32 ViewIsSelected = View == &ProgramState->Views[ProgramState->SelectedViewIndex];
+    rect ViewRect = View->Rect;
+    v2 ViewPos = V2(View->Rect.x, View->Rect.y);
+    v2 ViewDim = V2(View->Rect.w, View->Rect.h);
+    
+    // Draw whole view to texture
+    BeginScissorMode(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h);
+    
     
     DrawRectangleRec(R(View->Rect), ProgramState->BGColor);
+    //ClearBackground(ProgramState->BGColor);
     
-    DrawRectangle(View->Rect.x, View->Rect.y, 4*CharWidth, View->Rect.h, ProgramState->LineNumberBGColor);
+    DrawRectangle(ViewPos.x, ViewPos.y, 4*CharWidth, ViewDim.h, ProgramState->LineNumberBGColor);
     
-    BeginShaderMode(ProgramState->ShaderSDF);
     
     
     // Draw cursor
     rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
-    //if(View == ProgramState->SelectedView)
-    DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
-    //else
-    //DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
+    
+    if(ViewIsSelected)
+    {
+        DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+    }
+    else
+    {
+        DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
+    }
     
     // Draw text
+    BeginShaderMode(ProgramState->ShaderSDF);
     for(int l = 0; l < LineCount(View); l++)
     {
         string NumberString = String("%d", l);
@@ -457,7 +470,7 @@ DrawView(program_state *ProgramState, view *View)
             rect Rect = ScreenRectAt(View, l, c);
             
             color CharColor = ProgramState->FGColor;
-            if(/*View == ProgramState->SelectedView && */BufferPos(l, c) == View->CursorPos)
+            if(ViewIsSelected && BufferPos(l, c) == View->CursorPos)
             {
                 CharColor = ProgramState->CursorFGColor;
             }
@@ -469,15 +482,19 @@ DrawView(program_state *ProgramState, view *View)
     
     DrawRectangleLinesEx(R(View->Rect), 5, ORANGE);
     DrawRectangleLinesEx(R(View->TextRect), 2, BLUE);
+    
+    EndScissorMode();
 }
 
 view
 View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation, f32 Area)
 {
     view View = {0};
+    View.CursorPos.l = 0;
+    View.CursorPos.c = 0;
     View.Buffer = Buffer;
     View.ParentId = ParentId;
-    View.LineDataList = {0};//LineDataList();
+    View.LineDataList = {0};
     
     if(ParentId == -1)
     {
@@ -741,8 +758,136 @@ extern "C"
             Memory->IsRunning = false;
         }
         
-        // TODO: this probably doesn't account for a rect with x>0
-        Clamp(View->TextRect.w, CharWidth, View->Rect.w - View->TextRect.x);
+        // Compute view rects
+        // SUPER TODO
+        
+        // Root view is at top left
+        // Compute root view
+        b32 FoundRootView;
+        view *RootView;
+        for(int i = 0; i < Views->Count; i++)
+        {
+            if(Views->Data[i].Id == 0)
+            {
+                FoundRootView = true;
+                RootView = &(Views->Data[i]);
+                break;
+            }
+        }
+        if(!FoundRootView)
+            printf("MAJOR ERROR: CAN'T FIND ROOT VIEW\n");
+        
+        
+        for(int i = 0; i < Views->Count; i++)
+        {
+            Views->Data[i].ComputedFromParentThisFrame = false;
+        }
+        
+#if 0
+        rect *OldRects = (rect *)malloc(sizeof(rect) * Views->Count);
+        for(int i = 0; i < Views->Count; i++)
+        {
+            OldRects[i] = Views->Data[i].Rect;
+        }
+#endif
+        
+        RootView->Rect.x = 0;
+        RootView->Rect.y = 0;
+        RootView->Rect.w = ProgramState->ScreenWidth;
+        RootView->Rect.h = ProgramState->ScreenHeight;
+        ComputeTextRect(ProgramState, RootView);
+        RootView->ComputedFromParentThisFrame = true;
+        
+        for(int ViewIndex = 0; ViewIndex < Views->Count; ViewIndex++)
+        {
+            int Id = Views->Data[ViewIndex].Id;
+            // Compute child count
+            int ChildCount = 0;
+            for(int i = 0; i < Views->Count; i++)
+            {
+                if(Views->Data[i].ParentId == Id)
+                    ChildCount++;
+            }
+            if(ChildCount == 0)
+                continue;
+            
+            // Compute children
+            
+            // Operate on children in birth order
+            for(int child = 0; child < ChildCount; child++)
+            {
+                view *NextChild = NULL;
+                int LowestBirthOrdinal = 1000000;
+                // get next child to operate on
+                for(int i = 0; i < Views->Count; i++)
+                {
+                    view *TestView = &Views->Data[i];
+                    if((NextChild == NULL && TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame) || (TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame && TestView->BirthOrdinal < LowestBirthOrdinal))
+                    {
+                        NextChild = TestView;
+                        LowestBirthOrdinal = NextChild->BirthOrdinal;
+                    }
+                }
+                if(NextChild == NULL)
+                {
+                    printf("ERROR: Couldn't find next child!\n");
+                    break;
+                }
+                
+                // Compute child
+                
+                view *Parent = &Views->Data[ViewIndex];
+                view *Child = NextChild;
+                f32 Ratio = Child->Area;
+                //Ratio = 0.5f;
+                //printf("id: %d\n", Child->Id);
+                //printf("%f\n", Ratio);
+                
+                if(Child->SpawnLocation == Location_Right)
+                {
+                    // horizontal splitting
+                    Child->Rect.x = Parent->Rect.x + Parent->Rect.w * (1.0f-Ratio);
+                    Child->Rect.y = Parent->Rect.y;
+                    Child->Rect.w = Parent->Rect.w * Ratio;
+                    Child->Rect.h = Parent->Rect.h;
+                    Parent->Rect.w = Parent->Rect.w * (1.0f-Ratio);
+                }
+                else
+                {
+                    // vertical splitting
+                    Child->Rect.x = Parent->Rect.x;
+                    Child->Rect.y = Parent->Rect.y + Parent->Rect.h * (1.0f-Ratio);
+                    Child->Rect.w = Parent->Rect.w;
+                    Child->Rect.h = Parent->Rect.h * Ratio;
+                    Parent->Rect.h = Parent->Rect.h * (1.0f-Ratio);
+                }
+                
+                ComputeTextRect(ProgramState, Child);
+                ComputeTextRect(ProgramState, Parent);
+                
+                NextChild->ComputedFromParentThisFrame = true;
+            }
+        }
+        
+        if(IsMouseButtonDown(0))
+        {
+            v2 MousePos = V2(GetMousePosition());
+            
+            int NewViewIndex = 0;
+            for(int i = 0; i < Views->Count; i++)
+            {
+                rect Rect = Views->Data[i].Rect;
+                if(MousePos.x >= Rect.x && MousePos.y >= Rect.y &&
+                   MousePos.x <= Rect.x + Rect.w && MousePos.y <= Rect.y + Rect.h)
+                {
+                    NewViewIndex = i;
+                }
+            }
+            ProgramState->SelectedViewIndex = NewViewIndex;
+            View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+        }
+        
+        
         
         if(IsAnyControlKeyDown)
         {
@@ -1036,122 +1181,11 @@ extern "C"
         
         
         
-        
-        
         Clamp(View->CursorPos.l, 0, LineCount(View)-1);
         Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
         
         
-        
-        // Compute view rects
-        // SUPER TODO
-        
-        // Root view is at top left
-        // Compute root view
-        b32 FoundRootView;
-        view *RootView;
-        for(int i = 0; i < Views->Count; i++)
-        {
-            if(Views->Data[i].Id == 0)
-            {
-                FoundRootView = true;
-                RootView = &(Views->Data[i]);
-                break;
-            }
-        }
-        if(!FoundRootView)
-            printf("MAJOR ERROR: CAN'T FIND ROOT VIEW\n");
-        
-        
-        for(int i = 0; i < Views->Count; i++)
-        {
-            Views->Data[i].ComputedFromParentThisFrame = false;
-            Views->Data[i].ChildrenComputedThisFrame = false;
-        }
-        
-        RootView->Rect.x = 0;
-        RootView->Rect.y = 0;
-        RootView->Rect.w = ProgramState->ScreenWidth;
-        RootView->Rect.h = ProgramState->ScreenHeight;
-        ComputeTextRect(ProgramState, RootView);
-        RootView->ComputedFromParentThisFrame = true;
-        
-        
-        for(int ViewIndex = 0; ViewIndex < Views->Count; ViewIndex++)
-        {
-            int Id = Views->Data[ViewIndex].Id;
-            // Compute child count
-            int ChildCount = 0;
-            for(int i = 0; i < Views->Count; i++)
-            {
-                if(Views->Data[i].ParentId == Id)
-                    ChildCount++;
-            }
-            if(ChildCount == 0)
-                continue;
-            
-            // Compute children
-            
-            // Operate on children in birth order
-            for(int child = 0; child < ChildCount; child++)
-            {
-                printf("Yeah\n");
-                view *NextChild = NULL;
-                int LowestBirthOrdinal = 1000000;
-                // get next child to operate on
-                for(int i = 0; i < Views->Count; i++)
-                {
-                    view *View = &Views->Data[i];
-                    if((NextChild == NULL && View->ParentId == Id && !View->ComputedFromParentThisFrame) || (View->ParentId == Id && !View->ComputedFromParentThisFrame && View->BirthOrdinal < LowestBirthOrdinal))
-                    {
-                        NextChild = View;
-                        LowestBirthOrdinal = NextChild->BirthOrdinal;
-                    }
-                }
-                if(NextChild == NULL)
-                {
-                    printf("ERROR: Couldn't find next child!\n");
-                    break;
-                }
-                
-                // Compute child
-                
-                view *Parent = &Views->Data[ViewIndex];
-                view *Child = NextChild;
-                f32 Ratio = Child->Area;
-                //Ratio = 0.5f;
-                printf("id: %d\n", Child->Id);
-                printf("%f\n", Ratio);
-                
-                if(Child->SpawnLocation == Location_Right)
-                {
-                    // horizontal splitting
-                    Child->Rect.x = Parent->Rect.x + Parent->Rect.w * (1.0f-Ratio);
-                    Child->Rect.y = Parent->Rect.y;
-                    Child->Rect.w = Parent->Rect.w * Ratio;
-                    Child->Rect.h = Parent->Rect.h;
-                    Parent->Rect.w = Parent->Rect.w * (1.0f-Ratio);
-                }
-                else
-                {
-                    // vertical splitting
-                    Child->Rect.x = Parent->Rect.x;
-                    Child->Rect.y = Parent->Rect.y + Parent->Rect.h * (1.0f-Ratio);
-                    Child->Rect.w = Parent->Rect.w;
-                    Child->Rect.h = Parent->Rect.h * Ratio;
-                    Parent->Rect.h = Parent->Rect.h * (1.0f-Ratio);
-                }
-                
-                ComputeTextRect(ProgramState, Child);
-                ComputeTextRect(ProgramState, Parent);
-                
-                NextChild->ComputedFromParentThisFrame = true;
-            }
-        }
-        
-        
-        
-        
+#if 0
         printf("\n\n\n\n");
         for(int i = 0; i < Views->Count; i++)
         {
@@ -1160,21 +1194,26 @@ extern "C"
             printf("\trect=(%d, %d, %d, %d)\n", View->Rect.x, View->Rect.y, View->Rect.w, View->Rect.h);
             printf("\ttext=(%d, %d, %d, %d)\n", View->TextRect.x, View->TextRect.y, View->TextRect.w, View->TextRect.h);
         }
+#endif
         
         
         AdjustView(ProgramState, View);
         
         
-        View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
-        View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
-        View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
-        
-        ClearBackground(ProgramState->BGColor);
-        
         for(int i = 0; i < Views->Count; i++)
         {
             view *View = &Views->Data[i];
             FillLineData(View, ProgramState);
+            View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
+            View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
+            View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
+        }
+        
+        //ClearBackground(ProgramState->BGColor);
+        
+        for(int i = 0; i < Views->Count; i++)
+        {
+            view *View = &Views->Data[i];
             DrawView(ProgramState, View);
         }
         //u64 BeforeTime = GetNanoseconds();
