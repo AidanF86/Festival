@@ -43,10 +43,12 @@ DONE get Print working again
 DONE fix mouse clicking (1/2 off both axes)
 DONE(hopefully) Solidify text rect and char rect concepts
 
-Views & Multiple buffers
+DONE Views & Multiple buffers
                 DONE sub: separate buffer into purely text/file data, move spatial data into view struct
 
-Current goal: rect spawn system :shiver:
+DONE (yippee! :smug:) rect spawn system :shiver:
+
+Current goal: Modal system
 
 File writing
 File open
@@ -104,3 +106,4 @@ Interactive chatbot w/ face that helps with stuff (integrate cheat.sh?) and show
 It could have its own buffer and a little pop-up interface?
 Could be displayed with ascii art, as that would go well with the text editor vibe
 Look into integrating cheat.sh
+OpenCYC seems like a bust BUT we can get free WolframAlpha API calls so look into integrating that

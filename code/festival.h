@@ -136,6 +136,9 @@ struct program_state
     b32 UserMovedCursor;
     b32 UserMovedView;
     
+    b32 ShowViewInfo;
+    b32 ShowViewRects;
+    
     struct
     {
         color BGColor;
