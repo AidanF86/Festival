@@ -143,6 +143,16 @@ CharAt(view *View, int l, int c)
         return 0;
     return CharAt(View->Buffer, l, c);
 }
+char
+CharAt(buffer *Buffer, buffer_pos Pos)
+{
+    return CharAt(Buffer, Pos.l, Pos.c);
+}
+char
+CharAt(view *View, buffer_pos Pos)
+{
+    return CharAt(View, Pos.l, Pos.c);
+}
 
 void
 InsertLine(buffer *Buffer, int l, string S)
@@ -483,6 +493,7 @@ UpdateKeyInput(program_state *ProgramState)
     for(int i = 0; i < sizeof(ProgramState->KeyData) / sizeof(key_data); i++)
     {
         key_data *Key = &ProgramState->KeyData[i];
+        
         if(IsKeyDown(Key->KeyCode))
         {
             if(Key->PressTime == 0)
@@ -512,3 +523,138 @@ UpdateKeyInput(program_state *ProgramState)
     }
 }
 
+
+view
+View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation, f32 Area)
+{
+    view View = {0};
+    View.CursorPos.l = 0;
+    View.CursorPos.c = 0;
+    View.Buffer = Buffer;
+    View.ParentId = ParentId;
+    View.LineDataList = {0};
+    
+    if(ParentId == -1)
+    {
+        // TODO(cheryl): check if there are any views in existence (there shouldn't be)
+        View.Id = 0;
+        View.Area = 1;
+        View.SpawnLocation = Location_Below;
+        View.BirthOrdinal = 0;
+    }
+    else
+    {
+        // TODO(cheryl): test :3
+        
+        // Get a unique Id
+        int Id = 0;
+        for(Id; Id <= ProgramState->Views.Count; Id++)
+        {
+            b32 IsIdTaken = false;
+            for(int a = 0; a < ProgramState->Views.Count; a++)
+            {
+                if(ProgramState->Views[a].Id == Id)
+                    IsIdTaken = true;
+            }
+            if(!IsIdTaken)
+                break;
+        }
+        
+        View.Id = Id;
+        View.SpawnLocation = SpawnLocation;
+        View.Area = 0.5f; // Default
+        
+        int SiblingCount = 0;
+        for(int i = 0; i < ProgramState->Views.Count; i++)
+        {
+            if(ProgramState->Views[i].ParentId == ParentId)
+                SiblingCount++;
+        }
+        
+        View.BirthOrdinal = SiblingCount;
+    }
+    
+    return View;
+}
+
+view View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation)
+{
+    return View(ProgramState, Buffer, ParentId, SpawnLocation, 0.5f);
+}
+
+void
+ComputeTextRect(program_state *ProgramState, view *View)
+{
+    v2 CharDim = GetCharDim(ProgramState);
+    int CharWidth = CharDim.x;
+    
+    View->TextRect.x = View->Rect.x + ProgramState->NumbersWidth*CharWidth + ProgramState->MarginLeft;
+    View->TextRect.y = View->Rect.y;
+    View->TextRect.w = View->Rect.w - (View->TextRect.x - View->Rect.x);
+    View->TextRect.h = View->Rect.h;
+}
+
+void
+RemoveView(program_state *ProgramState, int Index)
+{
+    // TODO: decrement birth ordinal of children?
+    
+    view_list *Views = &ProgramState->Views;
+    if(Views->Count <= 1)
+    {
+        // TODO: set view to no buffer?
+        return;
+    }
+    
+    int RemovedViewId = Views->Data[Index].Id;
+    int RemovedViewParentId = Views->Data[Index].ParentId;
+    view_spawn_location RemovedViewSpawnLocation = Views->Data[Index].SpawnLocation;
+    
+    ListRemoveAt(Views, Index);
+    
+    // find a suitable heir
+    view *Heir = NULL;
+    int HeirIndex = 0;
+    int ChildCount = 0;
+    int SmallestBirthOrdinal = 256;
+    for(int i = 0; i < Views->Count; i++)
+    {
+        view *View = &Views->Data[i];
+        if(View->ParentId == RemovedViewId)
+        {
+            ChildCount++;
+            if(View->BirthOrdinal < SmallestBirthOrdinal)
+            {
+                Heir = View;
+                HeirIndex = i;
+                SmallestBirthOrdinal = View->BirthOrdinal;
+            }
+        }
+    }
+    
+    if(Heir != NULL && ChildCount > 0)
+    {
+        Print("Has Heir");
+        Heir->Id = RemovedViewId;
+        Heir->ParentId = RemovedViewParentId;
+        Heir->SpawnLocation = RemovedViewSpawnLocation;
+        
+        if(ProgramState->SelectedViewIndex == Index || ProgramState->SelectedViewIndex >= Views->Count)
+        {
+            // set to heir
+            ProgramState->SelectedViewIndex = HeirIndex;
+        }
+    }
+    if(ProgramState->SelectedViewIndex >= Views->Count)
+    {
+        // set to parent
+        int ParentIndex = 0;
+        for(int i = 0; i < Views->Count; i++)
+        {
+            view *View = &Views->Data[i];
+            if(View->Id == RemovedViewParentId)
+                ParentIndex = i;
+        }
+        ProgramState->SelectedViewIndex = ParentIndex;
+    }
+}

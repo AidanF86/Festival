@@ -100,6 +100,7 @@ int main()
     InitWindow(Memory.WindowWidth, Memory.WindowHeight, "Festival");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(60);
+    SetExitKey(0);
     
     while(Memory.IsRunning)
     {

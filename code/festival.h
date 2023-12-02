@@ -7,6 +7,14 @@
 #define IsAnyAltKeyDown (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) 
 #define IsAnyControlKeyDown (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
 
+#define IsAlphaNumeric(c) (\
+((c) >= 'a' && (c) <= 'z') || \
+((c) >= 'A' && (c) <= 'Z') || \
+((c) >= '0' && (c) <= '9')\
+)
+#define IsNonSpecial(c) (IsAlphaNumeric(c) || \
+c == '_')
+
 
 typedef struct rect_list
 {
@@ -108,9 +116,18 @@ struct key_data
     f32 TimeTillNextRepeat;
 };
 
+enum input_mode
+{
+    InputMode_Nav,
+    InputMode_Select,
+    InputMode_Insert,
+    InputMode_Search
+};
+
 #define MAX_BUFFERS 50
 struct program_state
 {
+    b32 ShouldExit;
     f32 dTime;
     i32 ScreenWidth, ScreenHeight;
     
@@ -138,6 +155,9 @@ struct program_state
     
     b32 ShowViewInfo;
     b32 ShowViewRects;
+    
+    // modal system
+    input_mode InputMode;
     
     struct
     {
@@ -199,7 +219,7 @@ struct program_state
                 key_data Number7Key;
                 key_data Number8Key;
                 key_data Number9Key;
-                //key_data _Key;
+                
                 key_data Grave_Key;
                 key_data Minus_Key;
                 key_data Equals_Key;
@@ -229,7 +249,7 @@ struct program_state
                 key_data SpecialKeys[7];
             };
         };
-        key_data KeyData[4+26+10+11+7];
+        key_data KeyData[6+26+10+11+7];
     };
 };
 

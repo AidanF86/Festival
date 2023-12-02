@@ -67,8 +67,25 @@ DrawView(program_state *ProgramState, view *View)
     DrawRectangle(ViewPos.x, ViewPos.y, 4*CharWidth, ViewDim.h, ProgramState->LineNumberBGColor);
     
     rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
+    
     if(ViewIsSelected)
-        DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+    {
+        if(ProgramState->InputMode == InputMode_Insert)
+        {
+            DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
+                                    CursorDrawRect.w/3, CursorDrawRect.h)),
+                             ProgramState->CursorBGColor);
+            
+#if 0
+            DrawRectangleRec(R(Rect(CursorDrawRect.x,
+                                    CursorDrawRect.y + CursorDrawRect.h - CursorDrawRect.h/6,
+                                    CursorDrawRect.w, CursorDrawRect.h/6)),
+                             ProgramState->CursorBGColor);
+#endif
+        }
+        else
+            DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+    }
     else
         DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
     
@@ -90,7 +107,7 @@ DrawView(program_state *ProgramState, view *View)
             rect Rect = ScreenRectAt(View, l, c);
             
             color CharColor = ProgramState->FGColor;
-            if(ViewIsSelected && BufferPos(l, c) == View->CursorPos)
+            if(ViewIsSelected && BufferPos(l, c) == View->CursorPos && ProgramState->InputMode != InputMode_Insert)
             {
                 CharColor = ProgramState->CursorFGColor;
             }
@@ -140,140 +157,481 @@ DrawView(program_state *ProgramState, view *View)
     EndScissorMode();
 }
 
-view
-View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation, f32 Area)
+
+void
+MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
 {
-    view View = {0};
-    View.CursorPos.l = 0;
-    View.CursorPos.c = 0;
-    View.Buffer = Buffer;
-    View.ParentId = ParentId;
-    View.LineDataList = {0};
-    
-    if(ParentId == -1)
-    {
-        // TODO(cheryl): check if there are any views in existence (there shouldn't be)
-        View.Id = 0;
-        View.Area = 1;
-        View.SpawnLocation = Location_Below;
-        View.BirthOrdinal = 0;
-    }
-    else
-    {
-        // TODO(cheryl): test :3
-        
-        // Get a unique Id
-        int Id = 0;
-        for(Id; Id <= ProgramState->Views.Count; Id++)
-        {
-            b32 IsIdTaken = false;
-            for(int a = 0; a < ProgramState->Views.Count; a++)
-            {
-                if(ProgramState->Views[a].Id == Id)
-                    IsIdTaken = true;
-            }
-            if(!IsIdTaken)
-                break;
-        }
-        
-        View.Id = Id;
-        View.SpawnLocation = SpawnLocation;
-        View.Area = 0.5f; // Default
-        
-        int SiblingCount = 0;
-        for(int i = 0; i < ProgramState->Views.Count; i++)
-        {
-            if(ProgramState->Views[i].ParentId == ParentId)
-                SiblingCount++;
-        }
-        
-        View.BirthOrdinal = SiblingCount;
-    }
-    
-    return View;
+    // TODO: set ideal cursor pos
+    ProgramState->UserMovedCursor = true;
+    View->CursorPos += dPos;
+    Clamp(View->CursorPos.l, 0, LineCount(View));
+    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
 }
 
-view View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation)
+/*
+ hi  yeah   well   hello
+*/
+
+void
+MoveBackNonWhitespace(program_state *ProgramState, view *View)
 {
-    return View(ProgramState, Buffer, ParentId, SpawnLocation, 0.5f);
+    b32 StartedAtSpace = false;
+    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos - BufferPos(0, 1)) == ' ')
+        StartedAtSpace = true;
+    
+    if(StartedAtSpace)
+    {
+        do {
+            View->CursorPos -= BufferPos(0, 1);
+        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c > 0);
+    }
+    
+    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c > 0)
+    {
+        View->CursorPos -= BufferPos(0, 1);
+    }
 }
 
 void
-ComputeTextRect(program_state *ProgramState, view *View)
+MoveForwardNonWhitespace(program_state *ProgramState, view *View)
 {
-    v2 CharDim = GetCharDim(ProgramState);
-    int CharWidth = CharDim.x;
+    b32 StartedAtSpace = false;
+    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos + BufferPos(0, 1)) == ' ')
+        StartedAtSpace = true;
     
-    View->TextRect.x = View->Rect.x + ProgramState->NumbersWidth*CharWidth + ProgramState->MarginLeft;
-    View->TextRect.y = View->Rect.y;
-    View->TextRect.w = View->Rect.w - (View->TextRect.x - View->Rect.x);
-    View->TextRect.h = View->Rect.h;
+    if(StartedAtSpace)
+    {
+        do {
+            //View->CursorPos += BufferPos(0, 1);
+            MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l));
+    }
+    
+    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l))
+    {
+        //View->CursorPos += BufferPos(0, 1);
+        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+    }
+}
+
+buffer_pos
+SeekBackBorder(view *View, buffer_pos From)
+{
+    buffer_pos Result = From;
+    if(CharAt(View, Result) == 0)
+        Result.c--;
+    if(Result.c < 0)
+        return From;
+    
+    b32 StartedAtSpace = false;
+    if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, -1)) == ' ')
+        StartedAtSpace = true;
+    
+    if(StartedAtSpace)
+    {
+        Print("Started at space");
+        do {
+            Result.c--;
+        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        
+        return Result;
+    }
+    
+    b32 StartedAtSpecial = false;
+    if(!IsNonSpecial(CharAt(View, Result)))
+    {
+        StartedAtSpecial = true;
+    }
+    
+    if(StartedAtSpecial)
+    {
+        while(!IsNonSpecial(CharAt(View, Result)) && 
+              Result.c < LineLength(View, Result.l))
+            Result.c--;
+        return Result;
+    }
+    
+    char c = CharAt(View, Result);
+    while(( c != ' ' && (IsNonSpecial(c)) )
+          && Result.c < LineLength(View, Result.l))
+    {
+        Result.c--;
+        c = CharAt(View, Result);
+    }
+    
+    return Result;
+}
+
+buffer_pos
+SeekForwardBorder(view *View, buffer_pos From)
+{
+    buffer_pos Result = From;
+    
+    b32 StartedAtSpace = false;
+    if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, 1)) == ' ')
+        StartedAtSpace = true;
+    
+    if(StartedAtSpace)
+    {
+        do {
+            Result.c++;
+        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        
+        return Result;
+    }
+    
+    b32 StartedAtSpecial = false;
+    if(!IsNonSpecial(CharAt(View, Result)))
+    {
+        StartedAtSpecial = true;
+    }
+    
+    if(StartedAtSpecial)
+    {
+        while(!IsNonSpecial(CharAt(View, Result))
+              && Result.c < LineLength(View, Result.l))
+            Result.c++;
+        return Result;
+    }
+    
+    char c = CharAt(View, Result);
+    while(( c != ' ' && (IsNonSpecial(c)) )
+          && Result.c < LineLength(View, Result.l))
+    {
+        Result.c++;
+        c = CharAt(View, Result);
+    }
+    
+    return Result;
+}
+
+b32
+AtLineBeginning(view *View, buffer_pos Pos)
+{
+    return Pos.c == 0;
+}
+b32
+AtLineEnd(view *View, buffer_pos Pos)
+{
+    return Pos.c == LineLength(View, Pos.l);
+}
+
+buffer_pos
+SeekLineBeginning(view *View, buffer_pos From)
+{
+    return BufferPos(From.l, 0);
+}
+buffer_pos
+SeekLineEnd(view *View, buffer_pos From)
+{
+    return BufferPos(From.l, LineLength(View, From.l));
+}
+
+buffer_pos
+SeekPrevEmptyLine(view *View, buffer_pos From)
+{
+    int ResultLine = From.l;
+    while(ResultLine > 0)
+    {
+        ResultLine--;
+        if(LineLength(View, ResultLine) == 0)
+            break;
+    }
+    return BufferPos(ResultLine, 0);
+}
+buffer_pos
+SeekNextEmptyLine(view *View, buffer_pos From)
+{
+    int ResultLine = From.l;
+    while(ResultLine < LineCount(View))
+    {
+        ResultLine++;
+        if(LineLength(View, ResultLine) == 0)
+            break;
+    }
+    return BufferPos(ResultLine, LineLength(View, ResultLine) + 1);
 }
 
 void
-RemoveView(program_state *ProgramState, int Index)
+SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
 {
-    // TODO: decrement birth ordinal of children?
-    
-    view_list *Views = &ProgramState->Views;
-    if(Views->Count <= 1)
+    ProgramState->UserMovedCursor = true;
+    View->CursorPos = Pos;
+    Clamp(View->CursorPos.l, 0, LineCount(View));
+    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+}
+
+void
+HandleInput_Nav(program_state *ProgramState)
+{
+    if(KeyShouldExecute(ProgramState->FKey))
     {
-        // TODO: set view to no buffer?
-        return;
+        ProgramState->InputMode = InputMode_Insert;
     }
     
-    int RemovedViewId = Views->Data[Index].Id;
-    int RemovedViewParentId = Views->Data[Index].ParentId;
-    view_spawn_location RemovedViewSpawnLocation = Views->Data[Index].SpawnLocation;
-    
-    ListRemoveAt(Views, Index);
-    
-    // find a suitable heir
-    view *Heir = NULL;
-    int HeirIndex = 0;
-    int ChildCount = 0;
-    int SmallestBirthOrdinal = 256;
-    for(int i = 0; i < Views->Count; i++)
+    if(KeyShouldExecute(ProgramState->NKey))
     {
-        view *View = &Views->Data[i];
-        if(View->ParentId == RemovedViewId)
+        if(IsAnyShiftKeyDown)
         {
-            ChildCount++;
-            if(View->BirthOrdinal < SmallestBirthOrdinal)
-            {
-                Heir = View;
-                HeirIndex = i;
-                SmallestBirthOrdinal = View->BirthOrdinal;
+            ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Below));
+            printf("splitting view vertically\n");
+        }
+        else
+        {
+            ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Right));
+            printf("splitting view horizontally\n");
+        }
+    }
+    
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    if(KeyShouldExecute(ProgramState->IKey))
+        MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+    if(KeyShouldExecute(ProgramState->KKey))
+        MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+    if(KeyShouldExecute(ProgramState->JKey))
+        MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+    if(KeyShouldExecute(ProgramState->LKey))
+        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+    
+    if(KeyShouldExecute(ProgramState->UKey))
+        SetCursorPos(ProgramState, View, SeekBackBorder(View, View->CursorPos));
+    if(KeyShouldExecute(ProgramState->OKey))
+        SetCursorPos(ProgramState, View, SeekForwardBorder(View, View->CursorPos));
+    
+    if(KeyShouldExecute(ProgramState->HKey))
+    {
+        if(!AtLineBeginning(View, View->CursorPos))
+            SetCursorPos(ProgramState, View, SeekLineBeginning(View, View->CursorPos));
+        else
+            SetCursorPos(ProgramState, View, SeekPrevEmptyLine(View, View->CursorPos));
+    }
+    if(KeyShouldExecute(ProgramState->Semicolon_Key))
+    {
+        if(!AtLineEnd(View, View->CursorPos))
+            SetCursorPos(ProgramState, View, SeekLineEnd(View, View->CursorPos));
+        else
+            SetCursorPos(ProgramState, View, SeekNextEmptyLine(View, View->CursorPos));
+    }
+    
+    if(KeyShouldExecute(ProgramState->WKey))
+    {// TODO: write current buffer to file
+    }
+    
+    if(KeyShouldExecute(ProgramState->QKey))
+    {
+        if(IsAnyControlKeyDown)
+        {
+            if(IsAnyShiftKeyDown)
+            {// Exit program
+                ProgramState->ShouldExit = true;
+            }
+            else
+            {// Close current view
+                RemoveView(ProgramState, ProgramState->SelectedViewIndex);
             }
         }
+        else
+        {// TODO: Close current buffer
+        }
     }
     
-    if(Heir != NULL && ChildCount > 0)
+}
+
+
+void
+HandleInput_Insert(program_state *ProgramState)
+{
+    buffer *Buffer = ProgramState->Views[ProgramState->SelectedViewIndex].Buffer;
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    if(KeyShouldExecute(ProgramState->Escape_Key))
     {
-        Print("Has Heir");
-        Heir->Id = RemovedViewId;
-        Heir->ParentId = RemovedViewParentId;
-        Heir->SpawnLocation = RemovedViewSpawnLocation;
-        
-        if(ProgramState->SelectedViewIndex == Index || ProgramState->SelectedViewIndex >= Views->Count)
+        ProgramState->InputMode = InputMode_Nav;
+    }
+    
+    for(int i = 0; i < 26; i++)
+    {
+        if(KeyShouldExecute(ProgramState->LetterKeys[i]))
         {
-            // set to heir
-            ProgramState->SelectedViewIndex = HeirIndex;
+            char CharToAdd;
+            if(IsAnyShiftKeyDown)
+                CharToAdd = 'A' + i;
+            else
+                CharToAdd = 'a' + i;
+            
+            Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
+            View->CursorPos.c++;
+            View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
         }
     }
-    if(ProgramState->SelectedViewIndex >= Views->Count)
+    for(int i = 0; i < 10; i++)
     {
-        // set to parent
-        int ParentIndex = 0;
-        for(int i = 0; i < Views->Count; i++)
+        if(KeyShouldExecute(ProgramState->NumberKeys[i]))
         {
-            view *View = &Views->Data[i];
-            if(View->Id == RemovedViewParentId)
-                ParentIndex = i;
+            char CharToAdd;
+            if(IsAnyShiftKeyDown)
+            {
+                if(i == 1)
+                    CharToAdd = '!';
+                else if(i == 2)
+                    CharToAdd = '@';
+                else if(i == 3)
+                    CharToAdd = '#';
+                else if(i == 4)
+                    CharToAdd = '$';
+                else if(i == 5)
+                    CharToAdd = '%';
+                else if(i == 6)
+                    CharToAdd = '^';
+                else if(i == 7)
+                    CharToAdd = '&';
+                else if(i == 8)
+                    CharToAdd = '*';
+                else if(i == 9)
+                    CharToAdd = '(';
+                else
+                    CharToAdd = ')';
+                
+            }
+            else
+            {
+                CharToAdd = '0' + i;
+            }
+            
+            Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
+            View->CursorPos.c++;
+            View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
         }
-        ProgramState->SelectedViewIndex = ParentIndex;
+    }
+    for(int i = 0; i < 11; i++)
+    {
+        if(KeyShouldExecute(ProgramState->SymbolKeys[i]))
+        {
+            
+            char CharToAdd = ' ';
+            if(!IsAnyShiftKeyDown)
+            {
+                if(i == 0)
+                    CharToAdd = '`';
+                else if(i == 1)
+                    CharToAdd = '-';
+                else if(i == 2)
+                    CharToAdd = '=';
+                else if(i == 3)
+                    CharToAdd = '[';
+                else if(i == 4)
+                    CharToAdd = ']';
+                else if(i == 5)
+                    CharToAdd = '\\';
+                else if(i == 6)
+                    CharToAdd = ';';
+                else if(i == 7)
+                    CharToAdd = '\'';
+                else if(i == 8)
+                    CharToAdd = '/';
+                else if(i == 9)
+                    CharToAdd = ',';
+                else if(i == 10)
+                    CharToAdd = '.';
+            }
+            else
+            {
+                if(i == 0)
+                    CharToAdd = '~';
+                else if(i == 1)
+                    CharToAdd = '_';
+                else if(i == 2)
+                    CharToAdd = '+';
+                else if(i == 3)
+                    CharToAdd = '{';
+                else if(i == 4)
+                    CharToAdd = '}';
+                else if(i == 5)
+                    CharToAdd = '|';
+                else if(i == 6)
+                    CharToAdd = ':';
+                else if(i == 7)
+                    CharToAdd = '"';
+                else if(i == 8)
+                    CharToAdd = '?';
+                else if(i == 9)
+                    CharToAdd = '<';
+                else if(i == 10)
+                    CharToAdd = '>';
+            }
+            
+            Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
+            View->CursorPos.c++;
+            View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
+        }
+    }
+    
+    for(int i = 0; i < 7; i++)
+    {
+        if(KeyShouldExecute(ProgramState->SpecialKeys[i]))
+        {
+            
+            char CharToAdd = ' ';
+            if(i == 0)
+            {// Space
+                Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
+                View->CursorPos.c++;
+                View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
+            }
+            else if(i == 1)
+            { // Backspace
+                if(View->CursorPos.c > 0)
+                {
+                    Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
+                    View->CursorPos.c--;
+                    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+                }
+            }
+            else if(i == 2)
+            { // Delete
+                Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c);
+            }
+            else if(i == 3)
+            { // Tab
+                // TODO: handling tab char
+                for(int a = 0; a < 4; a++)
+                {
+                    Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
+                    View->CursorPos.c++;
+                    View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
+                }
+            }
+            else if(i == 4)
+            { // Return
+                InsertLine(Buffer, View->CursorPos.l+1, CopyString(Buffer->Lines[View->CursorPos.l]));
+                Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
+                Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
+                View->CursorPos.l++;
+                View->CursorPos.c = 0;
+                
+                ProgramState->UserMovedCursor = true;
+            }
+            else if(i == 5)
+            { // Caps lock
+            }
+            else if(i == 6)
+            { // Escape
+            }
+            
+        }
     }
 }
+
+void
+HandleInput(program_state *ProgramState)
+{
+    if(ProgramState->InputMode == InputMode_Nav)
+        HandleInput_Nav(ProgramState);
+    else if(ProgramState->InputMode == InputMode_Insert)
+        HandleInput_Insert(ProgramState);
+}
+
 
 extern "C"
 {
@@ -291,6 +649,7 @@ extern "C"
         if(!Memory->Initialized)
         {
             Memory->Initialized = true;
+            ProgramState->ShouldExit = false;
             
             for(int i = 0; i < MAX_BUFFERS; i++) {
                 Buffers[i] = {0};
@@ -350,17 +709,11 @@ extern "C"
             
             ProgramState->Views = ViewList();
             ListAdd(Views, View(ProgramState, &Buffers[0], -1, Location_Below));
-            /*
-                        ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[0].Id, Location_Right));
-                        ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[1].Id, Location_Below));
-                        ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[2].Id, Location_Below));
-                        ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[3].Id, Location_Right));
-            */
             
             ProgramState->SelectedViewIndex = 0;
             
-            ProgramState->ShowViewInfo = true;
-            ProgramState->ShowViewRects = true;
+            ProgramState->ShowViewInfo = false;
+            ProgramState->ShowViewRects = false;
             
             FillLineData(&ProgramState->Views[0], ProgramState);
         }
@@ -381,36 +734,17 @@ extern "C"
         int CharWidth = CharDim.x;
         int CharHeight = CharDim.y;
         
-        if(WindowShouldClose())
+        if(WindowShouldClose() || ProgramState->ShouldExit)
         {
             Memory->IsRunning = false;
         }
         
-        if(KeyShouldExecute(ProgramState->IKey))
-        {
-            ProgramState->ShowViewInfo = !ProgramState->ShowViewInfo;
-        }
+        /*
+                if(KeyShouldExecute(ProgramState->IKey))
+                    ProgramState->ShowViewInfo = !ProgramState->ShowViewInfo;
+        */
         
-        if(IsAnyControlKeyDown && IsKeyPressed(ProgramState->NKey.KeyCode))
-        {
-            if(IsAnyShiftKeyDown)
-            {
-                ListAdd(Views, View(ProgramState, &Buffers[0], Views->Data[ProgramState->SelectedViewIndex].Id, Location_Below));
-                printf("splitting view vertically\n");
-            }
-            else
-            {
-                ListAdd(Views, View(ProgramState, &Buffers[0],
-                                    Views->Data[ProgramState->SelectedViewIndex].Id, Location_Right));
-                printf("splitting view horizontally\n");
-            }
-        }
         
-        if(IsAnyControlKeyDown && IsKeyPressed(ProgramState->QKey.KeyCode))
-        {
-            RemoveView(ProgramState, ProgramState->SelectedViewIndex);
-            // TODO: handle children
-        }
         
         view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
         
@@ -626,179 +960,7 @@ extern "C"
         }
         
         
-#if 0
-        for(int i = 0; i < 26; i++)
-        {
-            if(KeyShouldExecute(ProgramState->LetterKeys[i]))
-            {
-                char CharToAdd;
-                if(IsAnyShiftKeyDown)
-                    CharToAdd = 'A' + i;
-                else
-                    CharToAdd = 'a' + i;
-                
-                Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
-                View->CursorPos.c++;
-                View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-            }
-        }
-        for(int i = 0; i < 10; i++)
-        {
-            if(KeyShouldExecute(ProgramState->NumberKeys[i]))
-            {
-                char CharToAdd;
-                if(IsAnyShiftKeyDown)
-                {
-                    if(i == 1)
-                        CharToAdd = '!';
-                    else if(i == 2)
-                        CharToAdd = '@';
-                    else if(i == 3)
-                        CharToAdd = '#';
-                    else if(i == 4)
-                        CharToAdd = '$';
-                    else if(i == 5)
-                        CharToAdd = '%';
-                    else if(i == 6)
-                        CharToAdd = '^';
-                    else if(i == 7)
-                        CharToAdd = '&';
-                    else if(i == 8)
-                        CharToAdd = '*';
-                    else if(i == 9)
-                        CharToAdd = '(';
-                    else
-                        CharToAdd = ')';
-                    
-                }
-                else
-                {
-                    CharToAdd = '0' + i;
-                }
-                
-                Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
-                View->CursorPos.c++;
-                View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-            }
-        }
-        for(int i = 0; i < 11; i++)
-        {
-            if(KeyShouldExecute(ProgramState->SymbolKeys[i]))
-            {
-                
-                char CharToAdd = ' ';
-                if(!IsAnyShiftKeyDown)
-                {
-                    if(i == 0)
-                        CharToAdd = '`';
-                    else if(i == 1)
-                        CharToAdd = '-';
-                    else if(i == 2)
-                        CharToAdd = '=';
-                    else if(i == 3)
-                        CharToAdd = '[';
-                    else if(i == 4)
-                        CharToAdd = ']';
-                    else if(i == 5)
-                        CharToAdd = '\\';
-                    else if(i == 6)
-                        CharToAdd = ';';
-                    else if(i == 7)
-                        CharToAdd = '\'';
-                    else if(i == 8)
-                        CharToAdd = '/';
-                    else if(i == 9)
-                        CharToAdd = ',';
-                    else if(i == 10)
-                        CharToAdd = '.';
-                }
-                else
-                {
-                    if(i == 0)
-                        CharToAdd = '~';
-                    else if(i == 1)
-                        CharToAdd = '_';
-                    else if(i == 2)
-                        CharToAdd = '+';
-                    else if(i == 3)
-                        CharToAdd = '{';
-                    else if(i == 4)
-                        CharToAdd = '}';
-                    else if(i == 5)
-                        CharToAdd = '|';
-                    else if(i == 6)
-                        CharToAdd = ':';
-                    else if(i == 7)
-                        CharToAdd = '"';
-                    else if(i == 8)
-                        CharToAdd = '?';
-                    else if(i == 9)
-                        CharToAdd = '<';
-                    else if(i == 10)
-                        CharToAdd = '>';
-                }
-                
-                Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
-                View->CursorPos.c++;
-                View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-            }
-        }
-        
-        for(int i = 0; i < 7; i++)
-        {
-            if(KeyShouldExecute(ProgramState->SpecialKeys[i]))
-            {
-                
-                char CharToAdd = ' ';
-                if(i == 0)
-                {// Space
-                    Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
-                    View->CursorPos.c++;
-                    View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-                }
-                else if(i == 1)
-                { // Backspace
-                    if(View->CursorPos.c > 0)
-                    {
-                        Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
-                        View->CursorPos.c--;
-                        Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-                    }
-                }
-                else if(i == 2)
-                { // Delete
-                    Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c);
-                }
-                else if(i == 3)
-                { // Tab
-                    // Switch views
-                    for(int a = 0; a < 4; a++)
-                    {
-                        Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
-                        View->CursorPos.c++;
-                        View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-                    }
-                }
-                else if(i == 4)
-                { // Return
-                    InsertLine(Buffer, View->CursorPos.l+1, CopyString(Buffer->Lines[View->CursorPos.l]));
-                    Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
-                    Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
-                    View->CursorPos.l++;
-                    View->CursorPos.c = 0;
-                    
-                    ProgramState->UserMovedCursor = true;
-                }
-                else if(i == 5)
-                { // Caps lock
-                }
-                else if(i == 6)
-                { // Escape
-                }
-                
-            }
-        }
-#endif
+        HandleInput(ProgramState);
         
         
         Clamp(View->CursorPos.l, 0, LineCount(View)-1);
