@@ -1,10 +1,3 @@
-u64
-GetNanoseconds() {
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
-    return (u64)ts.tv_sec * 1000000000L + ts.tv_nsec;
-}
-
 color
 RGBA(int r, int g, int b, int a) {
     color Result;
@@ -587,11 +580,12 @@ ComputeTextRect(program_state *ProgramState, view *View)
 {
     v2 CharDim = GetCharDim(ProgramState);
     int CharWidth = CharDim.x;
+    int CharHeight = CharDim.y;
     
     View->TextRect.x = View->Rect.x + ProgramState->NumbersWidth*CharWidth + ProgramState->MarginLeft;
-    View->TextRect.y = View->Rect.y;
+    View->TextRect.y = View->Rect.y + CharHeight;
     View->TextRect.w = View->Rect.w - (View->TextRect.x - View->Rect.x);
-    View->TextRect.h = View->Rect.h;
+    View->TextRect.h = View->Rect.h - CharHeight;
 }
 
 void

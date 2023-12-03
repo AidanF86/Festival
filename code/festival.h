@@ -60,7 +60,8 @@ typedef struct line_data_list
 
 struct buffer
 {
-    //b32 IsOpen;
+    string FileName;
+    string AbsoluteFilePath;
     string_list Lines;
 };
 
@@ -139,6 +140,7 @@ struct program_state
     Shader ShaderSDF;
     
     int FontSize;
+    int PrevFontSize;
     int CharsPerVirtualLine;
     int SubLineOffset;
     int MarginLeft;
@@ -168,6 +170,9 @@ struct program_state
         color CursorBGColor;
         color CursorFGColor;
     };
+    
+    RenderTexture2D CharTextures[256];
+    b32 CharTexturesExist[256];
     
     union
     {

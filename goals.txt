@@ -48,7 +48,12 @@ DONE Views & Multiple buffers
 
 DONE (yippee! :smug:) rect spawn system :shiver:
 
-Current goal: Modal system
+DONE Basic Modal system
+
+Current Goal: title bar,
+			  text bar & lister,
+			  commands
+
 
 File writing
 File open

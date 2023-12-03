@@ -111,6 +111,18 @@ FreeString(string String)
     free(String.Data);
 }
 
+char *
+RawString(string String)
+{
+    char *Result = (char *)malloc(sizeof(String.Length) + 1);
+    for(int i = 0; i < String.Length; i++)
+    {
+        Result[i] = (char)String.Data[i];
+    }
+    Result[String.Length] = 0;
+    return Result;
+}
+
 #if 0
 string
 _String(const char *Contents)
@@ -164,13 +176,19 @@ Sprintf(u32 *Dest, const char *Format, ...)
     return _U32_Sprintf(Dest, Format, Args);
 }
 
+b32 StringDebug = false;
 string
 _String(const char *Format, va_list Args)
 {
+    if(StringDebug)
+    {
+        printf("String creation log\n");
+        printf("-----------------------------\n");
+    }
     int Index = 0;
     
     b32 NextIsVariable = false;
-    while(*Format != '\0')
+    while(*Format != 0)
     {
         if(*Format == '%')
         {
@@ -180,6 +198,11 @@ _String(const char *Format, va_list Args)
         {
             if(NextIsVariable)
             {
+                if(StringDebug)
+                {
+                    printf("Var: ");
+                    printf("%c, ", *Format);
+                }
                 // Do proper printing
                 int Length = 0;
                 switch(*Format)
@@ -192,12 +215,23 @@ _String(const char *Format, va_list Args)
                     case 'f':
                     {
                         f64 Var = va_arg(Args, f64);
-                        Length = Sprintf(StringVarBuffer, "%.3f", Var);
+                        Length = Sprintf(StringVarBuffer, "%.3lf", Var);
                     }break;
                     case 's':
                     {
                         char *Var = va_arg(Args, char *);
                         Length = Sprintf(StringVarBuffer, "%s", Var);
+                    }break;
+                    case 'S':
+                    {
+                        if(StringDebug)
+                            printf("type String, ");
+                        string Var = va_arg(Args, string);
+                        char *TempStr = RawString(Var);
+                        if(StringDebug)
+                            printf("value \"%s\"", TempStr);
+                        Length = Sprintf(StringVarBuffer, "%s", TempStr);
+                        free(TempStr);
                     }break;
                     // TODO(cheryl): add our string (%S)
                     case 'v':
@@ -224,6 +258,8 @@ _String(const char *Format, va_list Args)
                     StringFormatBuffer[Index+i] = StringVarBuffer[i];
                 }
                 //strcpy(&(StringFormatBuffer[Index]), StringVarBuffer);
+                if(StringDebug)
+                    printf("length %d\n", Length);
                 Index += Length;//NullTerminatedStringLength(StringVarBuffer);
                 StringFormatBuffer[Index] = 0;
             }
@@ -239,6 +275,8 @@ _String(const char *Format, va_list Args)
         
         Format++;
     }
+    if(StringDebug)
+        printf("-----------------------------\n\n\n");
     
     return __String(StringFormatBuffer);
 }

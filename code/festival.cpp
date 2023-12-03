@@ -9,15 +9,72 @@
 #include "festival.h"
 #include "festival_lists.h"
 
-#include <time.h>
-#define NanoToMilli (1.0/1000000.0)
-
 #include "festival_functions.cpp"
+#include "festival_editing.h"
+#include "festival_profiling.h"
 
+void
+LoadCharTexture(program_state *ProgramState, int Char, int Size)
+{
+    if(Char < 0 || Char > 255)
+        return;
+    
+    RenderTexture2D *Tex = &ProgramState->CharTextures[Char];
+    if(ProgramState->CharTexturesExist[Char])
+        UnloadRenderTexture(*Tex);
+    
+    v2 CharDim = GetCharDim(ProgramState, Size);
+    *Tex = LoadRenderTexture(CharDim.x, CharDim.y);
+    
+    {
+        BeginTextureMode(*Tex);
+        BeginShaderMode(ProgramState->ShaderSDF);
+        
+        char CharBuffer[2] = {(char)Char, 0};
+        DrawTextEx(ProgramState->FontSDF, CharBuffer, {0,0}, Size, 0, WHITE);
+        
+        EndShaderMode();
+        EndTextureMode();
+    }
+    
+    printf("Yeah\n");
+    ProgramState->CharTexturesExist[Char] = true;
+}
+
+void
+LoadAllCharTextures(program_state *ProgramState)
+{
+    BeginDrawing();
+    for(int i = 0; i < 256; i++)
+    {
+        ProgramState->CharTexturesExist[i] = false;
+        LoadCharTexture(ProgramState, i, ProgramState->FontSize);
+    }
+    Print("Loading char textures for size %d", ProgramState->FontSize);
+    EndDrawing();
+}
 
 void
 DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor, color BGColor)
 {
+    if(!ProgramState->CharTexturesExist[Char])
+        return;
+    
+    v2 CharDim = GetCharDim(ProgramState, Size);
+    
+    if(BGColor.a != 0)
+        DrawRectangleV(V(Pos), V(CharDim), BGColor);
+    
+    //DrawTextureV(ProgramState->CharTextures[Char].texture, V(Pos), BLACK);
+    
+    DrawTexturePro(ProgramState->CharTextures[Char].texture,
+                   R(Rect(0, CharDim.y, CharDim.x, -CharDim.y)),
+                   R(Rect(Pos.x, Pos.y, CharDim.x, CharDim.y)),
+                   {0, 0}, 0, BLACK);
+    
+    
+#if 0
+    BeginShaderMode(ProgramState->ShaderSDF);
     v2 CharDim = GetCharDim(ProgramState, Size);
     if(BGColor.a != 0)
     {
@@ -25,6 +82,8 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor,
     }
     char CharBuffer[2] = {(char)Char, 0};
     DrawTextEx(ProgramState->FontSDF, CharBuffer, V(Pos), Size, 0, FGColor);
+    EndShaderMode();
+#endif
 }
 
 void
@@ -58,16 +117,27 @@ DrawView(program_state *ProgramState, view *View)
     int CharHeight = CharDim.y;
     b32 ViewIsSelected = View == &ProgramState->Views[ProgramState->SelectedViewIndex];
     rect ViewRect = View->Rect;
-    v2 ViewPos = V2(View->Rect.x, View->Rect.y);
-    v2 ViewDim = V2(View->Rect.w, View->Rect.h);
+    rect TextRect = View->TextRect;
     
     BeginScissorMode(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h);
     
+    // draw background
     DrawRectangleRec(R(View->Rect), ProgramState->BGColor);
-    DrawRectangle(ViewPos.x, ViewPos.y, 4*CharWidth, ViewDim.h, ProgramState->LineNumberBGColor);
     
+    // draw line numbers
+    DrawRectangle(ViewRect.x, View->TextRect.y, 4*CharWidth, View->TextRect.h, ProgramState->LineNumberBGColor);
+    
+    // draw title bar
+    // TODO: proper colors
+    
+    DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, GRAY);
+    string TitleString = String("%S   %d,%d", View->Buffer->FileName, View->CursorPos.l, View->CursorPos.c);
+    DrawString(ProgramState, TitleString, V2(ViewRect.x, ViewRect.y), ProgramState->FontSize, BLACK);
+    FreeString(TitleString);
+    
+    
+    // draw cursor
     rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
-    
     if(ViewIsSelected)
     {
         if(ProgramState->InputMode == InputMode_Insert)
@@ -75,32 +145,30 @@ DrawView(program_state *ProgramState, view *View)
             DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
                                     CursorDrawRect.w/3, CursorDrawRect.h)),
                              ProgramState->CursorBGColor);
-            
-#if 0
-            DrawRectangleRec(R(Rect(CursorDrawRect.x,
-                                    CursorDrawRect.y + CursorDrawRect.h - CursorDrawRect.h/6,
-                                    CursorDrawRect.w, CursorDrawRect.h/6)),
-                             ProgramState->CursorBGColor);
-#endif
         }
         else
             DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
     }
     else
+    {
         DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
+    }
     
     // Draw text
-    BeginShaderMode(ProgramState->ShaderSDF);
+    EndScissorMode();
+    BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
     for(int l = 0; l < LineCount(View); l++)
     {
-        string NumberString = String("%d", l);
-        DrawString(ProgramState, NumberString, V2(View->Rect.x, LineRect(View, l).y - View->Y), ProgramState->FontSize, ProgramState->LineNumberFGColor);
-        
         line_data LineData = LineDataAt(View, l);
-        
         int LineY = LineData.LineRect.y;
         if(LineY - View->Y > View->TextRect.y + View->TextRect.h)
             break;
+        if(LineY + CharHeight - View->Y < View->TextRect.y)
+            continue;
+        
+        string NumberString = String("%d", l);
+        DrawString(ProgramState, NumberString, V2(View->Rect.x, LineData.LineRect.y - View->Y + View->TextRect.y), ProgramState->FontSize, ProgramState->LineNumberFGColor);
+        
         
         for(int c = 0; c < LineData.CharRects.Count; c++)
         {
@@ -115,11 +183,12 @@ DrawView(program_state *ProgramState, view *View)
             DrawChar(ProgramState, CharAt(View, l, c), V2(Rect), ProgramState->FontSize, CharColor);
         }
     }
-    EndShaderMode();
+    EndScissorMode();
+    BeginScissorMode(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h);
     
     if(ProgramState->ShowViewRects)
     {
-        //DrawRectangleLinesEx(R(View->TextRect), 2, {159, 192, 123, 255});
+        DrawRectangleLinesEx(R(View->TextRect), 2, {159, 192, 123, 255});
     }
     
     if(ProgramState->ShowViewInfo)
@@ -131,7 +200,6 @@ DrawView(program_state *ProgramState, view *View)
         int KeyValueDistance = KeyValueDistanceChars * InfoCharWidth;
         
         DrawRectangleRec(R(View->Rect), {0, 0, 0, 200});
-        BeginShaderMode(ProgramState->ShaderSDF);
         {
             v2 TextPos = V2(View->Rect.x + 10, View->Rect.y + 10);
             DrawString(ProgramState, String("id"), TextPos, InfoFontSize, WHITE);
@@ -146,7 +214,6 @@ DrawView(program_state *ProgramState, view *View)
             DrawString(ProgramState, String("area"), TextPos, InfoFontSize, WHITE);
             DrawString(ProgramState, String("%d", View->Area), TextPos + V2(KeyValueDistance, 0), InfoFontSize, YELLOW);
         }
-        EndShaderMode();
     }
     
     if(ProgramState->ShowViewRects)
@@ -159,479 +226,35 @@ DrawView(program_state *ProgramState, view *View)
 
 
 void
-MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
+LoadFileToBuffer(buffer *Buffer, const char *Path)
 {
-    // TODO: set ideal cursor pos
-    ProgramState->UserMovedCursor = true;
-    View->CursorPos += dPos;
-    Clamp(View->CursorPos.l, 0, LineCount(View));
-    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-}
-
-/*
- hi  yeah   well   hello
-*/
-
-void
-MoveBackNonWhitespace(program_state *ProgramState, view *View)
-{
-    b32 StartedAtSpace = false;
-    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos - BufferPos(0, 1)) == ' ')
-        StartedAtSpace = true;
+    // TODO: check if file exists and is readable, etc
+    u32 FileSize = (u32)GetFileLength(Path);
+    char *FileData = LoadFileText(Path);
     
-    if(StartedAtSpace)
+    Buffer->FileName = String(Path);
+    
+    Buffer->Lines = StringList();
+    printf("Gathering text\n");
+    for(int i = 0; i < FileSize; i++)
     {
-        do {
-            View->CursorPos -= BufferPos(0, 1);
-        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c > 0);
-    }
-    
-    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c > 0)
-    {
-        View->CursorPos -= BufferPos(0, 1);
-    }
-}
-
-void
-MoveForwardNonWhitespace(program_state *ProgramState, view *View)
-{
-    b32 StartedAtSpace = false;
-    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos + BufferPos(0, 1)) == ' ')
-        StartedAtSpace = true;
-    
-    if(StartedAtSpace)
-    {
-        do {
-            //View->CursorPos += BufferPos(0, 1);
-            MoveCursorPos(ProgramState, View, BufferPos(0, 1));
-        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l));
-    }
-    
-    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l))
-    {
-        //View->CursorPos += BufferPos(0, 1);
-        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
-    }
-}
-
-buffer_pos
-SeekBackBorder(view *View, buffer_pos From)
-{
-    buffer_pos Result = From;
-    if(CharAt(View, Result) == 0)
-        Result.c--;
-    if(Result.c < 0)
-        return From;
-    
-    b32 StartedAtSpace = false;
-    if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, -1)) == ' ')
-        StartedAtSpace = true;
-    
-    if(StartedAtSpace)
-    {
-        Print("Started at space");
-        do {
-            Result.c--;
-        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        int LineStart = i;
+        // TODO: need to add AppendString to easily do this
+        for(i; FileData[i] != '\n' && i < FileSize; i++) {}
         
-        return Result;
-    }
-    
-    b32 StartedAtSpecial = false;
-    if(!IsNonSpecial(CharAt(View, Result)))
-    {
-        StartedAtSpecial = true;
-    }
-    
-    if(StartedAtSpecial)
-    {
-        while(!IsNonSpecial(CharAt(View, Result)) && 
-              Result.c < LineLength(View, Result.l))
-            Result.c--;
-        return Result;
-    }
-    
-    char c = CharAt(View, Result);
-    while(( c != ' ' && (IsNonSpecial(c)) )
-          && Result.c < LineLength(View, Result.l))
-    {
-        Result.c--;
-        c = CharAt(View, Result);
-    }
-    
-    return Result;
-}
-
-buffer_pos
-SeekForwardBorder(view *View, buffer_pos From)
-{
-    buffer_pos Result = From;
-    
-    b32 StartedAtSpace = false;
-    if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, 1)) == ' ')
-        StartedAtSpace = true;
-    
-    if(StartedAtSpace)
-    {
-        do {
-            Result.c++;
-        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        ListAdd(&(Buffer->Lines), AllocString(i-LineStart));
         
-        return Result;
-    }
-    
-    b32 StartedAtSpecial = false;
-    if(!IsNonSpecial(CharAt(View, Result)))
-    {
-        StartedAtSpecial = true;
-    }
-    
-    if(StartedAtSpecial)
-    {
-        while(!IsNonSpecial(CharAt(View, Result))
-              && Result.c < LineLength(View, Result.l))
-            Result.c++;
-        return Result;
-    }
-    
-    char c = CharAt(View, Result);
-    while(( c != ' ' && (IsNonSpecial(c)) )
-          && Result.c < LineLength(View, Result.l))
-    {
-        Result.c++;
-        c = CharAt(View, Result);
-    }
-    
-    return Result;
-}
-
-b32
-AtLineBeginning(view *View, buffer_pos Pos)
-{
-    return Pos.c == 0;
-}
-b32
-AtLineEnd(view *View, buffer_pos Pos)
-{
-    return Pos.c == LineLength(View, Pos.l);
-}
-
-buffer_pos
-SeekLineBeginning(view *View, buffer_pos From)
-{
-    return BufferPos(From.l, 0);
-}
-buffer_pos
-SeekLineEnd(view *View, buffer_pos From)
-{
-    return BufferPos(From.l, LineLength(View, From.l));
-}
-
-buffer_pos
-SeekPrevEmptyLine(view *View, buffer_pos From)
-{
-    int ResultLine = From.l;
-    while(ResultLine > 0)
-    {
-        ResultLine--;
-        if(LineLength(View, ResultLine) == 0)
-            break;
-    }
-    return BufferPos(ResultLine, 0);
-}
-buffer_pos
-SeekNextEmptyLine(view *View, buffer_pos From)
-{
-    int ResultLine = From.l;
-    while(ResultLine < LineCount(View))
-    {
-        ResultLine++;
-        if(LineLength(View, ResultLine) == 0)
-            break;
-    }
-    return BufferPos(ResultLine, LineLength(View, ResultLine) + 1);
-}
-
-void
-SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
-{
-    ProgramState->UserMovedCursor = true;
-    View->CursorPos = Pos;
-    Clamp(View->CursorPos.l, 0, LineCount(View));
-    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-}
-
-void
-HandleInput_Nav(program_state *ProgramState)
-{
-    if(KeyShouldExecute(ProgramState->FKey))
-    {
-        ProgramState->InputMode = InputMode_Insert;
-    }
-    
-    if(KeyShouldExecute(ProgramState->NKey))
-    {
-        if(IsAnyShiftKeyDown)
+        int InLine = 0;
+        for(int a = LineStart; a < i; a++)
         {
-            ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Below));
-            printf("splitting view vertically\n");
-        }
-        else
-        {
-            ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Right));
-            printf("splitting view horizontally\n");
+            Buffer->Lines[Buffer->Lines.Count-1].Data[InLine] = FileData[a];
+            InLine++;
         }
     }
+    printf("Finished with text\n");
     
-    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
-    
-    if(KeyShouldExecute(ProgramState->IKey))
-        MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
-    if(KeyShouldExecute(ProgramState->KKey))
-        MoveCursorPos(ProgramState, View, BufferPos(1, 0));
-    if(KeyShouldExecute(ProgramState->JKey))
-        MoveCursorPos(ProgramState, View, BufferPos(0, -1));
-    if(KeyShouldExecute(ProgramState->LKey))
-        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
-    
-    if(KeyShouldExecute(ProgramState->UKey))
-        SetCursorPos(ProgramState, View, SeekBackBorder(View, View->CursorPos));
-    if(KeyShouldExecute(ProgramState->OKey))
-        SetCursorPos(ProgramState, View, SeekForwardBorder(View, View->CursorPos));
-    
-    if(KeyShouldExecute(ProgramState->HKey))
-    {
-        if(!AtLineBeginning(View, View->CursorPos))
-            SetCursorPos(ProgramState, View, SeekLineBeginning(View, View->CursorPos));
-        else
-            SetCursorPos(ProgramState, View, SeekPrevEmptyLine(View, View->CursorPos));
-    }
-    if(KeyShouldExecute(ProgramState->Semicolon_Key))
-    {
-        if(!AtLineEnd(View, View->CursorPos))
-            SetCursorPos(ProgramState, View, SeekLineEnd(View, View->CursorPos));
-        else
-            SetCursorPos(ProgramState, View, SeekNextEmptyLine(View, View->CursorPos));
-    }
-    
-    if(KeyShouldExecute(ProgramState->WKey))
-    {// TODO: write current buffer to file
-    }
-    
-    if(KeyShouldExecute(ProgramState->QKey))
-    {
-        if(IsAnyControlKeyDown)
-        {
-            if(IsAnyShiftKeyDown)
-            {// Exit program
-                ProgramState->ShouldExit = true;
-            }
-            else
-            {// Close current view
-                RemoveView(ProgramState, ProgramState->SelectedViewIndex);
-            }
-        }
-        else
-        {// TODO: Close current buffer
-        }
-    }
-    
+    UnloadFileText(FileData);
 }
-
-
-void
-HandleInput_Insert(program_state *ProgramState)
-{
-    buffer *Buffer = ProgramState->Views[ProgramState->SelectedViewIndex].Buffer;
-    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
-    
-    if(KeyShouldExecute(ProgramState->Escape_Key))
-    {
-        ProgramState->InputMode = InputMode_Nav;
-    }
-    
-    for(int i = 0; i < 26; i++)
-    {
-        if(KeyShouldExecute(ProgramState->LetterKeys[i]))
-        {
-            char CharToAdd;
-            if(IsAnyShiftKeyDown)
-                CharToAdd = 'A' + i;
-            else
-                CharToAdd = 'a' + i;
-            
-            Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
-            View->CursorPos.c++;
-            View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-        }
-    }
-    for(int i = 0; i < 10; i++)
-    {
-        if(KeyShouldExecute(ProgramState->NumberKeys[i]))
-        {
-            char CharToAdd;
-            if(IsAnyShiftKeyDown)
-            {
-                if(i == 1)
-                    CharToAdd = '!';
-                else if(i == 2)
-                    CharToAdd = '@';
-                else if(i == 3)
-                    CharToAdd = '#';
-                else if(i == 4)
-                    CharToAdd = '$';
-                else if(i == 5)
-                    CharToAdd = '%';
-                else if(i == 6)
-                    CharToAdd = '^';
-                else if(i == 7)
-                    CharToAdd = '&';
-                else if(i == 8)
-                    CharToAdd = '*';
-                else if(i == 9)
-                    CharToAdd = '(';
-                else
-                    CharToAdd = ')';
-                
-            }
-            else
-            {
-                CharToAdd = '0' + i;
-            }
-            
-            Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
-            View->CursorPos.c++;
-            View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-        }
-    }
-    for(int i = 0; i < 11; i++)
-    {
-        if(KeyShouldExecute(ProgramState->SymbolKeys[i]))
-        {
-            
-            char CharToAdd = ' ';
-            if(!IsAnyShiftKeyDown)
-            {
-                if(i == 0)
-                    CharToAdd = '`';
-                else if(i == 1)
-                    CharToAdd = '-';
-                else if(i == 2)
-                    CharToAdd = '=';
-                else if(i == 3)
-                    CharToAdd = '[';
-                else if(i == 4)
-                    CharToAdd = ']';
-                else if(i == 5)
-                    CharToAdd = '\\';
-                else if(i == 6)
-                    CharToAdd = ';';
-                else if(i == 7)
-                    CharToAdd = '\'';
-                else if(i == 8)
-                    CharToAdd = '/';
-                else if(i == 9)
-                    CharToAdd = ',';
-                else if(i == 10)
-                    CharToAdd = '.';
-            }
-            else
-            {
-                if(i == 0)
-                    CharToAdd = '~';
-                else if(i == 1)
-                    CharToAdd = '_';
-                else if(i == 2)
-                    CharToAdd = '+';
-                else if(i == 3)
-                    CharToAdd = '{';
-                else if(i == 4)
-                    CharToAdd = '}';
-                else if(i == 5)
-                    CharToAdd = '|';
-                else if(i == 6)
-                    CharToAdd = ':';
-                else if(i == 7)
-                    CharToAdd = '"';
-                else if(i == 8)
-                    CharToAdd = '?';
-                else if(i == 9)
-                    CharToAdd = '<';
-                else if(i == 10)
-                    CharToAdd = '>';
-            }
-            
-            Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, CharToAdd);
-            View->CursorPos.c++;
-            View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-        }
-    }
-    
-    for(int i = 0; i < 7; i++)
-    {
-        if(KeyShouldExecute(ProgramState->SpecialKeys[i]))
-        {
-            
-            char CharToAdd = ' ';
-            if(i == 0)
-            {// Space
-                Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
-                View->CursorPos.c++;
-                View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-            }
-            else if(i == 1)
-            { // Backspace
-                if(View->CursorPos.c > 0)
-                {
-                    Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
-                    View->CursorPos.c--;
-                    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-                }
-            }
-            else if(i == 2)
-            { // Delete
-                Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c);
-            }
-            else if(i == 3)
-            { // Tab
-                // TODO: handling tab char
-                for(int a = 0; a < 4; a++)
-                {
-                    Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
-                    View->CursorPos.c++;
-                    View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-                }
-            }
-            else if(i == 4)
-            { // Return
-                InsertLine(Buffer, View->CursorPos.l+1, CopyString(Buffer->Lines[View->CursorPos.l]));
-                Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
-                Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
-                View->CursorPos.l++;
-                View->CursorPos.c = 0;
-                
-                ProgramState->UserMovedCursor = true;
-            }
-            else if(i == 5)
-            { // Caps lock
-            }
-            else if(i == 6)
-            { // Escape
-            }
-            
-        }
-    }
-}
-
-void
-HandleInput(program_state *ProgramState)
-{
-    if(ProgramState->InputMode == InputMode_Nav)
-        HandleInput_Nav(ProgramState);
-    else if(ProgramState->InputMode == InputMode_Insert)
-        HandleInput_Insert(ProgramState);
-}
-
 
 extern "C"
 {
@@ -656,31 +279,7 @@ extern "C"
             };
             
             // TEXT FILE
-            const char *Filename = "test.cpp";
-            
-            u32 FileSize = (u32)GetFileLength(Filename);
-            char *FileData = LoadFileText(Filename);
-            
-            Buffers[0].Lines = StringList();
-            printf("Gathering text\n");
-            for(int i = 0; i < FileSize; i++)
-            {
-                int LineStart = i;
-                // TODO: need to add AppendString to easily do this
-                for(i; FileData[i] != '\n' && i < FileSize; i++) {}
-                
-                ListAdd(&(Buffer->Lines), AllocString(i-LineStart));
-                
-                int InLine = 0;
-                for(int a = LineStart; a < i; a++)
-                {
-                    Buffer->Lines[Buffer->Lines.Count-1].Data[InLine] = FileData[a];
-                    InLine++;
-                }
-            }
-            printf("Finished with text\n");
-            
-            UnloadFileText(FileData);
+            LoadFileToBuffer(&Buffers[0], "test.cpp");
             
             LoadFonts(ProgramState, FontMain, FontSDF);
             ProgramState->KeyFirstRepeatTime = 0.4f;
@@ -689,6 +288,7 @@ extern "C"
             FillKeyData(ProgramState);
             
             ProgramState->FontSize = 22;
+            ProgramState->PrevFontSize = ProgramState->FontSize;
             ProgramState->CharsPerVirtualLine = 10;
             ProgramState->SubLineOffset = 4;
             ProgramState->MarginLeft = 10;
@@ -703,7 +303,6 @@ extern "C"
                 ProgramState->CursorFGColor = ProgramState->BGColor;
             }
             
-            
             ProgramState->ScreenHeight = Memory->WindowHeight;
             ProgramState->ScreenWidth = Memory->WindowWidth;
             
@@ -713,17 +312,26 @@ extern "C"
             ProgramState->SelectedViewIndex = 0;
             
             ProgramState->ShowViewInfo = false;
-            ProgramState->ShowViewRects = false;
+            ProgramState->ShowViewRects = true;
             
             FillLineData(&ProgramState->Views[0], ProgramState);
+            
+            LoadAllCharTextures(ProgramState);
         }
+        
+        // Re-render font chars if needed
+        if(ProgramState->PrevFontSize != ProgramState->FontSize)
+            LoadAllCharTextures(ProgramState);
+        ProgramState->PrevFontSize = ProgramState->FontSize;
+        
+        StartProfiling();
+        StartProfile(Total);
         
         UpdateKeyInput(ProgramState);
         
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
         
-        BeginDrawing();
         
         int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
         int SubLineOffset = ProgramState->SubLineOffset;
@@ -981,7 +589,7 @@ extern "C"
         
         AdjustView(ProgramState, View);
         
-        
+        StartProfile(FillLineData);
         for(int i = 0; i < Views->Count; i++)
         {
             view *View = &Views->Data[i];
@@ -990,18 +598,21 @@ extern "C"
             View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
             View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
         }
+        EndProfile(FillLineData);
         
-        //ClearBackground(ProgramState->BGColor);
-        
+        StartProfile(Rendering);
+        BeginDrawing();
         for(int i = 0; i < Views->Count; i++)
         {
             view *View = &Views->Data[i];
             DrawView(ProgramState, View);
         }
-        //u64 BeforeTime = GetNanoseconds();
-        //printf("Fill time: %lu\n", (GetNanoseconds() - BeforeTime) /1000000);
         
-        
+        //DrawFPS(400, 100);
         EndDrawing();
+        EndProfile(Rendering);
+        
+        EndProfile(Total);
+        //PrintProfiles();
     }
 }
