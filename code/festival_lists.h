@@ -4,17 +4,6 @@
 #define FESTIVAL_LISTS_H
 
 
-
-rect_list RectList()
-{
-    rect_list Result;
-    Result.Count = 0;
-    Result.ArraySize = 20;
-    Result.IsAllocated = true;
-    Result.Data = (rect *)malloc(20 * sizeof(rect));
-    return Result;
-}
-
 rect_list RectList(int Size)
 {
     rect_list Result;
@@ -131,6 +120,32 @@ view_list ViewList(int Size)
 }
 
 int ListRemoveAt(view_list *List, int Index)
+{
+    if(Index >= 0 && Index < List->Count)
+    {
+        for(int i = Index; i < List->Count; i++)
+        {
+            List->Data[i] = List->Data[i+1];
+        }
+        List->Count--;
+        return 1;
+    }
+    return 0;
+}
+
+
+
+
+lister_entry_list ListerEntryList(int Size)
+{
+    lister_entry_list Result;
+    Result.Count = 0;
+    Result.ArraySize = Size;
+    Result.Data = (lister_entry *)malloc(Size * sizeof(lister_entry));
+    return Result;
+}
+
+int ListRemoveAt(lister_entry_list *List, int Index)
 {
     if(Index >= 0 && Index < List->Count)
     {

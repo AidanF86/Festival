@@ -25,6 +25,15 @@ typedef struct rect_list
     inline rect& operator[](size_t Index) { return Data[Index]; }
     inline const rect& operator[](size_t Index) const { return Data[Index]; }
 } rect_list;
+rect_list RectList()
+{
+    rect_list Result;
+    Result.Count = 0;
+    Result.ArraySize = 20;
+    Result.IsAllocated = true;
+    Result.Data = (rect *)malloc(20 * sizeof(rect));
+    return Result;
+}
 
 typedef Color color;
 typedef struct color_list
@@ -66,6 +75,72 @@ struct buffer
 };
 
 
+enum lister_type
+{
+    ListerType_BufferPointer,
+    ListerType_String,
+    ListerType_Function,
+};
+struct lister_entry
+{
+    string Name;
+    lister_type Type;
+    union {
+        struct {
+            buffer *Buffer;
+        };
+        struct {
+            string String;
+        };
+        struct {
+            void *Function;
+        };
+    };
+};
+typedef struct lister_entry_list
+{
+    int Count;
+    int ArraySize;
+    lister_entry *Data;
+    inline lister_entry& operator[](size_t Index) { return Data[Index]; }
+    inline const lister_entry& operator[](size_t Index) const { return Data[Index]; }
+} lister_entry_list;
+lister_entry_list ListerEntryList()
+{
+    lister_entry_list Result;
+    Result.Count = 0;
+    Result.ArraySize = 20;
+    Result.Data = (lister_entry *)malloc(20 * sizeof(lister_entry));
+    return Result;
+}
+struct lister
+{
+    lister_type Type;
+    lister_entry_list Entries;
+    
+    int Y;
+    int TargetY;
+    
+    rect_list Rects;
+    rect_list TargetRects;
+    
+    int SelectedIndex;
+    b32 HasSelected;
+};
+lister Lister(lister_type Type)
+{
+    lister Result;
+    Result.Type = Type;
+    Result.Entries = ListerEntryList();
+    Result.Y = 0;
+    Result.Y = Result.TargetY;
+    Result.Rects = RectList();
+    Result.TargetRects = RectList();
+    Result.SelectedIndex = -1;
+    b32 HasSelected = false;
+    return Result;
+}
+
 
 enum view_spawn_location {
     Location_Below,
@@ -75,30 +150,30 @@ struct view
 {
     buffer *Buffer;
     
-    // Rect-spawn data
     int Id;
     int ParentId; // -1 means this is root view
     view_spawn_location SpawnLocation;
     int BirthOrdinal; // [this]-th child. Determines placement and parental succession
-    // Family consists of this and child views
     f32 Area; // fraction of parent
     b32 ComputedFromParentThisFrame;
     
     rect Rect;
     rect TextRect;
     
-    int Y;
-    int TargetY;
-    
     buffer_pos CursorPos;
     int IdealCursorCol;
     
+    int Y;
+    int TargetY;
     rect CursorRect;
     rect CursorTargetRect;
     
     line_data_list LineDataList;
+    
+    b32 EntryBarTakingInput;
+    string EntryBarInput;
+    lister Lister;
 };
-
 typedef struct view_list
 {
     int Count;
@@ -122,8 +197,9 @@ enum input_mode
     InputMode_Nav,
     InputMode_Select,
     InputMode_Insert,
-    InputMode_Search
+    InputMode_EntryBar,
 };
+
 
 #define MAX_BUFFERS 50
 struct program_state

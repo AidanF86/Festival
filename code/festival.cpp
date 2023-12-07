@@ -10,9 +10,9 @@
 #include "festival_lists.h"
 
 #include "festival_functions.cpp"
-#include "festival_editing.h"
 #include "festival_profiling.h"
 
+#if 0
 void
 LoadCharTexture(program_state *ProgramState, int Char, int Size)
 {
@@ -24,7 +24,9 @@ LoadCharTexture(program_state *ProgramState, int Char, int Size)
         UnloadRenderTexture(*Tex);
     
     v2 CharDim = GetCharDim(ProgramState, Size);
-    *Tex = LoadRenderTexture(CharDim.x, CharDim.y);
+    GlyphInfo Info = ProgramState->FontMain.glyphs[Char];
+    
+    *Tex = LoadRenderTexture(CharDim.x + Info.advanceX, CharDim.y);
     
     {
         BeginTextureMode(*Tex);
@@ -40,25 +42,16 @@ LoadCharTexture(program_state *ProgramState, int Char, int Size)
     printf("Yeah\n");
     ProgramState->CharTexturesExist[Char] = true;
 }
+#endif
 
-void
-LoadAllCharTextures(program_state *ProgramState)
-{
-    BeginDrawing();
-    for(int i = 0; i < 256; i++)
-    {
-        ProgramState->CharTexturesExist[i] = false;
-        LoadCharTexture(ProgramState, i, ProgramState->FontSize);
-    }
-    Print("Loading char textures for size %d", ProgramState->FontSize);
-    EndDrawing();
-}
 
 void
 DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor, color BGColor)
 {
-    if(!ProgramState->CharTexturesExist[Char])
-        return;
+    /*
+        if(!ProgramState->CharTexturesExist[Char])
+            return;
+    */
     
     v2 CharDim = GetCharDim(ProgramState, Size);
     
@@ -67,23 +60,28 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor,
     
     //DrawTextureV(ProgramState->CharTextures[Char].texture, V(Pos), BLACK);
     
-    DrawTexturePro(ProgramState->CharTextures[Char].texture,
-                   R(Rect(0, CharDim.y, CharDim.x, -CharDim.y)),
-                   R(Rect(Pos.x, Pos.y, CharDim.x, CharDim.y)),
-                   {0, 0}, 0, BLACK);
-    
-    
-#if 0
-    BeginShaderMode(ProgramState->ShaderSDF);
-    v2 CharDim = GetCharDim(ProgramState, Size);
-    if(BGColor.a != 0)
+    GlyphInfo Info = {0};
+    int GlyphIndex = 0;
+    for(int i = 0; i < ProgramState->FontMain.glyphCount; i++)
     {
-        DrawRectangleV(V(Pos), V(CharDim), BGColor);
+        if(ProgramState->FontMain.glyphs[i].value == Char)
+        {
+            Info = ProgramState->FontMain.glyphs[i];
+            GlyphIndex = i;
+            break;
+        }
     }
-    char CharBuffer[2] = {(char)Char, 0};
-    DrawTextEx(ProgramState->FontSDF, CharBuffer, V(Pos), Size, 0, FGColor);
-    EndShaderMode();
-#endif
+    
+    //rect DestRect = Rect(Pos.x, Pos.y, CharDim.x, CharDim.y);
+    rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
+                         ProgramState->FontMain.recs[GlyphIndex].width,
+                         ProgramState->FontMain.recs[GlyphIndex].height);
+    
+    DrawTexturePro(ProgramState->FontMain.texture,
+                   //DrawTexturePro(ProgramState->CharTextures[Char].texture,
+                   ProgramState->FontMain.recs[GlyphIndex],
+                   R(DestRect),
+                   {0, 0}, 0, FGColor);
 }
 
 void
@@ -130,10 +128,18 @@ DrawView(program_state *ProgramState, view *View)
     // draw title bar
     // TODO: proper colors
     
-    DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, GRAY);
-    string TitleString = String("%S   %d,%d", View->Buffer->FileName, View->CursorPos.l, View->CursorPos.c);
-    DrawString(ProgramState, TitleString, V2(ViewRect.x, ViewRect.y), ProgramState->FontSize, BLACK);
-    FreeString(TitleString);
+    if(View->EntryBarTakingInput)
+    {
+        DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, BLUE);
+        DrawString(ProgramState, View->EntryBarInput, V2(ViewRect.x, ViewRect.y), ProgramState->FontSize, WHITE);
+    }
+    else
+    {
+        DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, GRAY);
+        string TitleString = String("%S   %d,%d", View->Buffer->FileName, View->CursorPos.l, View->CursorPos.c);
+        DrawString(ProgramState, TitleString, V2(ViewRect.x, ViewRect.y), ProgramState->FontSize, BLACK);
+        FreeString(TitleString);
+    }
     
     
     // draw cursor
@@ -256,6 +262,34 @@ LoadFileToBuffer(buffer *Buffer, const char *Path)
     UnloadFileText(FileData);
 }
 
+void
+OpenEditFileLister()
+{
+}
+
+void
+OpenCommandLister(program_state *ProgramState, view *View)
+{
+    FilePathList FilesInDir = LoadDirectoryFiles("./");
+    
+    
+    View->Lister = Lister(ListerType_String);
+    lister *Lister = &View->Lister;
+    for(int i = 0; i < FilesInDir.count; i++)
+    {
+        lister_entry NewEntry;
+        NewEntry.String = String(FilesInDir.paths[i]);
+        NewEntry.Name = NewEntry.String;
+        ListAdd(&Lister->Entries, NewEntry);
+    }
+    
+    // TODO
+    
+    UnloadDirectoryFiles(FilesInDir);
+}
+
+#include "festival_editing.h"
+
 extern "C"
 {
     PROGRAM_UPDATE_AND_RENDER(ProgramUpdateAndRender)
@@ -267,7 +301,7 @@ extern "C"
         view_list *Views = &ProgramState->Views;
         buffer *Buffer = &ProgramState->Buffers[0];
         Font *FontMain = &ProgramState->FontMain;
-        Font *FontSDF = &ProgramState->FontSDF;
+        //Font *FontSDF = &ProgramState->FontSDF;
         
         if(!Memory->Initialized)
         {
@@ -281,13 +315,13 @@ extern "C"
             // TEXT FILE
             LoadFileToBuffer(&Buffers[0], "test.cpp");
             
-            LoadFonts(ProgramState, FontMain, FontSDF);
+            ProgramState->FontSize = 22;
+            LoadFont(ProgramState, ProgramState->FontSize);
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;
             
             FillKeyData(ProgramState);
             
-            ProgramState->FontSize = 22;
             ProgramState->PrevFontSize = ProgramState->FontSize;
             ProgramState->CharsPerVirtualLine = 10;
             ProgramState->SubLineOffset = 4;
@@ -316,12 +350,13 @@ extern "C"
             
             FillLineData(&ProgramState->Views[0], ProgramState);
             
-            LoadAllCharTextures(ProgramState);
+            //LoadAllCharTextures(ProgramState);
         }
         
         // Re-render font chars if needed
         if(ProgramState->PrevFontSize != ProgramState->FontSize)
-            LoadAllCharTextures(ProgramState);
+            LoadFont(ProgramState, ProgramState->FontSize);
+        //LoadAllCharTextures(ProgramState);
         ProgramState->PrevFontSize = ProgramState->FontSize;
         
         StartProfiling();

@@ -362,9 +362,22 @@ FillLineData(view *View, program_state *ProgramState)
                 RectData->DisplayLines++;
             }
             
+            // TODO: optimize!!
+            GlyphInfo Info = {0};
+            int GlyphIndex = 0;
+            for(int i = 0; i < ProgramState->FontMain.glyphCount; i++)
+            {
+                if(ProgramState->FontMain.glyphs[i].value == CharAt(View, l, c))
+                {
+                    Info = ProgramState->FontMain.glyphs[i];
+                    GlyphIndex = i;
+                    break;
+                }
+            }
+            
             ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
             
-            x += CharWidth;
+            x += /*CharWidth + */Info.advanceX;
         }
         RectData->EndLineRect = Rect(x, y, CharWidth, CharHeight);
         
@@ -449,38 +462,6 @@ FillKeyData(program_state *ProgramState)
 }
 
 void
-LoadFonts(program_state *ProgramState, Font *FontMain, Font *FontSDF)
-{
-    // FONT
-    {
-        u32 FontFileSize = 0;
-        u8 *FontFileData = LoadFileData("LiberationMono-Regular.ttf", &FontFileSize);
-        
-        *FontMain = {0};
-        FontMain->baseSize = 16;
-        FontMain->glyphCount = 95;
-        FontMain->glyphs = LoadFontData(FontFileData, FontFileSize, 16, 0, 95, FONT_DEFAULT);
-        Image Atlas = GenImageFontAtlas(FontMain->glyphs, &FontMain->recs, 95, 16, 4, 0);
-        FontMain->texture = LoadTextureFromImage(Atlas);
-        UnloadImage(Atlas);
-        
-        *FontSDF = {0};
-        FontSDF->baseSize = 32;
-        FontSDF->glyphCount = 95;
-        FontSDF->glyphs = LoadFontData(FontFileData, FontFileSize, 32, 0, 0, FONT_SDF);
-        Atlas = GenImageFontAtlas(FontSDF->glyphs, &FontSDF->recs, 95, 32, 0, 1);
-        FontSDF->texture = LoadTextureFromImage(Atlas);
-        UnloadImage(Atlas);
-        
-        UnloadFileData(FontFileData);
-        
-        ProgramState->ShaderSDF = LoadShader(0, TextFormat("../data/shaders/glsl%i/sdf.fs", 330));
-        SetTextureFilter(FontSDF->texture, TEXTURE_FILTER_BILINEAR);
-    }
-}
-
-
-void
 UpdateKeyInput(program_state *ProgramState)
 {
     for(int i = 0; i < sizeof(ProgramState->KeyData) / sizeof(key_data); i++)
@@ -516,6 +497,29 @@ UpdateKeyInput(program_state *ProgramState)
     }
 }
 
+void
+LoadFont(program_state *ProgramState, int Size)
+{
+    // TODO: unload font
+    //UnloadFontData(GlyphInfo *glyphs, int glyphCount);
+    //UnloadFont(Font font);
+    
+    u32 FontFileSize = 0;
+    u8 *FontFileData = LoadFileData("LiberationMono-Regular.ttf", &FontFileSize);
+    //u8 *FontFileData = LoadFileData("Georgia.ttf", &FontFileSize);
+    //u8 *FontFileData = LoadFileData("HelveticaNeue-Regular.otf", &FontFileSize);
+    
+    Font *FontMain = &ProgramState->FontMain;
+    *FontMain = {0};
+    FontMain->baseSize = Size;
+    FontMain->glyphCount = 95;
+    FontMain->glyphs = LoadFontData(FontFileData, FontFileSize, FontMain->baseSize, 0, 95, FONT_DEFAULT);
+    Image Atlas = GenImageFontAtlas(FontMain->glyphs, &FontMain->recs, 95, FontMain->baseSize, 4, 0);
+    FontMain->texture = LoadTextureFromImage(Atlas);
+    UnloadImage(Atlas);
+    
+    UnloadFileData(FontFileData);
+}
 
 view
 View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation, f32 Area)
