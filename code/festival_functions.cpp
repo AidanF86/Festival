@@ -15,7 +15,7 @@ RGB(int r, int g, int b) {
 
 v2 GetCharDim(program_state *ProgramState, int Size)
 {
-    return V2(MeasureTextEx(ProgramState->FontMain, "_", Size, 0));
+    return V2(MeasureTextEx(ProgramState->FontMain.RFont, "_", Size, 0));
 }
 v2 GetCharDim(program_state *ProgramState)
 {
@@ -299,93 +299,6 @@ AdjustView(program_state *ProgramState, view *View)
     }
 }
 
-void
-FillLineData(view *View, program_state *ProgramState)
-{
-    line_data_list *DataList = &View->LineDataList;
-    
-    int MarginLeft = ProgramState->MarginLeft;
-    int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
-    int NumbersWidth = ProgramState->NumbersWidth;
-    int SubLineOffset = ProgramState->SubLineOffset;
-    v2 CharDim = GetCharDim(ProgramState);
-    int CharWidth = CharDim.x;
-    int CharHeight = CharDim.y;
-    // TODO(cheryl): formalize char-exclusion-zone
-    int WrapPoint = View->TextRect.w - CharWidth;
-    
-    // DeAllocation
-    if(DataList->IsAllocated);
-    {
-        // Deallocate all lists
-        for(int i = 0; i < DataList->Count; i++)
-        {
-            if(DataList->Data[i].CharRects.IsAllocated)
-            {
-                ListFree(&(DataList->Data[i].CharRects));
-            }
-            else
-            {
-                Print("Unallocated rect list???\n");
-            }
-            
-        }
-        ListFree(DataList);
-    }
-    // Allocation
-    *DataList = LineDataList();
-    
-    
-    int y = 0;
-    
-    for(int l = 0; l < LineCount(View); l++)
-    {
-        ListAdd(DataList, LineData());
-        
-        line_data *RectData = &(DataList->Data[l]);
-        int x = 0;
-        
-        RectData->LineRect.x = x;
-        RectData->LineRect.y = y;
-        RectData->LineRect.w = View->TextRect.w;
-        RectData->DisplayLines = 1;
-        
-        for(int c = 0; c < LineLength(View, l); c++)
-        {
-            // Rect is within the space of textrect
-            // so when drawing, offset by textrect.x and textrect.y
-            // as well as buffer viewpos
-            if(x+CharWidth >= WrapPoint)
-            {
-                x = SubLineOffset*CharWidth;
-                y += CharHeight;
-                RectData->DisplayLines++;
-            }
-            
-            // TODO: optimize!!
-            GlyphInfo Info = {0};
-            int GlyphIndex = 0;
-            for(int i = 0; i < ProgramState->FontMain.glyphCount; i++)
-            {
-                if(ProgramState->FontMain.glyphs[i].value == CharAt(View, l, c))
-                {
-                    Info = ProgramState->FontMain.glyphs[i];
-                    GlyphIndex = i;
-                    break;
-                }
-            }
-            
-            ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
-            
-            x += /*CharWidth + */Info.advanceX;
-        }
-        RectData->EndLineRect = Rect(x, y, CharWidth, CharHeight);
-        
-        y += CharHeight;
-        
-        RectData->LineRect.h = RectData->DisplayLines * CharHeight;
-    }
-}
 
 void
 FillKeyData(program_state *ProgramState)
@@ -509,16 +422,54 @@ LoadFont(program_state *ProgramState, int Size)
     //u8 *FontFileData = LoadFileData("Georgia.ttf", &FontFileSize);
     //u8 *FontFileData = LoadFileData("HelveticaNeue-Regular.otf", &FontFileSize);
     
-    Font *FontMain = &ProgramState->FontMain;
-    *FontMain = {0};
-    FontMain->baseSize = Size;
-    FontMain->glyphCount = 95;
-    FontMain->glyphs = LoadFontData(FontFileData, FontFileSize, FontMain->baseSize, 0, 95, FONT_DEFAULT);
-    Image Atlas = GenImageFontAtlas(FontMain->glyphs, &FontMain->recs, 95, FontMain->baseSize, 4, 0);
-    FontMain->texture = LoadTextureFromImage(Atlas);
+    font *LoadedFont = &ProgramState->FontMain;
+    Font *RLoadedFont = &ProgramState->FontMain.RFont;
+    *LoadedFont = {0};
+    RLoadedFont->baseSize = Size;
+    RLoadedFont->glyphCount = 95;
+    RLoadedFont->glyphs = LoadFontData(FontFileData, FontFileSize, RLoadedFont->baseSize, 0, 95, FONT_DEFAULT);
+    Image Atlas = GenImageFontAtlas(RLoadedFont->glyphs, &RLoadedFont->recs, 95, RLoadedFont->baseSize, 4, 0);
+    RLoadedFont->texture = LoadTextureFromImage(Atlas);
     UnloadImage(Atlas);
-    
     UnloadFileData(FontFileData);
+    
+    //for(int i = 0; i < RLoadedFont.glyphCount; i++)
+    int GlyphIndex = 0;
+    for(int i = 0; i < 256; i++)
+    {
+        for(int a = 0; a < RLoadedFont->glyphCount; a++)
+        {
+            if(RLoadedFont->glyphs[a].value == i)
+            {
+                LoadedFont->AsciiGlyphIndexes[i] = a;
+                break;
+            }
+        }
+    }
+}
+
+int
+CharIndex(font *Font, int Char) {
+    if(Char <= 0)
+        return 0;
+    if(Char < 256)
+    {
+        return Font->AsciiGlyphIndexes[Char];
+    }
+    else
+    {
+        Print("Searching for non-ascii char index");
+        int GlyphIndex = 0;
+        for(int i = 0; i < Font->RFont.glyphCount; i++)
+        {
+            if(Font->RFont.glyphs[i].value == Char)
+            {
+                GlyphIndex = i;
+                break;
+            }
+        }
+        return GlyphIndex;
+    }
 }
 
 view
@@ -654,5 +605,86 @@ RemoveView(program_state *ProgramState, int Index)
                 ParentIndex = i;
         }
         ProgramState->SelectedViewIndex = ParentIndex;
+    }
+}
+
+
+
+void
+FillLineData(view *View, program_state *ProgramState)
+{
+    line_data_list *DataList = &View->LineDataList;
+    
+    int MarginLeft = ProgramState->MarginLeft;
+    int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
+    int NumbersWidth = ProgramState->NumbersWidth;
+    int SubLineOffset = ProgramState->SubLineOffset;
+    v2 CharDim = GetCharDim(ProgramState);
+    int CharWidth = CharDim.x;
+    int CharHeight = CharDim.y;
+    // TODO(cheryl): formalize char-exclusion-zone
+    int WrapPoint = View->TextRect.w - CharWidth;
+    
+    // DeAllocation
+    if(DataList->IsAllocated);
+    {
+        // Deallocate all lists
+        for(int i = 0; i < DataList->Count; i++)
+        {
+            if(DataList->Data[i].CharRects.IsAllocated)
+            {
+                ListFree(&(DataList->Data[i].CharRects));
+            }
+            else
+            {
+                Print("Unallocated rect list???\n");
+            }
+            
+        }
+        ListFree(DataList);
+    }
+    // Allocation
+    *DataList = LineDataList();
+    
+    
+    int y = 0;
+    
+    for(int l = 0; l < LineCount(View); l++)
+    {
+        ListAdd(DataList, LineData());
+        
+        line_data *RectData = &(DataList->Data[l]);
+        int x = 0;
+        
+        RectData->LineRect.x = x;
+        RectData->LineRect.y = y;
+        RectData->LineRect.w = View->TextRect.w;
+        RectData->DisplayLines = 1;
+        
+        for(int c = 0; c < LineLength(View, l); c++)
+        {
+            // Rect is within the space of textrect
+            // so when drawing, offset by textrect.x and textrect.y
+            // as well as buffer viewpos
+            if(x+CharWidth >= WrapPoint)
+            {
+                x = SubLineOffset*CharWidth;
+                y += CharHeight;
+                RectData->DisplayLines++;
+            }
+            
+            // TODO: optimize!!
+            int GlyphIndex = CharIndex(&ProgramState->FontMain, c);
+            GlyphInfo Info = ProgramState->FontMain.RFont.glyphs[GlyphIndex];
+            
+            ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
+            
+            x += /*CharWidth + */Info.advanceX;
+        }
+        RectData->EndLineRect = Rect(x, y, CharWidth, CharHeight);
+        
+        y += CharHeight;
+        
+        RectData->LineRect.h = RectData->DisplayLines * CharHeight;
     }
 }

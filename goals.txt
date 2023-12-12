@@ -54,6 +54,10 @@ Current Goal: title bar,
 			  text bar & lister,
 			  commands
 
+Really nice design
+	Have a serif, sans-serif, and monospace font loaded for use
+		Maybe bold text too
+	Reference: Evangelion Magi / computer systems
 
 File writing
 File open

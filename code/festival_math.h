@@ -142,7 +142,76 @@ operator+=(rect &R, rect B)
     return R;
 }
 
-#define Interpolate(a, target, speed) ( ((speed) >= 1) ? (target) : ( (a) + ((target) - (a))*(speed) == (a) ? (target) : (a) + ((target) - (a))*(speed) ))
+/*
+#define Interpolate(a, target, speed) \
+( ((speed) >= 1) ? (target) :\
+( (a) + ((target) - (a))*(speed) == (a) ? (target) :\
+(a) + ((target) - (a))*(speed) ))
+*/
+
+#define InterpolateSpeedScalar 50
+
+inline rect Interpolate(rect a, rect b, f32 speed)
+{
+    speed *= InterpolateSpeedScalar*GetFrameTime();
+    if(speed >= 1)
+        return b;
+    rect Result = a + (b-a)*speed;
+    if(Result == b)
+        return Result;
+    
+    
+    //f32 newX = (f32)a.x + ((f32)(b.x-a.x))*speed;
+    //f32 newY = (f32)a.y + ((f32)(b.y-a.y))*speed;
+    
+    if(Result.x == a.x && a.x != b.x)
+    {
+        if(Result.x < b.x)
+            Result.x++;
+        else
+            Result.x--;
+    }
+    if(Result.y == a.y && a.y != b.y)
+    {
+        if(Result.y < b.y)
+            Result.y++;
+        else
+            Result.y--;
+    }
+    
+    if(Result.w == a.w && a.w != b.w)
+    {
+        if(Result.w < b.w)
+            Result.w++;
+        else
+            Result.w--;
+    }
+    if(Result.h == a.h && a.h != b.h)
+    {
+        if(Result.h < b.h)
+            Result.h++;
+        else
+            Result.h--;
+    }
+    
+    return Result;
+}
+
+inline int Interpolate(int a, int b, f32 speed)
+{
+    speed *= InterpolateSpeedScalar*GetFrameTime();
+    if(speed >= 1)
+        return b;
+    int Result = a + (b-a)*speed;
+    if(Result == a && a != b)
+    {
+        if(Result < b)
+            Result++;
+        else
+            Result--;
+    }
+    return Result;
+}
 
 inline v2
 V2(int x, int y)

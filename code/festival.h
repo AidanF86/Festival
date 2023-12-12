@@ -172,6 +172,7 @@ struct view
     
     b32 EntryBarTakingInput;
     string EntryBarInput;
+    b32 ListerIsOpen;
     lister Lister;
 };
 typedef struct view_list
@@ -201,6 +202,13 @@ enum input_mode
 };
 
 
+struct font
+{
+    Font RFont;
+    int AsciiGlyphIndexes[256];
+};
+
+
 #define MAX_BUFFERS 50
 struct program_state
 {
@@ -211,9 +219,7 @@ struct program_state
     f32 KeyFirstRepeatTime;
     f32 KeyRepeatSpeed = 1;
     
-    Font FontMain;
-    Font FontSDF;
-    Shader ShaderSDF;
+    font FontMain;
     
     int FontSize;
     int PrevFontSize;

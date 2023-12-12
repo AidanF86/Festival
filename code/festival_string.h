@@ -244,13 +244,13 @@ _String(const char *Format, va_list Args)
                         rect Var = va_arg(Args, rect);
                         Length = Sprintf(StringVarBuffer, "(%d, %d, %d, %d)",
                                          Var.x, Var.y, Var.w, Var.h);
-                    }
+                    }break;
                     case 'R':
                     {
                         Rectangle Var = va_arg(Args, Rectangle);
-                        Length = Sprintf(StringVarBuffer, "(%d, %d, %d, %d)",
+                        Length = Sprintf(StringVarBuffer, "(%f, %f, %f, %f)",
                                          Var.x, Var.y, Var.width, Var.height);
-                    }
+                    }break;
                 }
                 
                 for(int i = 0; i < Length; i++)

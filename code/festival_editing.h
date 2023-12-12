@@ -213,6 +213,7 @@ HandleInput_Nav(program_state *ProgramState)
     if(KeyShouldExecute(ProgramState->FKey))
     {
         ProgramState->InputMode = InputMode_Insert;
+        return;
     }
     
     if(KeyShouldExecute(ProgramState->NKey))
@@ -230,6 +231,12 @@ HandleInput_Nav(program_state *ProgramState)
     }
     
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    
+    if(KeyShouldExecute(ProgramState->EKey)) {
+        OpenEditFileDialog(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex]);
+    }
+    
     
     if(KeyShouldExecute(ProgramState->IKey))
         MoveCursorPos(ProgramState, View, BufferPos(-1, 0));

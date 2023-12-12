@@ -46,7 +46,7 @@ LoadCharTexture(program_state *ProgramState, int Char, int Size)
 
 
 void
-DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor, color BGColor)
+DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color BGColor, color FGColor)
 {
     /*
         if(!ProgramState->CharTexturesExist[Char])
@@ -60,26 +60,30 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor,
     
     //DrawTextureV(ProgramState->CharTextures[Char].texture, V(Pos), BLACK);
     
+    // TODO: replace w/ ascii index
     GlyphInfo Info = {0};
-    int GlyphIndex = 0;
-    for(int i = 0; i < ProgramState->FontMain.glyphCount; i++)
+    int GlyphIndex = CharIndex(&ProgramState->FontMain, Char);
+    Info = ProgramState->FontMain.RFont.glyphs[GlyphIndex];
+#if 0
+    for(int i = 0; i < ProgramState->FontMain.RFont.glyphCount; i++)
     {
-        if(ProgramState->FontMain.glyphs[i].value == Char)
+        if(ProgramState->FontMain.RFont.glyphs[i].value == Char)
         {
-            Info = ProgramState->FontMain.glyphs[i];
+            Info = ProgramState->FontMain.RFont.glyphs[i];
             GlyphIndex = i;
             break;
         }
     }
+#endif
     
     //rect DestRect = Rect(Pos.x, Pos.y, CharDim.x, CharDim.y);
     rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
-                         ProgramState->FontMain.recs[GlyphIndex].width,
-                         ProgramState->FontMain.recs[GlyphIndex].height);
+                         ProgramState->FontMain.RFont.recs[GlyphIndex].width,
+                         ProgramState->FontMain.RFont.recs[GlyphIndex].height);
     
-    DrawTexturePro(ProgramState->FontMain.texture,
+    DrawTexturePro(ProgramState->FontMain.RFont.texture,
                    //DrawTexturePro(ProgramState->CharTextures[Char].texture,
-                   ProgramState->FontMain.recs[GlyphIndex],
+                   ProgramState->FontMain.RFont.recs[GlyphIndex],
                    R(DestRect),
                    {0, 0}, 0, FGColor);
 }
@@ -87,16 +91,16 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor,
 void
 DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor)
 {
-    DrawChar(ProgramState, Char, Pos, Size, FGColor, RGBA(0, 0, 0, 0));
+    DrawChar(ProgramState, Char, Pos, Size, RGBA(0, 0, 0, 0), FGColor);
 }
 
 void
-DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color FGColor, color BGColor)
+DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color BGColor, color FGColor)
 {
     v2 CharDim = GetCharDim(ProgramState, Size);
     for(int i = 0; i < String.Length; i++)
     {
-        DrawChar(ProgramState, String[i], Pos, Size, FGColor, BGColor);
+        DrawChar(ProgramState, String[i], Pos, Size, BGColor, FGColor);
         Pos.x += CharDim.x;
     }
 }
@@ -104,7 +108,24 @@ DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color F
 void
 DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color FGColor)
 {
-    DrawString(ProgramState, String, Pos, Size, FGColor, RGBA(0, 0, 0, 0));
+    DrawString(ProgramState, String, Pos, Size, RGBA(0, 0, 0, 0), FGColor);
+}
+
+void DrawProfiles(program_state *ProgramState) {
+    int Y = 400;
+    v2 CharDim = GetCharDim(ProgramState);
+    int CharHeight = CharDim.y;
+    for(int i = 0; i < ProfileNames.Count; i++)
+    {
+        double Total = 0;
+        for(int a = 0; a < ProfileCycleFrameCount; a++)
+        {
+            Total += ProfileResultFrames[i][a];
+        }
+        string ProfileString = String("%S: %f", ProfileNames[i], Total/ProfileCycleFrameCount);
+        DrawString(ProgramState, ProfileString, V2(400, 200+CharHeight*i), ProgramState->FontSize, BLACK, RED);
+        FreeString(ProfileString);
+    }
 }
 
 void
@@ -123,7 +144,8 @@ DrawView(program_state *ProgramState, view *View)
     DrawRectangleRec(R(View->Rect), ProgramState->BGColor);
     
     // draw line numbers
-    DrawRectangle(ViewRect.x, View->TextRect.y, 4*CharWidth, View->TextRect.h, ProgramState->LineNumberBGColor);
+    rect LineNumbersRect = Rect(ViewRect.x, View->TextRect.y, 4*CharWidth, View->TextRect.h);
+    DrawRectangleRec(R(LineNumbersRect), ProgramState->LineNumberBGColor);
     
     // draw title bar
     // TODO: proper colors
@@ -162,20 +184,25 @@ DrawView(program_state *ProgramState, view *View)
     
     // Draw text
     EndScissorMode();
-    BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
+    
     for(int l = 0; l < LineCount(View); l++)
     {
         line_data LineData = LineDataAt(View, l);
         int LineY = LineData.LineRect.y;
         if(LineY - View->Y > View->TextRect.y + View->TextRect.h)
             break;
-        if(LineY + CharHeight - View->Y < View->TextRect.y)
+        if(LineY + CharHeight*2 - View->Y < View->TextRect.y)
             continue;
         
+        BeginScissorMode(LineNumbersRect.x, LineNumbersRect.y,
+                         LineNumbersRect.w, LineNumbersRect.h);
         string NumberString = String("%d", l);
-        DrawString(ProgramState, NumberString, V2(View->Rect.x, LineData.LineRect.y - View->Y + View->TextRect.y), ProgramState->FontSize, ProgramState->LineNumberFGColor);
+        v2 LineNumberPos = V2(View->Rect.x, LineData.LineRect.y - View->Y + View->TextRect.y);
+        DrawString(ProgramState, NumberString, LineNumberPos, ProgramState->FontSize, ProgramState->LineNumberFGColor);
+        FreeString(NumberString);
+        EndScissorMode();
         
-        
+        BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
         for(int c = 0; c < LineData.CharRects.Count; c++)
         {
             rect Rect = ScreenRectAt(View, l, c);
@@ -188,10 +215,25 @@ DrawView(program_state *ProgramState, view *View)
             
             DrawChar(ProgramState, CharAt(View, l, c), V2(Rect), ProgramState->FontSize, CharColor);
         }
+        EndScissorMode();
     }
-    EndScissorMode();
-    BeginScissorMode(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h);
     
+#if 0
+    if(View->ListerIsOpen) {
+        int Y = TextRect.y;
+        lister *Lister = &View->Lister;
+        for(int i = 0; i < Lister->Entries.Count; i++) {
+            DrawString(ProgramState, Lister->Entries[i].Name, V2(TextRect.x, Y), ProgramState->FontSize, GRAY, RED);
+            Y += CharHeight;
+        }
+    }
+#endif
+    
+    
+    // TODO: redraw chars drawn over by cursor 
+    // invert color and draw with scissor set to cursor rect
+    
+    BeginScissorMode(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h);
     if(ProgramState->ShowViewRects)
     {
         DrawRectangleLinesEx(R(View->TextRect), 2, {159, 192, 123, 255});
@@ -263,15 +305,19 @@ LoadFileToBuffer(buffer *Buffer, const char *Path)
 }
 
 void
-OpenEditFileLister()
+CloseLister(view *View) {
+    View->ListerIsOpen = false;
+}
+
+void
+OpenCommandLister()
 {
 }
 
 void
-OpenCommandLister(program_state *ProgramState, view *View)
+OpenEditFileLister(program_state *ProgramState, view *View)
 {
     FilePathList FilesInDir = LoadDirectoryFiles("./");
-    
     
     View->Lister = Lister(ListerType_String);
     lister *Lister = &View->Lister;
@@ -283,10 +329,17 @@ OpenCommandLister(program_state *ProgramState, view *View)
         ListAdd(&Lister->Entries, NewEntry);
     }
     
-    // TODO
-    
     UnloadDirectoryFiles(FilesInDir);
+    View->ListerIsOpen = true;
 }
+
+void
+OpenEditFileDialog(program_state *ProgramState, view *View) {
+    OpenEditFileLister(ProgramState, View);
+    View->EntryBarTakingInput = true;
+}
+
+
 
 #include "festival_editing.h"
 
@@ -300,7 +353,7 @@ extern "C"
         buffer *Buffers = ProgramState->Buffers;
         view_list *Views = &ProgramState->Views;
         buffer *Buffer = &ProgramState->Buffers[0];
-        Font *FontMain = &ProgramState->FontMain;
+        font *FontMain = &ProgramState->FontMain;
         //Font *FontSDF = &ProgramState->FontSDF;
         
         if(!Memory->Initialized)
@@ -349,6 +402,10 @@ extern "C"
             ProgramState->ShowViewRects = true;
             
             FillLineData(&ProgramState->Views[0], ProgramState);
+            
+            DefineProfile(FillLineData);
+            DefineProfile(Rendering);
+            DefineProfile(Total);
             
             //LoadAllCharTextures(ProgramState);
         }
@@ -643,11 +700,14 @@ extern "C"
             DrawView(ProgramState, View);
         }
         
-        //DrawFPS(400, 100);
+        DrawFPS(400, 100);
+        DrawProfiles(ProgramState);
+        
         EndDrawing();
         EndProfile(Rendering);
         
         EndProfile(Total);
-        //PrintProfiles();
+        
+        
     }
 }
