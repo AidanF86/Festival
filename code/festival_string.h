@@ -373,6 +373,7 @@ for(int _i = (List)->Count; _i > Index; _i--)\
 
 #define ListFree(List) {\
 free((List)->Data);\
+(List)->Count = 0;\
 }
 
 /*======= string List =======*/

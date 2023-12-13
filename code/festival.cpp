@@ -94,7 +94,7 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor)
     DrawChar(ProgramState, Char, Pos, Size, RGBA(0, 0, 0, 0), FGColor);
 }
 
-void
+int
 DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color BGColor, color FGColor)
 {
     v2 CharDim = GetCharDim(ProgramState, Size);
@@ -103,12 +103,13 @@ DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color B
         DrawChar(ProgramState, String[i], Pos, Size, BGColor, FGColor);
         Pos.x += CharDim.x;
     }
+    return Pos.x;
 }
 
-void
+int
 DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color FGColor)
 {
-    DrawString(ProgramState, String, Pos, Size, RGBA(0, 0, 0, 0), FGColor);
+    return DrawString(ProgramState, String, Pos, Size, RGBA(0, 0, 0, 0), FGColor);
 }
 
 void DrawProfiles(program_state *ProgramState) {
@@ -150,10 +151,14 @@ DrawView(program_state *ProgramState, view *View)
     // draw title bar
     // TODO: proper colors
     
-    if(View->EntryBarTakingInput)
+    if(View->ListerIsOpen)
     {
+        lister *Lister = &View->Lister;
         DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, BLUE);
-        DrawString(ProgramState, View->EntryBarInput, V2(ViewRect.x, ViewRect.y), ProgramState->FontSize, WHITE);
+        int InputX = DrawString(ProgramState, Lister->InputLabel, V2(ViewRect.x, ViewRect.y),
+                                ProgramState->FontSize, WHITE);
+        DrawString(ProgramState, Lister->Input, V2(InputX, ViewRect.y),
+                   ProgramState->FontSize, WHITE);
     }
     else
     {
@@ -218,16 +223,31 @@ DrawView(program_state *ProgramState, view *View)
         EndScissorMode();
     }
     
-#if 0
     if(View->ListerIsOpen) {
-        int Y = TextRect.y;
         lister *Lister = &View->Lister;
-        for(int i = 0; i < Lister->Entries.Count; i++) {
-            DrawString(ProgramState, Lister->Entries[i].Name, V2(TextRect.x, Y), ProgramState->FontSize, GRAY, RED);
+        
+        DrawRectangle(ViewRect.x, TextRect.y, ViewRect.w, Lister->MatchingEntries.Count*CharHeight, GRAY);
+        
+        int Y = TextRect.y;
+        for(int i = 0; i < Lister->MatchingEntries.Count; i++) {
+            Color BGColor = GRAY;
+            Color FGColor = WHITE;
+            
+            if(Lister->HoverIndex == i)
+                BGColor = LIGHTGRAY;
+            if(Lister->SelectedIndex == i)
+            {
+                BGColor = WHITE;
+                FGColor = RED;
+            }
+            rect EntryRect = Lister->Rects[i];
+            
+            DrawRectangleRec(R(EntryRect), BGColor);
+            DrawString(ProgramState, Lister->Entries[i].Name,
+                       V2(EntryRect.x, EntryRect.y), ProgramState->FontSize, FGColor);
             Y += CharHeight;
         }
     }
-#endif
     
     
     // TODO: redraw chars drawn over by cursor 
@@ -305,41 +325,40 @@ LoadFileToBuffer(buffer *Buffer, const char *Path)
 }
 
 void
-CloseLister(view *View) {
-    View->ListerIsOpen = false;
-}
-
-void
-OpenCommandLister()
+CloseLister(program_state *ProgramState, view *View)
 {
+    lister *Lister = &View->Lister;
+    ProgramState->InputMode = InputMode_Nav;
+    
+    View->ListerIsOpen = false;
+    ListFree(&Lister->Rects);
+    ListFree(&Lister->Entries);
+    ListFree(&Lister->MatchingEntries);
+    FreeString(Lister->Input);
+    FreeString(Lister->InputLabel);
 }
 
 void
 OpenEditFileLister(program_state *ProgramState, view *View)
 {
-    FilePathList FilesInDir = LoadDirectoryFiles("./");
-    
     View->Lister = Lister(ListerType_String);
     lister *Lister = &View->Lister;
+    
+    FilePathList FilesInDir = LoadDirectoryFiles("./");
+    
     for(int i = 0; i < FilesInDir.count; i++)
     {
         lister_entry NewEntry;
         NewEntry.String = String(FilesInDir.paths[i]);
         NewEntry.Name = NewEntry.String;
         ListAdd(&Lister->Entries, NewEntry);
+        ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+        ListAdd(&Lister->MatchingEntries, i);
     }
     
     UnloadDirectoryFiles(FilesInDir);
     View->ListerIsOpen = true;
 }
-
-void
-OpenEditFileDialog(program_state *ProgramState, view *View) {
-    OpenEditFileLister(ProgramState, View);
-    View->EntryBarTakingInput = true;
-}
-
-
 
 #include "festival_editing.h"
 
@@ -399,7 +418,7 @@ extern "C"
             ProgramState->SelectedViewIndex = 0;
             
             ProgramState->ShowViewInfo = false;
-            ProgramState->ShowViewRects = true;
+            ProgramState->ShowViewRects = false;
             
             FillLineData(&ProgramState->Views[0], ProgramState);
             
@@ -418,6 +437,13 @@ extern "C"
         
         StartProfiling();
         StartProfile(Total);
+        
+        view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+        
+        if(View->ListerIsOpen && View->Lister.ShouldExecute)
+        {
+            // TODO: Execute lister
+        }
         
         UpdateKeyInput(ProgramState);
         
@@ -439,14 +465,7 @@ extern "C"
             Memory->IsRunning = false;
         }
         
-        /*
-                if(KeyShouldExecute(ProgramState->IKey))
-                    ProgramState->ShowViewInfo = !ProgramState->ShowViewInfo;
-        */
         
-        
-        
-        view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
         
         // Compute view rects
         
@@ -471,14 +490,6 @@ extern "C"
         {
             Views->Data[i].ComputedFromParentThisFrame = false;
         }
-        
-#if 0
-        rect *OldRects = (rect *)malloc(sizeof(rect) * Views->Count);
-        for(int i = 0; i < Views->Count; i++)
-        {
-            OldRects[i] = Views->Data[i].Rect;
-        }
-#endif
         
         RootView->Rect.x = 0;
         RootView->Rect.y = 0;
@@ -558,10 +569,41 @@ extern "C"
             }
         }
         
+        HandleInput(ProgramState);
+        
+        
+        // lister set matchingentries
+        // TODO: only do this when Input has changed
+        // TODO: better string matching
+        for(int a = 0; a < Views->Count; a++)
+        {
+            view *View = &Views->Data[a];
+            if(View->ListerIsOpen)
+            {
+                lister *Lister = &View->Lister;
+                ListFree(&Lister->MatchingEntries);
+                Lister->MatchingEntries = IntList();
+                
+                for(int i = 0; i < Lister->Entries.Count; i++)
+                {
+                    b32 Matches = true;
+                    for(int j = 0; j < Lister->Input.Length && j < Lister->Entries[i].Name.Length; i++)
+                    {
+                        if(Lister->Input[j] != Lister->Entries[i].Name[j])
+                        {
+                            Matches = false;
+                            break;
+                        }
+                    }
+                    if(Matches)
+                        ListAdd(&Lister->MatchingEntries, i);
+                }
+            }
+        }
+        
+        v2 MousePos = V2(GetMousePosition());
         if(IsMouseButtonDown(0))
         {
-            v2 MousePos = V2(GetMousePosition());
-            
             int NewViewIndex = 0;
             for(int i = 0; i < Views->Count; i++)
             {
@@ -576,6 +618,32 @@ extern "C"
             View = &ProgramState->Views[ProgramState->SelectedViewIndex];
         }
         
+        for(int i = 0; i < Views->Count; i++)
+        {
+            view *View = &Views->Data[i];
+            if(View->ListerIsOpen)
+            {
+                lister *Lister = &View->Lister;
+                int Y = View->TextRect.y;
+                ListFree(&Lister->Rects);
+                Lister->Rects = RectList();//Lister->MatchingEntries.Count);
+                for(int i = 0; i < Lister->MatchingEntries.Count; i++)
+                {
+                    /*Lister->Rects[i] = */ListAdd(&Lister->Rects, Rect(View->Rect.x, Y, View->Rect.w, CharHeight));
+                    
+                    Y += CharHeight;
+                    if(CheckCollisionPointRec(V(MousePos), R(Lister->Rects[i])))
+                    {
+                        Lister->HoverIndex = i;
+                        if(IsMouseButtonPressed(0))
+                        {
+                            Lister->SelectedIndex = i;
+                            Lister->ShouldExecute = true;
+                        }
+                    }
+                }
+            }
+        }
         
         
         if(IsAnyControlKeyDown)
@@ -586,128 +654,69 @@ extern "C"
         }
         
         
-        if(!(IsAnyControlKeyDown))
-        {
-            // TODO: mouse scrolling is kind of stuttery, especially up
-            int NewTargetY = View->TargetY;
-            NewTargetY -= GetMouseWheelMove()*20;
-            Clamp(NewTargetY, 0, LineDataAt(View, LineCount(View)-1).EndLineRect.y);
-            
-            buffer_pos NewCursorPos = View->CursorPos;
-            
-            if(KeyShouldExecute(ProgramState->LeftKey))
-            {
-                NewCursorPos.c--;
-                View->IdealCursorCol = ColAt(ProgramState, View, NewCursorPos);
-            }
-            if(KeyShouldExecute(ProgramState->RightKey))
-            {
-                NewCursorPos.c++;
-                View->IdealCursorCol = ColAt(ProgramState, View, NewCursorPos);
-            }
-            
-            b32 MovedUpOrDown = false;
-            if(KeyShouldExecute(ProgramState->UpKey))
-            {
-                rect UpRect = View->CursorTargetRect - V2(0, CharHeight);
-                NewCursorPos = ClosestBufferPos(View, UpRect);
-                MovedUpOrDown = true;
-            }
-            if(KeyShouldExecute(ProgramState->DownKey))
-            {
-                rect DownRect = View->CursorTargetRect + V2(0, CharHeight);
-                NewCursorPos = ClosestBufferPos(View, DownRect);
-                MovedUpOrDown = true;
-            }
-            
-            
-            Clamp(NewCursorPos.l, 0, LineCount(View)-1);
-            Clamp(NewCursorPos.c, 0, LineLength(View, NewCursorPos.l));
-            
-            ProgramState->UserMovedView = false;
-            ProgramState->UserMovedCursor = false;
-            
-            if(NewTargetY != View->TargetY)
-            {
-                ProgramState->UserMovedView = true;
-            }
-            if(NewCursorPos != View->CursorPos)
-            {
-                ProgramState->UserMovedCursor = true;
-            }
-            
-            // NOTE: Col > IdealCursorChar shouldn't be possible
-            if(MovedUpOrDown && ColAt(ProgramState, View, NewCursorPos) < View->IdealCursorCol && NewCursorPos.l != View->CursorPos.l)
-            {
-                int Diff = View->IdealCursorCol - ColAt(ProgramState, View, NewCursorPos);
-                int DistToEnd = LineLength(View, NewCursorPos.l) - NewCursorPos.c;
-                if(Diff > DistToEnd)
-                    Diff = DistToEnd;
-                NewCursorPos.c += Diff;
-            }
-            
-            View->TargetY = NewTargetY;
-            View->CursorPos = NewCursorPos;
-        }
-        
-        if(IsMouseButtonDown(0))
-        {
-            v2 MousePos = V2(GetMousePosition());
-            
-            buffer_pos MouseBufferPos = ClosestBufferPos(View, ScreenToCharSpace(View, MousePos));
-            View->CursorPos = MouseBufferPos;
-            View->IdealCursorCol = View->CursorPos.c;
-        }
-        
-        
-        HandleInput(ProgramState);
-        
-        
-        Clamp(View->CursorPos.l, 0, LineCount(View)-1);
-        Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-        
-        
 #if 0
-        printf("\n\n\n\n");
-        for(int i = 0; i < Views->Count; i++)
+        // NOTE: Col > IdealCursorChar shouldn't be possible
+        if(MovedUpOrDown && ColAt(ProgramState, View, NewCursorPos) < View->IdealCursorCol && NewCursorPos.l != View->CursorPos.l)
         {
-            view *View = &Views->Data[i];
-            printf("View %d: parent=%d, birthordinal=%d, area=%f\n", View->Id, View->ParentId, View->BirthOrdinal, View->Area);
-            printf("\trect=(%d, %d, %d, %d)\n", View->Rect.x, View->Rect.y, View->Rect.w, View->Rect.h);
-            printf("\ttext=(%d, %d, %d, %d)\n", View->TextRect.x, View->TextRect.y, View->TextRect.w, View->TextRect.h);
-        }
-#endif
-        
-        
-        AdjustView(ProgramState, View);
-        
-        StartProfile(FillLineData);
-        for(int i = 0; i < Views->Count; i++)
-        {
-            view *View = &Views->Data[i];
-            FillLineData(View, ProgramState);
-            View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
-            View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
-            View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
-        }
-        EndProfile(FillLineData);
-        
-        StartProfile(Rendering);
-        BeginDrawing();
-        for(int i = 0; i < Views->Count; i++)
-        {
-            view *View = &Views->Data[i];
-            DrawView(ProgramState, View);
+            int Diff = View->IdealCursorCol - ColAt(ProgramState, View, NewCursorPos);
+            int DistToEnd = LineLength(View, NewCursorPos.l) - NewCursorPos.c;
+            if(Diff > DistToEnd)
+                Diff = DistToEnd;
+            NewCursorPos.c += Diff;
         }
         
-        DrawFPS(400, 100);
-        DrawProfiles(ProgramState);
-        
-        EndDrawing();
-        EndProfile(Rendering);
-        
-        EndProfile(Total);
-        
-        
+        View->TargetY = NewTargetY;
+        View->CursorPos = NewCursorPos;
     }
+#endif
+    
+    if(IsMouseButtonDown(0))
+    {
+        v2 MousePos = V2(GetMousePosition());
+        
+        buffer_pos MouseBufferPos = ClosestBufferPos(View, ScreenToCharSpace(View, MousePos));
+        View->CursorPos = MouseBufferPos;
+        View->IdealCursorCol = View->CursorPos.c;
+    }
+    
+    
+    
+    
+    
+    Clamp(View->CursorPos.l, 0, LineCount(View)-1);
+    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+    
+    AdjustView(ProgramState, View);
+    
+    
+    
+    StartProfile(FillLineData);
+    for(int i = 0; i < Views->Count; i++)
+    {
+        view *View = &Views->Data[i];
+        FillLineData(View, ProgramState);
+        View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
+        View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
+        View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
+    }
+    EndProfile(FillLineData);
+    
+    StartProfile(Rendering);
+    BeginDrawing();
+    for(int i = 0; i < Views->Count; i++)
+    {
+        view *View = &Views->Data[i];
+        DrawView(ProgramState, View);
+    }
+    
+    //DrawFPS(400, 100);
+    //DrawProfiles(ProgramState);
+    
+    EndDrawing();
+    EndProfile(Rendering);
+    
+    EndProfile(Total);
+    
+    
+}
 }

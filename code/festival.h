@@ -16,6 +16,24 @@
 c == '_')
 
 
+typedef struct int_list
+{
+    int Count;
+    int ArraySize;
+    int *Data;
+    inline int& operator[](size_t Index) { return Data[Index]; }
+    inline const int& operator[](size_t Index) const { return Data[Index]; }
+} int_list;
+int_list IntList()
+{
+    int_list Result;
+    Result.Count = 0;
+    Result.ArraySize = 20;
+    Result.Data = (int *)malloc(20 * sizeof(int));
+    return Result;
+}
+
+
 typedef struct rect_list
 {
     b32 IsAllocated;
@@ -81,6 +99,12 @@ enum lister_type
     ListerType_String,
     ListerType_Function,
 };
+
+enum lister_purpose {
+    ListerPurpose_EditFile,
+    ListerPurpose_RunCommand,
+};
+
 struct lister_entry
 {
     string Name;
@@ -113,31 +137,35 @@ lister_entry_list ListerEntryList()
     Result.Data = (lister_entry *)malloc(20 * sizeof(lister_entry));
     return Result;
 }
+
 struct lister
 {
     lister_type Type;
+    lister_purpose Purpose;
+    
+    string InputLabel;
+    string Input;
     lister_entry_list Entries;
+    int_list MatchingEntries;
+    
+    int HoverIndex;
+    int SelectedIndex;
+    b32 ShouldExecute;
     
     int Y;
     int TargetY;
-    
-    rect_list Rects;
-    rect_list TargetRects;
-    
-    int SelectedIndex;
-    b32 HasSelected;
+    rect_list Rects; // correspond to MatchingEntries
 };
 lister Lister(lister_type Type)
 {
     lister Result;
     Result.Type = Type;
     Result.Entries = ListerEntryList();
+    Result.MatchingEntries = IntList();
     Result.Y = 0;
     Result.Y = Result.TargetY;
     Result.Rects = RectList();
-    Result.TargetRects = RectList();
-    Result.SelectedIndex = -1;
-    b32 HasSelected = false;
+    Result.SelectedIndex = 0;
     return Result;
 }
 
@@ -146,6 +174,7 @@ enum view_spawn_location {
     Location_Below,
     Location_Right,
 };
+
 struct view
 {
     buffer *Buffer;
@@ -170,8 +199,6 @@ struct view
     
     line_data_list LineDataList;
     
-    b32 EntryBarTakingInput;
-    string EntryBarInput;
     b32 ListerIsOpen;
     lister Lister;
 };

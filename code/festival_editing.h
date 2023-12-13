@@ -14,9 +14,6 @@ MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
     Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
 }
 
-/*
- hi  yeah   well   hello
-*/
 
 void
 MoveBackNonWhitespace(program_state *ProgramState, view *View)
@@ -234,9 +231,17 @@ HandleInput_Nav(program_state *ProgramState)
     
     
     if(KeyShouldExecute(ProgramState->EKey)) {
-        OpenEditFileDialog(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex]);
+        OpenEditFileLister(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex]);
     }
     
+    if(KeyShouldExecute(ProgramState->UpKey))
+        MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+    if(KeyShouldExecute(ProgramState->DownKey))
+        MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+    if(KeyShouldExecute(ProgramState->LeftKey))
+        MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+    if(KeyShouldExecute(ProgramState->RightKey))
+        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
     
     if(KeyShouldExecute(ProgramState->IKey))
         MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
@@ -302,6 +307,15 @@ HandleInput_Insert(program_state *ProgramState)
     {
         ProgramState->InputMode = InputMode_Nav;
     }
+    
+    if(KeyShouldExecute(ProgramState->UpKey))
+        MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+    if(KeyShouldExecute(ProgramState->DownKey))
+        MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+    if(KeyShouldExecute(ProgramState->LeftKey))
+        MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+    if(KeyShouldExecute(ProgramState->RightKey))
+        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
     
     for(int i = 0; i < 26; i++)
     {
@@ -477,12 +491,161 @@ HandleInput_Insert(program_state *ProgramState)
 }
 
 void
+HandleInput_EntryBar(program_state *ProgramState)
+{
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    lister *Lister = &View->Lister;
+    string *EntryString = &View->Lister.Input;
+    
+    if(KeyShouldExecute(ProgramState->Escape_Key))
+    {
+        CloseLister(ProgramState, View);
+        return;
+    }
+    
+    if(KeyShouldExecute(ProgramState->Return_Key))
+    {
+        Lister->ShouldExecute = true;
+    }
+    if(KeyShouldExecute(ProgramState->UpKey))
+    {
+        if(Lister->SelectedIndex > 0)
+            Lister->SelectedIndex--;
+    }
+    if(KeyShouldExecute(ProgramState->DownKey))
+    {
+        if(Lister->SelectedIndex < Lister->MatchingEntries.Count - 1)
+            Lister->SelectedIndex++;
+    }
+    
+    for(int i = 0; i < 26; i++)
+    {
+        if(KeyShouldExecute(ProgramState->LetterKeys[i]))
+        {
+            char CharToAdd;
+            if(IsAnyShiftKeyDown)
+                CharToAdd = 'A' + i;
+            else
+                CharToAdd = 'a' + i;
+            
+            EntryString->InsertChar(EntryString->Length, CharToAdd);
+        }
+    }
+    for(int i = 0; i < 10; i++)
+    {
+        if(KeyShouldExecute(ProgramState->NumberKeys[i]))
+        {
+            char CharToAdd;
+            if(IsAnyShiftKeyDown)
+            {
+                if(i == 1)
+                    CharToAdd = '!';
+                else if(i == 2)
+                    CharToAdd = '@';
+                else if(i == 3)
+                    CharToAdd = '#';
+                else if(i == 4)
+                    CharToAdd = '$';
+                else if(i == 5)
+                    CharToAdd = '%';
+                else if(i == 6)
+                    CharToAdd = '^';
+                else if(i == 7)
+                    CharToAdd = '&';
+                else if(i == 8)
+                    CharToAdd = '*';
+                else if(i == 9)
+                    CharToAdd = '(';
+                else
+                    CharToAdd = ')';
+                
+            }
+            else
+            {
+                CharToAdd = '0' + i;
+            }
+            
+            EntryString->InsertChar(EntryString->Length, CharToAdd);
+        }
+    }
+    for(int i = 0; i < 11; i++)
+    {
+        if(KeyShouldExecute(ProgramState->SymbolKeys[i]))
+        {
+            
+            char CharToAdd = ' ';
+            if(!IsAnyShiftKeyDown)
+            {
+                if(i == 0)
+                    CharToAdd = '`';
+                else if(i == 1)
+                    CharToAdd = '-';
+                else if(i == 2)
+                    CharToAdd = '=';
+                else if(i == 3)
+                    CharToAdd = '[';
+                else if(i == 4)
+                    CharToAdd = ']';
+                else if(i == 5)
+                    CharToAdd = '\\';
+                else if(i == 6)
+                    CharToAdd = ';';
+                else if(i == 7)
+                    CharToAdd = '\'';
+                else if(i == 8)
+                    CharToAdd = '/';
+                else if(i == 9)
+                    CharToAdd = ',';
+                else if(i == 10)
+                    CharToAdd = '.';
+            }
+            else
+            {
+                if(i == 0)
+                    CharToAdd = '~';
+                else if(i == 1)
+                    CharToAdd = '_';
+                else if(i == 2)
+                    CharToAdd = '+';
+                else if(i == 3)
+                    CharToAdd = '{';
+                else if(i == 4)
+                    CharToAdd = '}';
+                else if(i == 5)
+                    CharToAdd = '|';
+                else if(i == 6)
+                    CharToAdd = ':';
+                else if(i == 7)
+                    CharToAdd = '"';
+                else if(i == 8)
+                    CharToAdd = '?';
+                else if(i == 9)
+                    CharToAdd = '<';
+                else if(i == 10)
+                    CharToAdd = '>';
+            }
+            
+            EntryString->InsertChar(EntryString->Length, CharToAdd);
+        }
+    }
+    
+}
+
+void
 HandleInput(program_state *ProgramState)
 {
-    if(ProgramState->InputMode == InputMode_Nav)
+    if(ProgramState->Views[ProgramState->SelectedViewIndex].ListerIsOpen)
+    {
+        HandleInput_EntryBar(ProgramState);
+    }
+    else if(ProgramState->InputMode == InputMode_Nav)
+    {
         HandleInput_Nav(ProgramState);
+    }
     else if(ProgramState->InputMode == InputMode_Insert)
+    {
         HandleInput_Insert(ProgramState);
+    }
 }
 
 
