@@ -392,6 +392,7 @@ UpdateKeyInput(program_state *ProgramState)
         }
         else
         {
+            Key->JustPressed = false;
             Key->PressTime = 0;
             Key->TimeTillNextRepeat = 0;
         }
@@ -458,7 +459,8 @@ CharIndex(font *Font, int Char) {
     }
     else
     {
-        Print("Searching for non-ascii char index");
+        return 0;
+        Print("Searching for non-ascii char index (%d)", Char);
         int GlyphIndex = 0;
         for(int i = 0; i < Font->RFont.glyphCount; i++)
         {
@@ -649,6 +651,7 @@ FillLineData(view *View, program_state *ProgramState)
     
     int y = 0;
     
+    int CharsProcessed = 0;
     for(int l = 0; l < LineCount(View); l++)
     {
         ListAdd(DataList, LineData());
@@ -663,6 +666,7 @@ FillLineData(view *View, program_state *ProgramState)
         
         for(int c = 0; c < LineLength(View, l); c++)
         {
+            CharsProcessed++;
             // Rect is within the space of textrect
             // so when drawing, offset by textrect.x and textrect.y
             // as well as buffer viewpos
@@ -673,7 +677,6 @@ FillLineData(view *View, program_state *ProgramState)
                 RectData->DisplayLines++;
             }
             
-            // TODO: optimize!!
             int GlyphIndex = CharIndex(&ProgramState->FontMain, c);
             GlyphInfo Info = ProgramState->FontMain.RFont.glyphs[GlyphIndex];
             
@@ -687,4 +690,5 @@ FillLineData(view *View, program_state *ProgramState)
         
         RectData->LineRect.h = RectData->DisplayLines * CharHeight;
     }
+    //Print("%d", CharsProcessed);
 }

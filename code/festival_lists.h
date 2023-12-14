@@ -208,4 +208,37 @@ int ListRemove(int_list *List, int E)
 }
 
 
+buffer_list BufferList()
+{
+    buffer_list Result;
+    Result.Count = 0;
+    Result.ArraySize = 20;
+    Result.Data = (buffer *)malloc(20 * sizeof(buffer));
+    return Result;
+}
+
+buffer_list BufferList(int Size)
+{
+    buffer_list Result;
+    Result.Count = 0;
+    Result.ArraySize = Size;
+    Result.Data = (buffer *)malloc(Size * sizeof(buffer));
+    return Result;
+}
+
+int ListRemoveAt(buffer_list *List, int Index)
+{
+    if(Index >= 0 && Index < List->Count)
+    {
+        for(int i = Index; i < List->Count; i++)
+        {
+            List->Data[i] = List->Data[i+1];
+        }
+        List->Count--;
+        return 1;
+    }
+    return 0;
+}
+
+
 #endif //FESTIVAL_LISTS_H

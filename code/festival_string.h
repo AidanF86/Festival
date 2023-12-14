@@ -19,7 +19,7 @@ struct string
         if(Index < 0 || Index > Length)
             return;
         
-        if(Length >= ArraySize)
+        if(Length + 5 >= ArraySize)
         { // realloc
             int NewSize = (ArraySize+64)*sizeof(32);
             Data = (u32 *)realloc(Data, NewSize);
@@ -34,6 +34,11 @@ struct string
         
         Data[Index] = Char;
         Length++;
+    }
+    
+    void AppendChar(u32 Char)
+    {
+        InsertChar(Length, Char);
     }
     
     void RemoveChar(int Index)
@@ -63,6 +68,22 @@ struct string
         }
     }
     
+    void AppendString(string Other)
+    {
+        for(int i = 0; i < Other.Length; i++)
+        {
+            AppendChar(Other.Data[i]);
+        }
+    }
+    
+    void PrependString(string Other)
+    {
+        for(int i = Other.Length - 1; i >= 0; i--)
+        {
+            InsertChar(0, Other.Data[i]);
+        }
+    }
+    
 };
 
 int
@@ -87,7 +108,10 @@ AllocString(int Length)
     string Result;
     
     Result.Length = Length;
-    Result.ArraySize = Length;
+    if(Length < 10)
+        Result.ArraySize = 10;
+    else
+        Result.ArraySize = Length;
     Result.Data = (u32 *)malloc(sizeof(u32) * Result.ArraySize);
     
     return Result;
@@ -114,7 +138,7 @@ FreeString(string String)
 char *
 RawString(string String)
 {
-    char *Result = (char *)malloc(sizeof(String.Length) + 1);
+    char *Result = (char *)malloc(String.Length + 1);
     for(int i = 0; i < String.Length; i++)
     {
         Result[i] = (char)String.Data[i];
@@ -152,7 +176,7 @@ __String(u32 *Contents)
 }
 
 u32 StringFormatBuffer[1024];
-u32 StringVarBuffer[128];
+u32 StringVarBuffer[1024];
 char SprintfBuffer[1024];
 
 int
@@ -180,6 +204,7 @@ b32 StringDebug = false;
 string
 _String(const char *Format, va_list Args)
 {
+    StringFormatBuffer[0] = 0;
     if(StringDebug)
     {
         printf("String creation log\n");
@@ -211,6 +236,11 @@ _String(const char *Format, va_list Args)
                     {
                         int Var = va_arg(Args, int);
                         Length = Sprintf(StringVarBuffer, "%d", Var);
+                    }break;
+                    case 'D':
+                    {
+                        int Var = va_arg(Args, u32);
+                        Length = Sprintf(StringVarBuffer, "%ud", Var);
                     }break;
                     case 'f':
                     {

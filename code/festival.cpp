@@ -196,7 +196,7 @@ DrawView(program_state *ProgramState, view *View)
         int LineY = LineData.LineRect.y;
         if(LineY - View->Y > View->TextRect.y + View->TextRect.h)
             break;
-        if(LineY + CharHeight*2 - View->Y < View->TextRect.y)
+        if(LineRect(View, l).y + LineRect(View, l).h - View->Y < View->TextRect.y)
             continue;
         
         BeginScissorMode(LineNumbersRect.x, LineNumbersRect.y,
@@ -243,7 +243,7 @@ DrawView(program_state *ProgramState, view *View)
             rect EntryRect = Lister->Rects[i];
             
             DrawRectangleRec(R(EntryRect), BGColor);
-            DrawString(ProgramState, Lister->Entries[i].Name,
+            DrawString(ProgramState, Lister->Entries[Lister->MatchingEntries[i]].Name,
                        V2(EntryRect.x, EntryRect.y), ProgramState->FontSize, FGColor);
             Y += CharHeight;
         }
@@ -294,15 +294,69 @@ DrawView(program_state *ProgramState, view *View)
 
 
 void
-LoadFileToBuffer(buffer *Buffer, const char *Path)
+CleanUpPath(string *Path)
 {
+    
+    // remove duplicate '/'s
+    for(int i = 0; i < Path->Length - 1; i++)
+    {
+        if(Path->Data[i] == '/' && Path->Data[i+1] == '/')
+        {
+            Path->RemoveChar(i+1);
+            i--;
+        }
+    }
+    
+    // remove beginning './'
+    if(Path->Length >= 2 && Path->Data[0] == '.' && Path->Data[1] == '/')
+    {
+        Path->RemoveChar(0);
+        Path->RemoveChar(0);
+    }
+}
+
+void
+AbsolutizePath(string *Path)
+{
+    CleanUpPath(Path);
+    
+    if(Path->Data[0] != '/')
+    {
+        Path->InsertChar(0, '/');
+        string DirStr = String(GetWorkingDirectory());
+        Path->PrependString(DirStr);
+        FreeString(DirStr);
+    }
+}
+
+buffer
+LoadFileToBuffer(const char *RawPath)
+{
+    if(!RawPath || RawPath[0] == 0)
+        return {};
+    
+    string FileName = String(RawPath);
+    CleanUpPath(&FileName);
+    string Path = String(RawPath);
+    AbsolutizePath(&Path);
+    
+    char *FullRawPath = RawString(Path);
+    
     // TODO: check if file exists and is readable, etc
-    u32 FileSize = (u32)GetFileLength(Path);
-    char *FileData = LoadFileText(Path);
+    if(!FileExists(FullRawPath))
+        Print("ERROR: no such file exists!");
     
-    Buffer->FileName = String(Path);
+    u32 FileSize = (u32)GetFileLength(FullRawPath);
+    Print("File size: %d", (int)FileSize);
+    char *FileData = LoadFileText(FullRawPath);
     
-    Buffer->Lines = StringList();
+    free(FullRawPath);
+    
+    buffer Buffer = {};
+    Buffer.FileName = FileName;
+    Buffer.Path = Path;
+    
+    Buffer.Lines = StringList();
     printf("Gathering text\n");
     for(int i = 0; i < FileSize; i++)
     {
@@ -310,18 +364,36 @@ LoadFileToBuffer(buffer *Buffer, const char *Path)
         // TODO: need to add AppendString to easily do this
         for(i; FileData[i] != '\n' && i < FileSize; i++) {}
         
-        ListAdd(&(Buffer->Lines), AllocString(i-LineStart));
+        ListAdd(&(Buffer.Lines), AllocString(i-LineStart));
         
         int InLine = 0;
         for(int a = LineStart; a < i; a++)
         {
-            Buffer->Lines[Buffer->Lines.Count-1].Data[InLine] = FileData[a];
+            Buffer.Lines[Buffer.Lines.Count-1].Data[InLine] = FileData[a];
             InLine++;
         }
     }
     printf("Finished with text\n");
     
     UnloadFileText(FileData);
+    
+    return Buffer;
+}
+
+buffer
+GetExistingBufferForPath(string PathString)
+{
+    return {};
+}
+
+buffer
+GetBufferForPath(buffer *Buffer, string PathString)
+{
+    // see if we already have a buffer
+    
+    //char *Path = RawString(PathString);
+    //free(Path);
+    return {};
 }
 
 void
@@ -339,10 +411,39 @@ CloseLister(program_state *ProgramState, view *View)
 }
 
 void
+ExecLister(program_state *ProgramState, view *View)
+{
+    Print("Exec lister!");
+    lister *Lister = &View->Lister;
+    switch(Lister->Purpose)
+    {
+        case ListerPurpose_EditFile: {
+            Print("Purpose: Edit file");
+            if(Lister->Type != ListerType_String) {
+                Print("Lister is for Edit File but type isn't String!");
+                break;
+            }
+            
+            char *RawFileName = RawString(Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
+            ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
+            free(RawFileName);
+            View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+            
+        } break;
+    }
+    
+    Lister->ShouldExecute = false;
+    CloseLister(ProgramState, View);
+}
+
+void
 OpenEditFileLister(program_state *ProgramState, view *View)
 {
     View->Lister = Lister(ListerType_String);
     lister *Lister = &View->Lister;
+    
+    Lister->InputLabel = String("Open file: ");
+    Lister->Input = String("");
     
     FilePathList FilesInDir = LoadDirectoryFiles("./");
     
@@ -369,11 +470,10 @@ extern "C"
         program_state *ProgramState = (program_state *)Memory->Data;
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
-        buffer *Buffers = ProgramState->Buffers;
+        buffer_list *Buffers = &ProgramState->Buffers;
         view_list *Views = &ProgramState->Views;
         buffer *Buffer = &ProgramState->Buffers[0];
         font *FontMain = &ProgramState->FontMain;
-        //Font *FontSDF = &ProgramState->FontSDF;
         
         if(!Memory->Initialized)
         {
@@ -385,7 +485,13 @@ extern "C"
             };
             
             // TEXT FILE
-            LoadFileToBuffer(&Buffers[0], "test.cpp");
+            ProgramState->Buffers = BufferList();
+            ListAdd(Buffers, LoadFileToBuffer("./test.cpp"));
+            //ListAdd(Buffers, LoadFileToBuffer("/home/aidan/programming/festival/build/test.cpp"));
+            //ListAdd(Buffers, LoadFileToBuffer("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.txt"));
+            
+            
+            //ListAdd(Buffers, LoadFileToBuffer("2mb.txt"));
             
             ProgramState->FontSize = 22;
             LoadFont(ProgramState, ProgramState->FontSize);
@@ -413,7 +519,7 @@ extern "C"
             ProgramState->ScreenWidth = Memory->WindowWidth;
             
             ProgramState->Views = ViewList();
-            ListAdd(Views, View(ProgramState, &Buffers[0], -1, Location_Below));
+            ListAdd(Views, View(ProgramState, &Buffers->Data[0], -1, Location_Below));
             
             ProgramState->SelectedViewIndex = 0;
             
@@ -428,6 +534,19 @@ extern "C"
             
             //LoadAllCharTextures(ProgramState);
         }
+        
+        for(int i = 0; i < Views->Count; i++)
+        {
+            view *View = &ProgramState->Views[i];
+            if(View->ListerIsOpen && View->Lister.ShouldExecute)
+                ExecLister(ProgramState, View);
+        }
+        
+        for(int i = 0; i < ProgramState->Buffers.Count; i++)
+        {
+            Print("%d: %S", i, ProgramState->Buffers[i].Path);
+        }
+        Print("");
         
         // Re-render font chars if needed
         if(ProgramState->PrevFontSize != ProgramState->FontSize)
@@ -587,7 +706,7 @@ extern "C"
                 for(int i = 0; i < Lister->Entries.Count; i++)
                 {
                     b32 Matches = true;
-                    for(int j = 0; j < Lister->Input.Length && j < Lister->Entries[i].Name.Length; i++)
+                    for(int j = 0; j < Lister->Input.Length && j < Lister->Entries[i].Name.Length; j++)
                     {
                         if(Lister->Input[j] != Lister->Entries[i].Name[j])
                         {
@@ -709,8 +828,8 @@ extern "C"
         DrawView(ProgramState, View);
     }
     
-    //DrawFPS(400, 100);
-    //DrawProfiles(ProgramState);
+    DrawFPS(400, 100);
+    DrawProfiles(ProgramState);
     
     EndDrawing();
     EndProfile(Rendering);

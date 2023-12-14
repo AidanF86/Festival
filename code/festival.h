@@ -88,7 +88,7 @@ typedef struct line_data_list
 struct buffer
 {
     string FileName;
-    string AbsoluteFilePath;
+    string Path;
     string_list Lines;
 };
 
@@ -235,6 +235,16 @@ struct font
     int AsciiGlyphIndexes[256];
 };
 
+typedef struct buffer_list
+{
+    int Count;
+    int ArraySize;
+    buffer *Data;
+    inline buffer& operator[](size_t Index) { return Data[Index]; }
+    inline const buffer& operator[](size_t Index) const { return Data[Index]; }
+} buffer_list;
+
+
 
 #define MAX_BUFFERS 50
 struct program_state
@@ -255,8 +265,9 @@ struct program_state
     int MarginLeft;
     int NumbersWidth;
     
-    buffer Buffers[MAX_BUFFERS];
-    int OpenBufferCount;
+    //buffer Buffers[MAX_BUFFERS];
+    //int OpenBufferCount;
+    buffer_list Buffers;
     
     view_list Views;
     int SelectedViewIndex;

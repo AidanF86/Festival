@@ -518,6 +518,12 @@ HandleInput_EntryBar(program_state *ProgramState)
             Lister->SelectedIndex++;
     }
     
+    if(KeyShouldExecute(ProgramState->Backspace_Key))
+    {
+        if(Lister->Input.Length > 0)
+            Lister->Input.Length--;
+    }
+    
     for(int i = 0; i < 26; i++)
     {
         if(KeyShouldExecute(ProgramState->LetterKeys[i]))
