@@ -186,13 +186,13 @@ buffer_pos
 SeekNextEmptyLine(view *View, buffer_pos From)
 {
     int ResultLine = From.l;
-    while(ResultLine < LineCount(View))
+    while(ResultLine < LineCount(View) - 1)
     {
         ResultLine++;
         if(LineLength(View, ResultLine) == 0)
             break;
     }
-    return BufferPos(ResultLine, LineLength(View, ResultLine) + 1);
+    return BufferPos(ResultLine, LineLength(View, ResultLine));
 }
 
 void
@@ -232,6 +232,9 @@ HandleInput_Nav(program_state *ProgramState)
     
     if(KeyShouldExecute(ProgramState->EKey)) {
         OpenEditFileLister(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex]);
+    }
+    else if(KeyShouldExecute(ProgramState->GKey)) {
+        OpenSwitchBufferLister(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex]);
     }
     
     if(KeyShouldExecute(ProgramState->UpKey))

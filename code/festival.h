@@ -102,6 +102,7 @@ enum lister_type
 
 enum lister_purpose {
     ListerPurpose_EditFile,
+    ListerPurpose_SwitchBuffer,
     ListerPurpose_RunCommand,
 };
 

@@ -86,6 +86,23 @@ struct string
     
 };
 
+inline bool
+operator==(string A, string B)
+{
+    if(A.Length != B.Length) return false;
+    for(int i = 0; i < A.Length; i++)
+    {
+        if(A[i] != B[i]) return false;
+    }
+    return true;
+}
+
+inline bool
+operator!=(string A, string B)
+{
+    return !(A == B);
+}
+
 int
 NullTerminatedStringLength(const char *Contents)
 {
@@ -122,7 +139,7 @@ CopyString(string S)
 {
     string Copy = AllocString(S.Length);
     
-    memcpy(Copy.Data, S.Data, Copy.Length);
+    memcpy(Copy.Data, S.Data, sizeof(u32) * Copy.Length);
     Copy.Length = S.Length;
     Copy.ArraySize = Copy.Length;
     
@@ -361,17 +378,6 @@ Print(FILE *File, const char *Format, ...)
     FreeString(Str);
 }
 
-
-inline bool
-operator==(string A, string B)
-{
-    if(A.Length != B.Length) return false;
-    for(int i = 0; i < A.Length; i++)
-    {
-        if(A[i] != B[i]) return false;
-    }
-    return true;
-}
 
 
 /*

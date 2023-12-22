@@ -12,71 +12,18 @@
 #include "festival_functions.cpp"
 #include "festival_profiling.h"
 
-#if 0
-void
-LoadCharTexture(program_state *ProgramState, int Char, int Size)
-{
-    if(Char < 0 || Char > 255)
-        return;
-    
-    RenderTexture2D *Tex = &ProgramState->CharTextures[Char];
-    if(ProgramState->CharTexturesExist[Char])
-        UnloadRenderTexture(*Tex);
-    
-    v2 CharDim = GetCharDim(ProgramState, Size);
-    GlyphInfo Info = ProgramState->FontMain.glyphs[Char];
-    
-    *Tex = LoadRenderTexture(CharDim.x + Info.advanceX, CharDim.y);
-    
-    {
-        BeginTextureMode(*Tex);
-        BeginShaderMode(ProgramState->ShaderSDF);
-        
-        char CharBuffer[2] = {(char)Char, 0};
-        DrawTextEx(ProgramState->FontSDF, CharBuffer, {0,0}, Size, 0, WHITE);
-        
-        EndShaderMode();
-        EndTextureMode();
-    }
-    
-    printf("Yeah\n");
-    ProgramState->CharTexturesExist[Char] = true;
-}
-#endif
-
-
 void
 DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color BGColor, color FGColor)
 {
-    /*
-        if(!ProgramState->CharTexturesExist[Char])
-            return;
-    */
-    
     v2 CharDim = GetCharDim(ProgramState, Size);
     
     if(BGColor.a != 0)
         DrawRectangleV(V(Pos), V(CharDim), BGColor);
     
-    //DrawTextureV(ProgramState->CharTextures[Char].texture, V(Pos), BLACK);
-    
-    // TODO: replace w/ ascii index
     GlyphInfo Info = {0};
     int GlyphIndex = CharIndex(&ProgramState->FontMain, Char);
     Info = ProgramState->FontMain.RFont.glyphs[GlyphIndex];
-#if 0
-    for(int i = 0; i < ProgramState->FontMain.RFont.glyphCount; i++)
-    {
-        if(ProgramState->FontMain.RFont.glyphs[i].value == Char)
-        {
-            Info = ProgramState->FontMain.RFont.glyphs[i];
-            GlyphIndex = i;
-            break;
-        }
-    }
-#endif
     
-    //rect DestRect = Rect(Pos.x, Pos.y, CharDim.x, CharDim.y);
     rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
                          ProgramState->FontMain.RFont.recs[GlyphIndex].width,
                          ProgramState->FontMain.RFont.recs[GlyphIndex].height);
@@ -386,14 +333,29 @@ GetExistingBufferForPath(string PathString)
     return {};
 }
 
-buffer
-GetBufferForPath(buffer *Buffer, string PathString)
+buffer *
+GetBufferForPath(program_state *ProgramState, string PathString)
 {
     // see if we already have a buffer
     
-    //char *Path = RawString(PathString);
-    //free(Path);
-    return {};
+    string PathCopy = CopyString(PathString);
+    AbsolutizePath(&PathCopy);
+    int Index = -1;
+    
+    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    {
+        if(PathCopy == ProgramState->Buffers[i].Path)
+        {
+            Index = i;
+            break;
+        }
+    }
+    
+    FreeString(PathCopy);
+    
+    if(Index != -1)
+        return &ProgramState->Buffers[Index];
+    return 0;
 }
 
 void
@@ -425,11 +387,32 @@ ExecLister(program_state *ProgramState, view *View)
             }
             
             char *RawFileName = RawString(Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
-            ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
+            buffer *ExistingBuffer = GetBufferForPath(ProgramState, Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
+            if(ExistingBuffer)
+            {
+                View->Buffer = ExistingBuffer;
+            }
+            else
+            {
+                ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
+                View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+            }
             free(RawFileName);
-            View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
             
         } break;
+        case ListerPurpose_SwitchBuffer: {
+            Print("Purpose: Switch buffer");
+            if(Lister->Type != ListerType_BufferPointer) {
+                Print("Lister is for Switch buffer but type isn't Buffer Pointer!");
+                break;
+            }
+            
+            View->Buffer = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].Buffer;
+            
+        } break;
+        default: {
+            Print("Unknown lister purpose!");
+        }
     }
     
     Lister->ShouldExecute = false;
@@ -444,6 +427,7 @@ OpenEditFileLister(program_state *ProgramState, view *View)
     
     Lister->InputLabel = String("Open file: ");
     Lister->Input = String("");
+    Lister->Purpose = ListerPurpose_EditFile;
     
     FilePathList FilesInDir = LoadDirectoryFiles("./");
     
@@ -459,6 +443,33 @@ OpenEditFileLister(program_state *ProgramState, view *View)
     
     UnloadDirectoryFiles(FilesInDir);
     View->ListerIsOpen = true;
+    Lister->ShouldExecute = false;
+}
+
+// TODO: policy: all strings used in lister are uniquely allocated and freed upon closure
+
+void
+OpenSwitchBufferLister(program_state *ProgramState, view *View)
+{
+    View->Lister = Lister(ListerType_BufferPointer);
+    lister *Lister = &View->Lister;
+    
+    Lister->InputLabel = String("Switch to Buffer: ");
+    Lister->Input = String("");
+    Lister->Purpose = ListerPurpose_SwitchBuffer;
+    
+    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    {
+        lister_entry NewEntry;
+        NewEntry.Buffer = &ProgramState->Buffers[i];
+        NewEntry.Name = CopyString(ProgramState->Buffers[i].Path);
+        ListAdd(&Lister->Entries, NewEntry);
+        ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+        ListAdd(&Lister->MatchingEntries, i);
+    }
+    
+    View->ListerIsOpen = true;
+    Lister->ShouldExecute = false;
 }
 
 #include "festival_editing.h"
@@ -544,9 +555,9 @@ extern "C"
         
         for(int i = 0; i < ProgramState->Buffers.Count; i++)
         {
-            Print("%d: %S", i, ProgramState->Buffers[i].Path);
+            //Print("%d: %S", i, ProgramState->Buffers[i].Path);
         }
-        Print("");
+        //Print("");
         
         // Re-render font chars if needed
         if(ProgramState->PrevFontSize != ProgramState->FontSize)
@@ -828,8 +839,20 @@ extern "C"
         DrawView(ProgramState, View);
     }
     
-    DrawFPS(400, 100);
-    DrawProfiles(ProgramState);
+    int Y = 300;
+    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    {
+        string Str = String("%d: %S", i, ProgramState->Buffers[i].Path);
+        color BGColor = BLACK;
+        if(ProgramState->Views[ProgramState->SelectedViewIndex].Buffer == &ProgramState->Buffers[i])
+            BGColor = GRAY;
+        DrawString(ProgramState, Str, V2(100, Y), ProgramState->FontSize, BGColor, ORANGE);
+        Y+=20;
+        FreeString(Str);
+    }
+    
+    //DrawFPS(400, 100);
+    //DrawProfiles(ProgramState);
     
     EndDrawing();
     EndProfile(Rendering);
