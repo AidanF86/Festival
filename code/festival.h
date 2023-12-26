@@ -15,54 +15,15 @@
 #define IsNonSpecial(c) (IsAlphaNumeric(c) || \
 c == '_')
 
-
-typedef struct int_list
-{
-    int Count;
-    int ArraySize;
-    int *Data;
-    inline int& operator[](size_t Index) { return Data[Index]; }
-    inline const int& operator[](size_t Index) const { return Data[Index]; }
-} int_list;
-int_list IntList()
-{
-    int_list Result;
-    Result.Count = 0;
-    Result.ArraySize = 20;
-    Result.Data = (int *)malloc(20 * sizeof(int));
-    return Result;
-}
-
-
-typedef struct rect_list
-{
-    b32 IsAllocated;
-    int Count;
-    int ArraySize;
-    rect *Data;
-    inline rect& operator[](size_t Index) { return Data[Index]; }
-    inline const rect& operator[](size_t Index) const { return Data[Index]; }
-} rect_list;
-rect_list RectList()
-{
-    rect_list Result;
-    Result.Count = 0;
-    Result.ArraySize = 20;
-    Result.IsAllocated = true;
-    Result.Data = (rect *)malloc(20 * sizeof(rect));
-    return Result;
-}
-
 typedef Color color;
-typedef struct color_list
-{
-    int Count;
-    int ArraySize;
-    color *Data;
-    inline color& operator[](size_t Index) { return Data[Index]; }
-    inline const color& operator[](size_t Index) const { return Data[Index]; }
-} color_list;
+struct color_list;
+struct program_state;
+struct view;
 
+DefineList(int, Int)
+DefineList(f32, f32)
+DefineList(rect, Rect)
+DefineList(color, Color)
 
 struct line_data
 {
@@ -74,16 +35,7 @@ struct line_data
     
     int DisplayLines;
 };
-
-typedef struct line_data_list
-{
-    b32 IsAllocated;
-    int Count;
-    int ArraySize;
-    line_data *Data;
-    inline line_data& operator[](size_t Index) { return Data[Index]; }
-    inline const line_data& operator[](size_t Index) const { return Data[Index]; }
-} line_data_list;
+DefineList(line_data, LineData)
 
 struct buffer
 {
@@ -91,21 +43,26 @@ struct buffer
     string Path;
     string_list Lines;
 };
+DefineList(buffer, Buffer)
 
+typedef int (*command_function)(program_state*, view*);
+struct command
+{
+    command_function Function;
+    const char *Name;
+};
 
 enum lister_type
 {
     ListerType_BufferPointer,
     ListerType_String,
-    ListerType_Function,
+    ListerType_Command,
 };
-
 enum lister_purpose {
     ListerPurpose_EditFile,
     ListerPurpose_SwitchBuffer,
     ListerPurpose_RunCommand,
 };
-
 struct lister_entry
 {
     string Name;
@@ -118,26 +75,11 @@ struct lister_entry
             string String;
         };
         struct {
-            void *Function;
+            command Command;
         };
     };
 };
-typedef struct lister_entry_list
-{
-    int Count;
-    int ArraySize;
-    lister_entry *Data;
-    inline lister_entry& operator[](size_t Index) { return Data[Index]; }
-    inline const lister_entry& operator[](size_t Index) const { return Data[Index]; }
-} lister_entry_list;
-lister_entry_list ListerEntryList()
-{
-    lister_entry_list Result;
-    Result.Count = 0;
-    Result.ArraySize = 20;
-    Result.Data = (lister_entry *)malloc(20 * sizeof(lister_entry));
-    return Result;
-}
+DefineList(lister_entry, ListerEntry)
 
 struct lister
 {
@@ -157,18 +99,7 @@ struct lister
     int TargetY;
     rect_list Rects; // correspond to MatchingEntries
 };
-lister Lister(lister_type Type)
-{
-    lister Result;
-    Result.Type = Type;
-    Result.Entries = ListerEntryList();
-    Result.MatchingEntries = IntList();
-    Result.Y = 0;
-    Result.Y = Result.TargetY;
-    Result.Rects = RectList();
-    Result.SelectedIndex = 0;
-    return Result;
-}
+
 
 
 enum view_spawn_location {
@@ -203,15 +134,7 @@ struct view
     b32 ListerIsOpen;
     lister Lister;
 };
-typedef struct view_list
-{
-    int Count;
-    int ArraySize;
-    view *Data;
-    inline view& operator[](size_t Index) { return Data[Index]; }
-    inline const view& operator[](size_t Index) const { return Data[Index]; }
-} view_list;
-
+DefineList(view, View)
 
 struct key_data
 {
@@ -236,14 +159,6 @@ struct font
     int AsciiGlyphIndexes[256];
 };
 
-typedef struct buffer_list
-{
-    int Count;
-    int ArraySize;
-    buffer *Data;
-    inline buffer& operator[](size_t Index) { return Data[Index]; }
-    inline const buffer& operator[](size_t Index) const { return Data[Index]; }
-} buffer_list;
 
 
 
@@ -378,6 +293,7 @@ struct program_state
         key_data KeyData[6+26+10+11+7];
     };
 };
+
 
 #define KeyShouldExecute(Key) ((Key).JustPressed || ((Key).PressTime >= ProgramState->KeyFirstRepeatTime && Key.TimeTillNextRepeat <= 0))
 

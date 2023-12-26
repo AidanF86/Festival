@@ -1,0 +1,42 @@
+/* date = December 22nd 2023 0:17 am */
+
+#ifndef FESTIVAL_COMMANDS_H
+#define FESTIVAL_COMMANDS_H
+
+//typedef int (*command_function)(program_state*, view*);
+#if 0
+struct command
+{
+    command_function Function;
+    const char *Name;
+};
+#endif
+
+command
+Command(command_function Function, const char *Name)
+{
+    command Result;
+    Result.Function = Function;
+    Result.Name = Name;
+    return Result;
+}
+
+
+#define DefineCommand(name) int name(program_state *ProgramState, view *View)
+
+
+DefineCommand(TestCommand)
+{
+    Print("Hello!!! This is the test command!");
+    return 0;
+}
+
+
+command Commands[2] =
+{
+    Command(TestCommand, "Test Command"),
+    Command(TestCommand, "Test Command 2"),
+};
+
+
+#endif //FESTIVAL_COMMANDS_H

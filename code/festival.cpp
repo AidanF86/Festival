@@ -5,12 +5,13 @@
 #include "festival_platform.h"
 
 #include "festival_math.h"
+#include "festival_lists.h"
 #include "festival_string.h"
 #include "festival.h"
-#include "festival_lists.h"
 
 #include "festival_functions.cpp"
 #include "festival_profiling.h"
+#include "festival_commands.h"
 
 void
 DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color BGColor, color FGColor)
@@ -462,6 +463,30 @@ OpenSwitchBufferLister(program_state *ProgramState, view *View)
     {
         lister_entry NewEntry;
         NewEntry.Buffer = &ProgramState->Buffers[i];
+        NewEntry.Name = CopyString(ProgramState->Buffers[i].Path);
+        ListAdd(&Lister->Entries, NewEntry);
+        ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+        ListAdd(&Lister->MatchingEntries, i);
+    }
+    
+    View->ListerIsOpen = true;
+    Lister->ShouldExecute = false;
+}
+
+void
+OpenCommandLister(program_state *ProgramState, view *View)
+{
+    View->Lister = Lister(ListerType_Command);
+    lister *Lister = &View->Lister;
+    
+    Lister->InputLabel = String("Run Command: ");
+    Lister->Input = String("");
+    Lister->Purpose = ListerPurpose_RunCommand;
+    
+    for(int i = 0; i < sizeof(Commands) / sizeof(command); i++)
+    {
+        lister_entry NewEntry;
+        NewEntry.Command = Commands[i];
         NewEntry.Name = CopyString(ProgramState->Buffers[i].Path);
         ListAdd(&Lister->Entries, NewEntry);
         ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));

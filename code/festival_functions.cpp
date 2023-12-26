@@ -692,3 +692,16 @@ FillLineData(view *View, program_state *ProgramState)
     }
     //Print("%d", CharsProcessed);
 }
+
+lister Lister(lister_type Type)
+{
+    lister Result;
+    Result.Type = Type;
+    Result.Entries = ListerEntryList();
+    Result.MatchingEntries = IntList();
+    Result.Y = 0;
+    Result.Y = Result.TargetY;
+    Result.Rects = RectList();
+    Result.SelectedIndex = 0;
+    return Result;
+}
