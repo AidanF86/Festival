@@ -13,13 +13,21 @@ RGB(int r, int g, int b) {
     return RGBA(r, g, b, 255);
 }
 
+/*
 v2 GetCharDim(program_state *ProgramState, int Size)
 {
     return V2(MeasureTextEx(ProgramState->FontMain.RFont, "_", Size, 0));
 }
+*/
+v2 GetCharDim(program_state *ProgramState, font_type FontType)
+{
+    int Size = ProgramState->FontSize;
+    return V2(MeasureTextEx(ProgramState->FontMonospace.RFont, "_", Size, 0));
+    //return GetCharDim(ProgramState, ProgramState->FontSize);
+}
 v2 GetCharDim(program_state *ProgramState)
 {
-    return GetCharDim(ProgramState, ProgramState->FontSize);
+    return GetCharDim(ProgramState, FontType_Monospace);
 }
 
 line_data
@@ -412,19 +420,18 @@ UpdateKeyInput(program_state *ProgramState)
 }
 
 void
-LoadFont(program_state *ProgramState, int Size)
+LoadFont(program_state *ProgramState, font *OurFont, int Size, const char *FileName)
 {
     // TODO: unload font
     //UnloadFontData(GlyphInfo *glyphs, int glyphCount);
     //UnloadFont(Font font);
     
     u32 FontFileSize = 0;
-    u8 *FontFileData = LoadFileData("LiberationMono-Regular.ttf", &FontFileSize);
+    u8 *FontFileData = LoadFileData(FileName, &FontFileSize);
     //u8 *FontFileData = LoadFileData("Georgia.ttf", &FontFileSize);
-    //u8 *FontFileData = LoadFileData("HelveticaNeue-Regular.otf", &FontFileSize);
     
-    font *LoadedFont = &ProgramState->FontMain;
-    Font *RLoadedFont = &ProgramState->FontMain.RFont;
+    font *LoadedFont = OurFont;
+    Font *RLoadedFont = &OurFont->RFont;
     *LoadedFont = {0};
     RLoadedFont->baseSize = Size;
     RLoadedFont->glyphCount = 95;
@@ -447,6 +454,14 @@ LoadFont(program_state *ProgramState, int Size)
             }
         }
     }
+}
+
+void
+LoadFonts(program_state *ProgramState)
+{
+    LoadFont(ProgramState, &ProgramState->FontMonospace, ProgramState->FontSize, "LiberationMono-Regular.ttf");
+    LoadFont(ProgramState, &ProgramState->FontSerif, ProgramState->FontSize, "Georgia.ttf");
+    LoadFont(ProgramState, &ProgramState->FontSans, ProgramState->FontSize, "HelveticaNeue-Regular.otf");
 }
 
 int
@@ -478,6 +493,8 @@ view
 View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation, f32 Area)
 {
     view View = {0};
+    //View.FontType = FontType_Monospace;
+    View.FontType = FontType_Sans;
     View.CursorPos.l = 0;
     View.CursorPos.c = 0;
     View.Buffer = Buffer;
@@ -648,8 +665,8 @@ FillLineData(view *View, program_state *ProgramState)
     // Allocation
     *DataList = LineDataList();
     
-    
     int y = 0;
+    font *Font = &ProgramState->FontMonospace;
     
     int CharsProcessed = 0;
     for(int l = 0; l < LineCount(View); l++)
@@ -677,8 +694,8 @@ FillLineData(view *View, program_state *ProgramState)
                 RectData->DisplayLines++;
             }
             
-            int GlyphIndex = CharIndex(&ProgramState->FontMain, c);
-            GlyphInfo Info = ProgramState->FontMain.RFont.glyphs[GlyphIndex];
+            int GlyphIndex = CharIndex(Font, c);
+            GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
             
             ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
             

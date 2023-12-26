@@ -101,6 +101,12 @@ struct lister
 };
 
 
+enum font_type
+{
+    FontType_Monospace,
+    FontType_Sans,
+    FontType_Serif,
+};
 
 enum view_spawn_location {
     Location_Below,
@@ -130,6 +136,8 @@ struct view
     rect CursorTargetRect;
     
     line_data_list LineDataList;
+    
+    font_type FontType;
     
     b32 ListerIsOpen;
     lister Lister;
@@ -161,7 +169,6 @@ struct font
 
 
 
-
 #define MAX_BUFFERS 50
 struct program_state
 {
@@ -172,7 +179,9 @@ struct program_state
     f32 KeyFirstRepeatTime;
     f32 KeyRepeatSpeed = 1;
     
-    font FontMain;
+    font FontMonospace;
+    font FontSans;
+    font FontSerif;
     
     int FontSize;
     int PrevFontSize;
@@ -181,8 +190,6 @@ struct program_state
     int MarginLeft;
     int NumbersWidth;
     
-    //buffer Buffers[MAX_BUFFERS];
-    //int OpenBufferCount;
     buffer_list Buffers;
     
     view_list Views;

@@ -14,50 +14,53 @@
 #include "festival_commands.h"
 
 void
-DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color BGColor, color FGColor)
+DrawChar(program_state *ProgramState, int Char, v2 Pos, color BGColor, color FGColor)
 {
-    v2 CharDim = GetCharDim(ProgramState, Size);
+    v2 CharDim = GetCharDim(ProgramState);
     
     if(BGColor.a != 0)
         DrawRectangleV(V(Pos), V(CharDim), BGColor);
     
+    font *Font = &ProgramState->FontMonospace;
+    
     GlyphInfo Info = {0};
-    int GlyphIndex = CharIndex(&ProgramState->FontMain, Char);
-    Info = ProgramState->FontMain.RFont.glyphs[GlyphIndex];
+    int GlyphIndex = CharIndex(Font, Char);
+    Info = Font->RFont.glyphs[GlyphIndex];
     
     rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
-                         ProgramState->FontMain.RFont.recs[GlyphIndex].width,
-                         ProgramState->FontMain.RFont.recs[GlyphIndex].height);
+                         Font->RFont.recs[GlyphIndex].width,
+                         Font->RFont.recs[GlyphIndex].height);
     
-    DrawTexturePro(ProgramState->FontMain.RFont.texture,
+    DrawTexturePro(Font->RFont.texture,
                    //DrawTexturePro(ProgramState->CharTextures[Char].texture,
-                   ProgramState->FontMain.RFont.recs[GlyphIndex],
+                   Font->RFont.recs[GlyphIndex],
                    R(DestRect),
                    {0, 0}, 0, FGColor);
 }
 
 void
-DrawChar(program_state *ProgramState, int Char, v2 Pos, int Size, color FGColor)
+DrawChar(program_state *ProgramState, int Char, v2 Pos, color FGColor)
 {
-    DrawChar(ProgramState, Char, Pos, Size, RGBA(0, 0, 0, 0), FGColor);
+    DrawChar(ProgramState, Char, Pos, RGBA(0, 0, 0, 0), FGColor);
 }
 
 int
-DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color BGColor, color FGColor)
+DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, color FGColor)
 {
-    v2 CharDim = GetCharDim(ProgramState, Size);
+    // TODO: use advanceX
+    v2 CharDim = GetCharDim(ProgramState);
     for(int i = 0; i < String.Length; i++)
     {
-        DrawChar(ProgramState, String[i], Pos, Size, BGColor, FGColor);
+        DrawChar(ProgramState, String[i], Pos, BGColor, FGColor);
         Pos.x += CharDim.x;
     }
     return Pos.x;
 }
 
 int
-DrawString(program_state *ProgramState, string String, v2 Pos, int Size, color FGColor)
+DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor)
 {
-    return DrawString(ProgramState, String, Pos, Size, RGBA(0, 0, 0, 0), FGColor);
+    return DrawString(ProgramState, String, Pos, RGBA(0, 0, 0, 0), FGColor);
 }
 
 void DrawProfiles(program_state *ProgramState) {
@@ -72,7 +75,7 @@ void DrawProfiles(program_state *ProgramState) {
             Total += ProfileResultFrames[i][a];
         }
         string ProfileString = String("%S: %f", ProfileNames[i], Total/ProfileCycleFrameCount);
-        DrawString(ProgramState, ProfileString, V2(400, 200+CharHeight*i), ProgramState->FontSize, BLACK, RED);
+        DrawString(ProgramState, ProfileString, V2(400, 200+CharHeight*i), BLACK, RED);
         FreeString(ProfileString);
     }
 }
@@ -103,20 +106,21 @@ DrawView(program_state *ProgramState, view *View)
     {
         lister *Lister = &View->Lister;
         DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, BLUE);
-        int InputX = DrawString(ProgramState, Lister->InputLabel, V2(ViewRect.x, ViewRect.y),
-                                ProgramState->FontSize, WHITE);
+        int InputX = DrawString(ProgramState, Lister->InputLabel, V2(ViewRect.x, ViewRect.y), WHITE);
         DrawString(ProgramState, Lister->Input, V2(InputX, ViewRect.y),
-                   ProgramState->FontSize, WHITE);
+                   WHITE);
     }
     else
     {
         DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, GRAY);
         string TitleString = String("%S   %d,%d", View->Buffer->FileName, View->CursorPos.l, View->CursorPos.c);
-        DrawString(ProgramState, TitleString, V2(ViewRect.x, ViewRect.y), ProgramState->FontSize, BLACK);
+        DrawString(ProgramState, TitleString, V2(ViewRect.x, ViewRect.y), BLACK);
         FreeString(TitleString);
     }
     
     
+    BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
+    // TODO: Cross-view cursor drawing
     // draw cursor
     rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
     if(ViewIsSelected)
@@ -134,6 +138,7 @@ DrawView(program_state *ProgramState, view *View)
     {
         DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
     }
+    EndScissorMode();
     
     // Draw text
     EndScissorMode();
@@ -151,7 +156,7 @@ DrawView(program_state *ProgramState, view *View)
                          LineNumbersRect.w, LineNumbersRect.h);
         string NumberString = String("%d", l);
         v2 LineNumberPos = V2(View->Rect.x, LineData.LineRect.y - View->Y + View->TextRect.y);
-        DrawString(ProgramState, NumberString, LineNumberPos, ProgramState->FontSize, ProgramState->LineNumberFGColor);
+        DrawString(ProgramState, NumberString, LineNumberPos, ProgramState->LineNumberFGColor);
         FreeString(NumberString);
         EndScissorMode();
         
@@ -166,7 +171,7 @@ DrawView(program_state *ProgramState, view *View)
                 CharColor = ProgramState->CursorFGColor;
             }
             
-            DrawChar(ProgramState, CharAt(View, l, c), V2(Rect), ProgramState->FontSize, CharColor);
+            DrawChar(ProgramState, CharAt(View, l, c), V2(Rect), CharColor);
         }
         EndScissorMode();
     }
@@ -192,7 +197,7 @@ DrawView(program_state *ProgramState, view *View)
             
             DrawRectangleRec(R(EntryRect), BGColor);
             DrawString(ProgramState, Lister->Entries[Lister->MatchingEntries[i]].Name,
-                       V2(EntryRect.x, EntryRect.y), ProgramState->FontSize, FGColor);
+                       V2(EntryRect.x, EntryRect.y), FGColor);
             Y += CharHeight;
         }
     }
@@ -209,7 +214,6 @@ DrawView(program_state *ProgramState, view *View)
     
     if(ProgramState->ShowViewInfo)
     {
-        int InfoFontSize = 20;
         int KeyValueDistanceChars = 10;
         int InfoCharHeight = GetCharDim(ProgramState).y;
         int InfoCharWidth = GetCharDim(ProgramState).x;
@@ -218,17 +222,17 @@ DrawView(program_state *ProgramState, view *View)
         DrawRectangleRec(R(View->Rect), {0, 0, 0, 200});
         {
             v2 TextPos = V2(View->Rect.x + 10, View->Rect.y + 10);
-            DrawString(ProgramState, String("id"), TextPos, InfoFontSize, WHITE);
-            DrawString(ProgramState, String("%d", View->Id), TextPos + V2(KeyValueDistance, 0), InfoFontSize, YELLOW);
+            DrawString(ProgramState, String("id"), TextPos, WHITE);
+            DrawString(ProgramState, String("%d", View->Id), TextPos + V2(KeyValueDistance, 0), YELLOW);
             TextPos.y += InfoCharHeight;
-            DrawString(ProgramState, String("parent"), TextPos, InfoFontSize, WHITE);
-            DrawString(ProgramState, String("%d", View->ParentId), TextPos + V2(KeyValueDistance, 0), InfoFontSize, YELLOW);
+            DrawString(ProgramState, String("parent"), TextPos, WHITE);
+            DrawString(ProgramState, String("%d", View->ParentId), TextPos + V2(KeyValueDistance, 0), YELLOW);
             TextPos.y += InfoCharHeight;
-            DrawString(ProgramState, String("birth #"), TextPos, InfoFontSize, WHITE);
-            DrawString(ProgramState, String("%d", View->BirthOrdinal), TextPos + V2(KeyValueDistance, 0), InfoFontSize, YELLOW);
+            DrawString(ProgramState, String("birth #"), TextPos, WHITE);
+            DrawString(ProgramState, String("%d", View->BirthOrdinal), TextPos + V2(KeyValueDistance, 0), YELLOW);
             TextPos.y += InfoCharHeight;
-            DrawString(ProgramState, String("area"), TextPos, InfoFontSize, WHITE);
-            DrawString(ProgramState, String("%d", View->Area), TextPos + V2(KeyValueDistance, 0), InfoFontSize, YELLOW);
+            DrawString(ProgramState, String("area"), TextPos, WHITE);
+            DrawString(ProgramState, String("%d", View->Area), TextPos + V2(KeyValueDistance, 0), YELLOW);
         }
     }
     
@@ -509,7 +513,7 @@ extern "C"
         buffer_list *Buffers = &ProgramState->Buffers;
         view_list *Views = &ProgramState->Views;
         buffer *Buffer = &ProgramState->Buffers[0];
-        font *FontMain = &ProgramState->FontMain;
+        //font *FontMonospace = &ProgramState->FontMonospace;
         
         if(!Memory->Initialized)
         {
@@ -530,7 +534,8 @@ extern "C"
             //ListAdd(Buffers, LoadFileToBuffer("2mb.txt"));
             
             ProgramState->FontSize = 22;
-            LoadFont(ProgramState, ProgramState->FontSize);
+            LoadFonts(ProgramState);
+            
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;
             
@@ -586,8 +591,7 @@ extern "C"
         
         // Re-render font chars if needed
         if(ProgramState->PrevFontSize != ProgramState->FontSize)
-            LoadFont(ProgramState, ProgramState->FontSize);
-        //LoadAllCharTextures(ProgramState);
+            LoadFonts(ProgramState);
         ProgramState->PrevFontSize = ProgramState->FontSize;
         
         StartProfiling();
@@ -871,7 +875,7 @@ extern "C"
         color BGColor = BLACK;
         if(ProgramState->Views[ProgramState->SelectedViewIndex].Buffer == &ProgramState->Buffers[i])
             BGColor = GRAY;
-        DrawString(ProgramState, Str, V2(100, Y), ProgramState->FontSize, BGColor, ORANGE);
+        DrawString(ProgramState, Str, V2(100, Y), BGColor, ORANGE);
         Y+=20;
         FreeString(Str);
     }
