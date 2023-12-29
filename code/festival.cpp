@@ -13,29 +13,41 @@
 #include "festival_profiling.h"
 #include "festival_commands.h"
 
-void
+rect
 DrawChar(program_state *ProgramState, int Char, v2 Pos, color BGColor, color FGColor)
 {
-    v2 CharDim = GetCharDim(ProgramState);
-    
-    if(BGColor.a != 0)
-        DrawRectangleV(V(Pos), V(CharDim), BGColor);
-    
     font *Font = &ProgramState->FontMonospace;
+    if(ProgramState->FontType == FontType_Sans)
+        Font = &ProgramState->FontSans;
+    else if(ProgramState->FontType == FontType_Serif)
+        Font = &ProgramState->FontSerif;
     
     GlyphInfo Info = {0};
     int GlyphIndex = CharIndex(Font, Char);
     Info = Font->RFont.glyphs[GlyphIndex];
     
+    
+    
     rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
                          Font->RFont.recs[GlyphIndex].width,
                          Font->RFont.recs[GlyphIndex].height);
     
+    if(BGColor.a != 0)
+    {
+        rect BGRect = Rect(Pos.x, Pos.y,
+                           ProgramState->FontSize/2,
+                           ProgramState->FontSize);
+        //if(Font->RFont.recs[GlyphIndex].width > ProgramState->FontSize/2)
+        if(Info.advanceX > ProgramState->FontSize/2)
+            BGRect.w = Info.advanceX;
+        DrawRectangleRec(R(BGRect), BGColor);
+    }
+    
     DrawTexturePro(Font->RFont.texture,
-                   //DrawTexturePro(ProgramState->CharTextures[Char].texture,
                    Font->RFont.recs[GlyphIndex],
                    R(DestRect),
                    {0, 0}, 0, FGColor);
+    return DestRect;
 }
 
 void
@@ -47,12 +59,19 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, color FGColor)
 int
 DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, color FGColor)
 {
-    // TODO: use advanceX
-    v2 CharDim = GetCharDim(ProgramState);
+    font *Font = &ProgramState->FontMonospace;
+    if(ProgramState->FontType == FontType_Sans)
+        Font = &ProgramState->FontSans;
+    else if(ProgramState->FontType == FontType_Serif)
+        Font = &ProgramState->FontSerif;
+    
     for(int i = 0; i < String.Length; i++)
     {
         DrawChar(ProgramState, String[i], Pos, BGColor, FGColor);
-        Pos.x += CharDim.x;
+        
+        int GlyphIndex = CharIndex(Font, String[i]);
+        GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
+        Pos.x += Info.advanceX;
     }
     return Pos.x;
 }
@@ -132,7 +151,20 @@ DrawView(program_state *ProgramState, view *View)
                              ProgramState->CursorBGColor);
         }
         else
+        {
+            font *Font = &ProgramState->FontMonospace;
+            if(ProgramState->FontType == FontType_Sans)
+                Font = &ProgramState->FontSans;
+            else if(ProgramState->FontType == FontType_Serif)
+                Font = &ProgramState->FontSerif;
+            
+            GlyphInfo Info = {0};
+            int GlyphIndex = CharIndex(Font, CharAt(View, View->CursorPos));
+            Info = Font->RFont.glyphs[GlyphIndex];
+            
+            CursorDrawRect.w = Info.advanceX;
             DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+        }
     }
     else
     {
@@ -391,18 +423,32 @@ ExecLister(program_state *ProgramState, view *View)
                 break;
             }
             
-            char *RawFileName = RawString(Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
-            buffer *ExistingBuffer = GetBufferForPath(ProgramState, Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
-            if(ExistingBuffer)
-            {
-                View->Buffer = ExistingBuffer;
+            if(Lister->MatchingEntries.Count == 0)
+            { // Create buffer for non-existant file
+                buffer NewBuffer;
+                // TODO: separate filename from path if input has slashes
+                NewBuffer.FileName = CopyString(Lister->Input);
+                NewBuffer.Path = CopyString(Lister->Input);
+                NewBuffer.Lines = StringList();
+                ListAdd(&NewBuffer.Lines, String(""));
+                ListAdd(&ProgramState->Buffers, NewBuffer);
+                View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
             }
             else
             {
-                ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
-                View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+                char *RawFileName = RawString(Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
+                buffer *ExistingBuffer = GetBufferForPath(ProgramState, Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
+                if(ExistingBuffer)
+                {
+                    View->Buffer = ExistingBuffer;
+                }
+                else
+                {
+                    ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
+                    View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+                }
+                free(RawFileName);
             }
-            free(RawFileName);
             
         } break;
         case ListerPurpose_SwitchBuffer: {
@@ -413,6 +459,29 @@ ExecLister(program_state *ProgramState, view *View)
             }
             
             View->Buffer = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].Buffer;
+            
+        } break;
+        case ListerPurpose_SwitchFontType: {
+            if(Lister->Type != ListerType_FontType) {
+                Print("Lister is for Switch font type but type isn't FontType!");
+                break;
+            }
+            
+            ProgramState->FontType = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].FontType;
+            
+        } break;
+        case ListerPurpose_RunCommand: {
+            if(Lister->Type != ListerType_Command) {
+                Print("Lister is for Switch font type but type isn't FontType!");
+                break;
+            }
+            Lister->ShouldExecute = false;
+            command CommandToExec = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].Command;
+            CloseLister(ProgramState, View);
+            
+            CommandToExec.Function(ProgramState, View);
+            
+            return;
             
         } break;
         default: {
@@ -491,7 +560,7 @@ OpenCommandLister(program_state *ProgramState, view *View)
     {
         lister_entry NewEntry;
         NewEntry.Command = Commands[i];
-        NewEntry.Name = CopyString(ProgramState->Buffers[i].Path);
+        NewEntry.Name = String(Commands[i].Name);
         ListAdd(&Lister->Entries, NewEntry);
         ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
         ListAdd(&Lister->MatchingEntries, i);
@@ -499,6 +568,53 @@ OpenCommandLister(program_state *ProgramState, view *View)
     
     View->ListerIsOpen = true;
     Lister->ShouldExecute = false;
+}
+
+void
+OpenSwitchFontTypeLister(program_state *ProgramState, view *View)
+{
+    View->Lister = Lister(ListerType_FontType);
+    lister *Lister = &View->Lister;
+    
+    Lister->InputLabel = String("Run Command: ");
+    Lister->Input = String("");
+    Lister->Purpose = ListerPurpose_SwitchFontType;
+    
+    lister_entry NewEntry;
+    NewEntry.FontType = FontType_Monospace;
+    NewEntry.Name = String("Monospace");
+    ListAdd(&Lister->Entries, NewEntry);
+    ListAdd(&Lister->MatchingEntries, 0);
+    
+    NewEntry.FontType = FontType_Sans;
+    NewEntry.Name = String("Sans");
+    ListAdd(&Lister->Entries, NewEntry);
+    ListAdd(&Lister->MatchingEntries, 1);
+    
+    NewEntry.FontType = FontType_Serif;
+    NewEntry.Name = String("Serif");
+    ListAdd(&Lister->Entries, NewEntry);
+    ListAdd(&Lister->MatchingEntries, 2);
+    
+    ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+    ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+    ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+    
+    View->ListerIsOpen = true;
+    Lister->ShouldExecute = false;
+}
+
+DefineCommand(SwitchFontType)
+{
+    OpenSwitchFontTypeLister(ProgramState, View);
+    return 0;
+}
+
+
+DefineCommand(EditFile)
+{
+    OpenEditFileLister(ProgramState, View);
+    return 0;
 }
 
 #include "festival_editing.h"
@@ -527,14 +643,11 @@ extern "C"
             // TEXT FILE
             ProgramState->Buffers = BufferList();
             ListAdd(Buffers, LoadFileToBuffer("./test.cpp"));
-            //ListAdd(Buffers, LoadFileToBuffer("/home/aidan/programming/festival/build/test.cpp"));
-            //ListAdd(Buffers, LoadFileToBuffer("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.txt"));
             
-            
-            //ListAdd(Buffers, LoadFileToBuffer("2mb.txt"));
             
             ProgramState->FontSize = 22;
             LoadFonts(ProgramState);
+            ProgramState->FontType = FontType_Monospace;
             
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;

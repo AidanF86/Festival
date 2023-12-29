@@ -50,24 +50,10 @@ DONE (yippee! :smug:) rect spawn system :shiver:
 
 DONE Basic Modal system
 
-Current Goal: commands
+Current Goal: Adjust view based on cursor when typing and when scrolling
+Better border seek :cry:
 
-Really nice design
-	Have a serif, sans-serif, and monospace font loaded for use
-		Maybe bold text too
-	Reference: Evangelion Magi / computer systems
-
-File writing
-File open
-    Lister
-        Like 4coder
-        auto-complete (fuzzy-finding?)
-    Command system
-        struct maybe consists of a name and a function?
-    For both of these: solidify key input system
-
-Adjust view based on cursor when typing
-
+Colorscheme (comes after/with treesitter)
 
 INFO
 ========================================

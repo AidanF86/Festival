@@ -63,11 +63,11 @@ SeekBackBorder(view *View, buffer_pos From)
     buffer_pos Result = From;
     if(CharAt(View, Result) == 0)
         Result.c--;
-    if(Result.c < 0)
+    if(Result.c < 0 || (Result.c == 0 && Result.l == 0))
         return From;
     
     b32 StartedAtSpace = false;
-    if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, -1)) == ' ')
+    /*if(CharAt(View, Result) == ' ' ||*/ if(CharAt(View, Result + BufferPos(0, -1)) == ' ')
         StartedAtSpace = true;
     
     if(StartedAtSpace)
@@ -83,6 +83,7 @@ SeekBackBorder(view *View, buffer_pos From)
     b32 StartedAtSpecial = false;
     if(!IsNonSpecial(CharAt(View, Result)))
     {
+        Print("Special");
         StartedAtSpecial = true;
     }
     
@@ -207,7 +208,7 @@ SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
 void
 HandleInput_Nav(program_state *ProgramState)
 {
-    if(KeyShouldExecute(ProgramState->FKey))
+    if(KeyShouldExecute(ProgramState->FKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {
         ProgramState->InputMode = InputMode_Insert;
         return;
@@ -231,10 +232,16 @@ HandleInput_Nav(program_state *ProgramState)
     
     
     if(KeyShouldExecute(ProgramState->EKey)) {
-        OpenEditFileLister(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex]);
+        OpenEditFileLister(ProgramState, View);
     }
     else if(KeyShouldExecute(ProgramState->GKey)) {
-        OpenSwitchBufferLister(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex]);
+        OpenSwitchBufferLister(ProgramState, View);
+    }
+    else if(KeyShouldExecute(ProgramState->FKey) && IsAnyShiftKeyDown) {
+        OpenSwitchFontTypeLister(ProgramState, View);
+    }
+    else if(KeyShouldExecute(ProgramState->AKey)) {
+        OpenCommandLister(ProgramState, View);
     }
     
     if(KeyShouldExecute(ProgramState->UpKey))

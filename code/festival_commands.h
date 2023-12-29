@@ -22,7 +22,7 @@ Command(command_function Function, const char *Name)
 }
 
 
-#define DefineCommand(name) int name(program_state *ProgramState, view *View)
+#define DefineCommand(name) int name##Command(program_state *ProgramState, view *View)
 
 
 DefineCommand(TestCommand)
@@ -31,11 +31,13 @@ DefineCommand(TestCommand)
     return 0;
 }
 
+DefineCommand(SwitchFontType);
+DefineCommand(EditFile);
 
 command Commands[2] =
 {
-    Command(TestCommand, "Test Command"),
-    Command(TestCommand, "Test Command 2"),
+    Command(SwitchFontTypeCommand, "Switch Font Type"),
+    Command(EditFileCommand, "Open File"),
 };
 
 

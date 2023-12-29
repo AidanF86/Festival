@@ -52,16 +52,26 @@ struct command
     const char *Name;
 };
 
+enum font_type
+{
+    FontType_Monospace,
+    FontType_Sans,
+    FontType_Serif,
+};
+
+
 enum lister_type
 {
-    ListerType_BufferPointer,
     ListerType_String,
+    ListerType_BufferPointer,
     ListerType_Command,
+    ListerType_FontType,
 };
 enum lister_purpose {
     ListerPurpose_EditFile,
     ListerPurpose_SwitchBuffer,
     ListerPurpose_RunCommand,
+    ListerPurpose_SwitchFontType,
 };
 struct lister_entry
 {
@@ -76,6 +86,9 @@ struct lister_entry
         };
         struct {
             command Command;
+        };
+        struct {
+            font_type FontType;
         };
     };
 };
@@ -100,13 +113,6 @@ struct lister
     rect_list Rects; // correspond to MatchingEntries
 };
 
-
-enum font_type
-{
-    FontType_Monospace,
-    FontType_Sans,
-    FontType_Serif,
-};
 
 enum view_spawn_location {
     Location_Below,
@@ -137,7 +143,6 @@ struct view
     
     line_data_list LineDataList;
     
-    font_type FontType;
     
     b32 ListerIsOpen;
     lister Lister;
@@ -182,6 +187,7 @@ struct program_state
     font FontMonospace;
     font FontSans;
     font FontSerif;
+    font_type FontType;
     
     int FontSize;
     int PrevFontSize;

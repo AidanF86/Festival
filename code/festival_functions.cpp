@@ -422,13 +422,8 @@ UpdateKeyInput(program_state *ProgramState)
 void
 LoadFont(program_state *ProgramState, font *OurFont, int Size, const char *FileName)
 {
-    // TODO: unload font
-    //UnloadFontData(GlyphInfo *glyphs, int glyphCount);
-    //UnloadFont(Font font);
-    
     u32 FontFileSize = 0;
     u8 *FontFileData = LoadFileData(FileName, &FontFileSize);
-    //u8 *FontFileData = LoadFileData("Georgia.ttf", &FontFileSize);
     
     font *LoadedFont = OurFont;
     Font *RLoadedFont = &OurFont->RFont;
@@ -441,7 +436,6 @@ LoadFont(program_state *ProgramState, font *OurFont, int Size, const char *FileN
     UnloadImage(Atlas);
     UnloadFileData(FontFileData);
     
-    //for(int i = 0; i < RLoadedFont.glyphCount; i++)
     int GlyphIndex = 0;
     for(int i = 0; i < 256; i++)
     {
@@ -494,7 +488,6 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
 {
     view View = {0};
     //View.FontType = FontType_Monospace;
-    View.FontType = FontType_Sans;
     View.CursorPos.l = 0;
     View.CursorPos.c = 0;
     View.Buffer = Buffer;
@@ -667,6 +660,14 @@ FillLineData(view *View, program_state *ProgramState)
     
     int y = 0;
     font *Font = &ProgramState->FontMonospace;
+    if(ProgramState->FontType == FontType_Sans)
+    {
+        Font = &ProgramState->FontSans;
+    }
+    else if(ProgramState->FontType == FontType_Serif)
+    {
+        Font = &ProgramState->FontSerif;
+    }
     
     int CharsProcessed = 0;
     for(int l = 0; l < LineCount(View); l++)
@@ -687,19 +688,20 @@ FillLineData(view *View, program_state *ProgramState)
             // Rect is within the space of textrect
             // so when drawing, offset by textrect.x and textrect.y
             // as well as buffer viewpos
-            if(x+CharWidth >= WrapPoint)
+            
+            int GlyphIndex = CharIndex(Font, CharAt(View, BufferPos(l, c)));
+            GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
+            
+            if(x+Info.advanceX >= WrapPoint)
             {
                 x = SubLineOffset*CharWidth;
                 y += CharHeight;
                 RectData->DisplayLines++;
             }
             
-            int GlyphIndex = CharIndex(Font, c);
-            GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
-            
             ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
             
-            x += /*CharWidth + */Info.advanceX;
+            x += Info.advanceX;
         }
         RectData->EndLineRect = Rect(x, y, CharWidth, CharHeight);
         
