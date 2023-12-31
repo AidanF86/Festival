@@ -380,4 +380,30 @@ Print(FILE *File, const char *Format, ...)
 
 DefineList(string, String);
 
+
+
+string_list TempStrings;
+
+string
+TempString(const char *Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    string Result = _String(Format, Args);
+    
+    ListAdd(&TempStrings, Result);
+    return Result;
+}
+
+void
+PurgeTempStrings()
+{
+    for(int i = 0; i < TempStrings.Count; i++)
+    {
+        FreeString(TempStrings[i]);
+    }
+    ListFree(&TempStrings);
+    TempStrings = StringList();
+}
+
 #endif //FESTIVAL_STRING_H

@@ -214,6 +214,11 @@ HandleInput_Nav(program_state *ProgramState)
         return;
     }
     
+    if(KeyShouldExecute(ProgramState->Slash_Key) && IsAnyShiftKeyDown)
+    {
+        ProgramState->ShowSuperDebugMenu = true;
+    }
+    
     if(KeyShouldExecute(ProgramState->NKey))
     {
         if(IsAnyShiftKeyDown)
@@ -245,30 +250,57 @@ HandleInput_Nav(program_state *ProgramState)
     }
     
     if(KeyShouldExecute(ProgramState->UpKey))
+    {
         MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+    }
     if(KeyShouldExecute(ProgramState->DownKey))
+    {
         MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+    }
     if(KeyShouldExecute(ProgramState->LeftKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+    }
     if(KeyShouldExecute(ProgramState->RightKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+    }
     
     if(KeyShouldExecute(ProgramState->IKey))
+    {
         MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+    }
     if(KeyShouldExecute(ProgramState->KKey))
+    {
         MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+    }
     if(KeyShouldExecute(ProgramState->JKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+    }
     if(KeyShouldExecute(ProgramState->LKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+    }
     
     if(KeyShouldExecute(ProgramState->UKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         SetCursorPos(ProgramState, View, SeekBackBorder(View, View->CursorPos));
+    }
     if(KeyShouldExecute(ProgramState->OKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         SetCursorPos(ProgramState, View, SeekForwardBorder(View, View->CursorPos));
+    }
     
     if(KeyShouldExecute(ProgramState->HKey))
     {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         if(!AtLineBeginning(View, View->CursorPos))
             SetCursorPos(ProgramState, View, SeekLineBeginning(View, View->CursorPos));
         else
@@ -276,6 +308,7 @@ HandleInput_Nav(program_state *ProgramState)
     }
     if(KeyShouldExecute(ProgramState->Semicolon_Key))
     {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         if(!AtLineEnd(View, View->CursorPos))
             SetCursorPos(ProgramState, View, SeekLineEnd(View, View->CursorPos));
         else
@@ -306,6 +339,15 @@ HandleInput_Nav(program_state *ProgramState)
     
 }
 
+void
+HandleInput_SuperDebugMenu(program_state *ProgramState)
+{
+    if(KeyShouldExecute(ProgramState->Slash_Key) && IsAnyShiftKeyDown)
+    {
+        ProgramState->ShowSuperDebugMenu = false;
+    }
+}
+
 
 void
 HandleInput_Insert(program_state *ProgramState)
@@ -319,18 +361,29 @@ HandleInput_Insert(program_state *ProgramState)
     }
     
     if(KeyShouldExecute(ProgramState->UpKey))
+    {
         MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+    }
     if(KeyShouldExecute(ProgramState->DownKey))
+    {
         MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+    }
     if(KeyShouldExecute(ProgramState->LeftKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+    }
     if(KeyShouldExecute(ProgramState->RightKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+    }
     
     for(int i = 0; i < 26; i++)
     {
         if(KeyShouldExecute(ProgramState->LetterKeys[i]))
         {
+            ProgramState->ShouldChangeIdealCursorCol = true;
             char CharToAdd;
             if(IsAnyShiftKeyDown)
                 CharToAdd = 'A' + i;
@@ -346,6 +399,7 @@ HandleInput_Insert(program_state *ProgramState)
     {
         if(KeyShouldExecute(ProgramState->NumberKeys[i]))
         {
+            ProgramState->ShouldChangeIdealCursorCol = true;
             char CharToAdd;
             if(IsAnyShiftKeyDown)
             {
@@ -385,6 +439,7 @@ HandleInput_Insert(program_state *ProgramState)
     {
         if(KeyShouldExecute(ProgramState->SymbolKeys[i]))
         {
+            ProgramState->ShouldChangeIdealCursorCol = true;
             
             char CharToAdd = ' ';
             if(!IsAnyShiftKeyDown)
@@ -650,7 +705,11 @@ HandleInput_EntryBar(program_state *ProgramState)
 void
 HandleInput(program_state *ProgramState)
 {
-    if(ProgramState->Views[ProgramState->SelectedViewIndex].ListerIsOpen)
+    if(ProgramState->ShowSuperDebugMenu)
+    {
+        HandleInput_SuperDebugMenu(ProgramState);
+    }
+    else if(ProgramState->Views[ProgramState->SelectedViewIndex].ListerIsOpen)
     {
         HandleInput_EntryBar(ProgramState);
     }
@@ -661,6 +720,18 @@ HandleInput(program_state *ProgramState)
     else if(ProgramState->InputMode == InputMode_Insert)
     {
         HandleInput_Insert(ProgramState);
+    }
+    
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    if(ProgramState->ShouldChangeIdealCursorCol)
+    {
+        ProgramState->ShouldChangeIdealCursorCol = false;
+        View->IdealCursorCol = View->CursorPos.c;
+    }
+    else
+    {
+        View->CursorPos.c = View->IdealCursorCol;
+        Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
     }
 }
 

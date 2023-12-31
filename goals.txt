@@ -55,6 +55,8 @@ Better border seek :cry:
 
 Colorscheme (comes after/with treesitter)
 
+TREE SITTERRRR
+
 INFO
 ========================================
 A text editor

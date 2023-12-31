@@ -204,8 +204,14 @@ struct program_state
     b32 UserMovedCursor;
     b32 UserMovedView;
     
+    //b32 UserMovedVertical;
+    b32 ShouldChangeIdealCursorCol;
+    
+    
     b32 ShowViewInfo;
     b32 ShowViewRects;
+    b32 ShowSuperDebugMenu;
+    int SuperDebugMenuY;
     
     // modal system
     input_mode InputMode;

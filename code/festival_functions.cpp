@@ -508,7 +508,7 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
         
         // Get a unique Id
         int Id = 0;
-        for(Id; Id <= ProgramState->Views.Count; Id++)
+        for(; Id <= ProgramState->Views.Count; Id++)
         {
             b32 IsIdTaken = false;
             for(int a = 0; a < ProgramState->Views.Count; a++)
@@ -638,7 +638,7 @@ FillLineData(view *View, program_state *ProgramState)
     int WrapPoint = View->TextRect.w - CharWidth;
     
     // DeAllocation
-    if(DataList->IsAllocated);
+    if(DataList->IsAllocated)
     {
         // Deallocate all lists
         for(int i = 0; i < DataList->Count; i++)

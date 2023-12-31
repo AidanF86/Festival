@@ -56,14 +56,19 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, color FGColor)
     DrawChar(ProgramState, Char, Pos, RGBA(0, 0, 0, 0), FGColor);
 }
 
-int
-DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, color FGColor)
+#define Style_Underline 1
+#define Style_Overline 2
+
+v2
+DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, color FGColor, int Style)
 {
     font *Font = &ProgramState->FontMonospace;
     if(ProgramState->FontType == FontType_Sans)
         Font = &ProgramState->FontSans;
     else if(ProgramState->FontType == FontType_Serif)
         Font = &ProgramState->FontSerif;
+    
+    v2 OriginalPos = Pos;
     
     for(int i = 0; i < String.Length; i++)
     {
@@ -73,13 +78,30 @@ DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, co
         GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
         Pos.x += Info.advanceX;
     }
-    return Pos.x;
+    if(Style & Style_Underline)
+    {
+        v2 YDiff = V2(0, ProgramState->FontSize - 3);
+        DrawLineEx(V(OriginalPos + YDiff), V(Pos + YDiff), 2, FGColor);
+    }
+    return V2(Pos.x - OriginalPos.x, Pos.y + ProgramState->FontSize - OriginalPos.y);
 }
 
-int
+v2
+DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor, int Style)
+{
+    return DrawString(ProgramState, String, Pos, RGBA(0, 0, 0, 0), FGColor, Style);
+}
+
+v2
 DrawString(program_state *ProgramState, string String, v2 Pos, color FGColor)
 {
-    return DrawString(ProgramState, String, Pos, RGBA(0, 0, 0, 0), FGColor);
+    return DrawString(ProgramState, String, Pos, RGBA(0, 0, 0, 0), FGColor, 0);
+}
+
+v2
+DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, color FGColor)
+{
+    return DrawString(ProgramState, String, Pos, BGColor, FGColor, 0);
 }
 
 void DrawProfiles(program_state *ProgramState) {
@@ -125,7 +147,7 @@ DrawView(program_state *ProgramState, view *View)
     {
         lister *Lister = &View->Lister;
         DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, BLUE);
-        int InputX = DrawString(ProgramState, Lister->InputLabel, V2(ViewRect.x, ViewRect.y), WHITE);
+        int InputX = DrawString(ProgramState, Lister->InputLabel, V2(ViewRect.x, ViewRect.y), WHITE).x;
         DrawString(ProgramState, Lister->Input, V2(InputX, ViewRect.y),
                    WHITE);
     }
@@ -346,7 +368,7 @@ LoadFileToBuffer(const char *RawPath)
     {
         int LineStart = i;
         // TODO: need to add AppendString to easily do this
-        for(i; FileData[i] != '\n' && i < FileSize; i++) {}
+        for(; FileData[i] != '\n' && i < FileSize; i++) {}
         
         ListAdd(&(Buffer.Lines), AllocString(i-LineStart));
         
@@ -617,6 +639,27 @@ DefineCommand(EditFile)
     return 0;
 }
 
+void
+DrawSuperDebugMenu(program_state *ProgramState)
+{
+    DrawRectangleRec(R(Rect(0, 0, ProgramState->ScreenWidth, ProgramState->ScreenHeight)), ORANGE);
+    int Y = -ProgramState->SuperDebugMenuY;
+    int X = 0;
+    
+    Y += DrawString(ProgramState, TempString("Super Debug Menu"), V2(X, Y), BLACK).y;
+    Y += ProgramState->FontSize;
+    Y += DrawString(ProgramState, TempString("Buffers"), V2(X, Y), BLACK, Style_Underline).y;
+    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    {
+        Y += DrawString(ProgramState, ProgramState->Buffers[i].FileName, V2(X + 20, Y), BLACK).y;
+    }
+    
+#if 0
+    Y += DrawString(ProgramState, String, v2 Pos, color FGColor).y;
+    Y += DrawString(ProgramState, String, v2 Pos, color FGColor).y;
+#endif
+}
+
 #include "festival_editing.h"
 
 extern "C"
@@ -629,7 +672,6 @@ extern "C"
         buffer_list *Buffers = &ProgramState->Buffers;
         view_list *Views = &ProgramState->Views;
         buffer *Buffer = &ProgramState->Buffers[0];
-        //font *FontMonospace = &ProgramState->FontMonospace;
         
         if(!Memory->Initialized)
         {
@@ -679,6 +721,8 @@ extern "C"
             
             ProgramState->ShowViewInfo = false;
             ProgramState->ShowViewRects = false;
+            ProgramState->ShowSuperDebugMenu = false;
+            ProgramState->SuperDebugMenuY = 0;
             
             FillLineData(&ProgramState->Views[0], ProgramState);
             
@@ -686,8 +730,10 @@ extern "C"
             DefineProfile(Rendering);
             DefineProfile(Total);
             
-            //LoadAllCharTextures(ProgramState);
+            TempStrings = StringList();
         }
+        
+        PurgeTempStrings();
         
         for(int i = 0; i < Views->Count; i++)
         {
@@ -696,13 +742,8 @@ extern "C"
                 ExecLister(ProgramState, View);
         }
         
-        for(int i = 0; i < ProgramState->Buffers.Count; i++)
-        {
-            //Print("%d: %S", i, ProgramState->Buffers[i].Path);
-        }
-        //Print("");
         
-        // Re-render font chars if needed
+        // Re-load fonts if needed
         if(ProgramState->PrevFontSize != ProgramState->FontSize)
             LoadFonts(ProgramState);
         ProgramState->PrevFontSize = ProgramState->FontSize;
@@ -712,16 +753,10 @@ extern "C"
         
         view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
         
-        if(View->ListerIsOpen && View->Lister.ShouldExecute)
-        {
-            // TODO: Execute lister
-        }
-        
         UpdateKeyInput(ProgramState);
         
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
-        
         
         int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
         int SubLineOffset = ProgramState->SubLineOffset;
@@ -736,8 +771,6 @@ extern "C"
         {
             Memory->IsRunning = false;
         }
-        
-        
         
         // Compute view rects
         
@@ -981,6 +1014,7 @@ extern "C"
         DrawView(ProgramState, View);
     }
     
+#if 0
     int Y = 300;
     for(int i = 0; i < ProgramState->Buffers.Count; i++)
     {
@@ -992,6 +1026,10 @@ extern "C"
         Y+=20;
         FreeString(Str);
     }
+#endif
+    
+    if(ProgramState->ShowSuperDebugMenu)
+        DrawSuperDebugMenu(ProgramState);
     
     //DrawFPS(400, 100);
     //DrawProfiles(ProgramState);
