@@ -951,94 +951,67 @@ extern "C"
         }
         
         
-        if(IsAnyControlKeyDown)
+        if(IsMouseButtonDown(0))
         {
-            ProgramState->FontSize += GetMouseWheelMove();
-            if(ProgramState->FontSize < 6) ProgramState->FontSize = 6;
-            if(ProgramState->FontSize > 100) ProgramState->FontSize = 100;
+            v2 MousePos = V2(GetMousePosition());
+            
+            buffer_pos MouseBufferPos = ClosestBufferPos(View, ScreenToCharSpace(View, MousePos));
+            View->CursorPos = MouseBufferPos;
+            View->IdealCursorCol = View->CursorPos.c;
         }
         
         
-#if 0
-        // NOTE: Col > IdealCursorChar shouldn't be possible
-        if(MovedUpOrDown && ColAt(ProgramState, View, NewCursorPos) < View->IdealCursorCol && NewCursorPos.l != View->CursorPos.l)
+        Clamp(View->CursorPos.l, 0, LineCount(View)-1);
+        Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+        
+        AdjustView(ProgramState, View);
+        
+        
+        
+        StartProfile(FillLineData);
+        for(int i = 0; i < Views->Count; i++)
         {
-            int Diff = View->IdealCursorCol - ColAt(ProgramState, View, NewCursorPos);
-            int DistToEnd = LineLength(View, NewCursorPos.l) - NewCursorPos.c;
-            if(Diff > DistToEnd)
-                Diff = DistToEnd;
-            NewCursorPos.c += Diff;
+            view *View = &Views->Data[i];
+            FillLineData(View, ProgramState);
+            View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
+            View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
+            View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
+        }
+        EndProfile(FillLineData);
+        
+        StartProfile(Rendering);
+        BeginDrawing();
+        for(int i = 0; i < Views->Count; i++)
+        {
+            view *View = &Views->Data[i];
+            DrawView(ProgramState, View);
         }
         
-        View->TargetY = NewTargetY;
-        View->CursorPos = NewCursorPos;
-    }
-#endif
-    
-    if(IsMouseButtonDown(0))
-    {
-        v2 MousePos = V2(GetMousePosition());
-        
-        buffer_pos MouseBufferPos = ClosestBufferPos(View, ScreenToCharSpace(View, MousePos));
-        View->CursorPos = MouseBufferPos;
-        View->IdealCursorCol = View->CursorPos.c;
-    }
-    
-    
-    
-    
-    
-    Clamp(View->CursorPos.l, 0, LineCount(View)-1);
-    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-    
-    AdjustView(ProgramState, View);
-    
-    
-    
-    StartProfile(FillLineData);
-    for(int i = 0; i < Views->Count; i++)
-    {
-        view *View = &Views->Data[i];
-        FillLineData(View, ProgramState);
-        View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
-        View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
-        View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
-    }
-    EndProfile(FillLineData);
-    
-    StartProfile(Rendering);
-    BeginDrawing();
-    for(int i = 0; i < Views->Count; i++)
-    {
-        view *View = &Views->Data[i];
-        DrawView(ProgramState, View);
-    }
-    
 #if 0
-    int Y = 300;
-    for(int i = 0; i < ProgramState->Buffers.Count; i++)
-    {
-        string Str = String("%d: %S", i, ProgramState->Buffers[i].Path);
-        color BGColor = BLACK;
-        if(ProgramState->Views[ProgramState->SelectedViewIndex].Buffer == &ProgramState->Buffers[i])
-            BGColor = GRAY;
-        DrawString(ProgramState, Str, V2(100, Y), BGColor, ORANGE);
-        Y+=20;
-        FreeString(Str);
-    }
+        int Y = 300;
+        for(int i = 0; i < ProgramState->Buffers.Count; i++)
+        {
+            string Str = String("%d: %S", i, ProgramState->Buffers[i].Path);
+            color BGColor = BLACK;
+            if(ProgramState->Views[ProgramState->SelectedViewIndex].Buffer == &ProgramState->Buffers[i])
+                BGColor = GRAY;
+            DrawString(ProgramState, Str, V2(100, Y), BGColor, ORANGE);
+            Y+=20;
+            FreeString(Str);
+        }
 #endif
-    
-    if(ProgramState->ShowSuperDebugMenu)
-        DrawSuperDebugMenu(ProgramState);
-    
-    //DrawFPS(400, 100);
-    //DrawProfiles(ProgramState);
-    
-    EndDrawing();
-    EndProfile(Rendering);
-    
-    EndProfile(Total);
-    
-    
-}
+        
+        if(ProgramState->ShowSuperDebugMenu)
+            DrawSuperDebugMenu(ProgramState);
+        
+        //DrawFPS(400, 100);
+        //DrawProfiles(ProgramState);
+        
+        EndDrawing();
+        EndProfile(Rendering);
+        
+        EndProfile(Total);
+        
+        
+    }
 }

@@ -705,6 +705,7 @@ HandleInput_EntryBar(program_state *ProgramState)
 void
 HandleInput(program_state *ProgramState)
 {
+    ProgramState->UserMovedCursor = false;
     if(ProgramState->ShowSuperDebugMenu)
     {
         HandleInput_SuperDebugMenu(ProgramState);
@@ -723,6 +724,13 @@ HandleInput(program_state *ProgramState)
     }
     
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    int ScrollAmount = ProgramState->FontSize * 3;
+    if(GetMouseWheelMoveV().y < 0)
+        View->TargetY += ScrollAmount;
+    else if(GetMouseWheelMoveV().y > 0)
+        View->TargetY -= ScrollAmount;
+    
     if(ProgramState->ShouldChangeIdealCursorCol)
     {
         ProgramState->ShouldChangeIdealCursorCol = false;
@@ -732,6 +740,14 @@ HandleInput(program_state *ProgramState)
     {
         View->CursorPos.c = View->IdealCursorCol;
         Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+    }
+    
+    
+    if(IsAnyControlKeyDown)
+    {
+        ProgramState->FontSize += GetMouseWheelMove();
+        if(ProgramState->FontSize < 6) ProgramState->FontSize = 6;
+        if(ProgramState->FontSize > 100) ProgramState->FontSize = 100;
     }
 }
 
