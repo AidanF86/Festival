@@ -7,6 +7,7 @@
 #include "festival_math.h"
 #include "festival_lists.h"
 #include "festival_string.h"
+#include "festival_filesystem.h"
 #include "festival.h"
 
 #include "festival_functions.cpp"
@@ -250,7 +251,7 @@ DrawView(program_state *ProgramState, view *View)
             rect EntryRect = Lister->Rects[i];
             
             DrawRectangleRec(R(EntryRect), BGColor);
-            DrawString(ProgramState, Lister->Entries[Lister->MatchingEntries[i]].Name,
+            DrawString(ProgramState, Lister->Entries[Lister->MatchingEntries[i]].String,
                        V2(EntryRect.x, EntryRect.y), FGColor);
             Y += CharHeight;
         }
@@ -299,42 +300,6 @@ DrawView(program_state *ProgramState, view *View)
 }
 
 
-void
-CleanUpPath(string *Path)
-{
-    
-    // remove duplicate '/'s
-    for(int i = 0; i < Path->Length - 1; i++)
-    {
-        if(Path->Data[i] == '/' && Path->Data[i+1] == '/')
-        {
-            Path->RemoveChar(i+1);
-            i--;
-        }
-    }
-    
-    // remove beginning './'
-    if(Path->Length >= 2 && Path->Data[0] == '.' && Path->Data[1] == '/')
-    {
-        Path->RemoveChar(0);
-        Path->RemoveChar(0);
-    }
-}
-
-void
-AbsolutizePath(string *Path)
-{
-    CleanUpPath(Path);
-    
-    if(Path->Data[0] != '/')
-    {
-        Path->InsertChar(0, '/');
-        string DirStr = String(GetWorkingDirectory());
-        Path->PrependString(DirStr);
-        FreeString(DirStr);
-    }
-}
-
 buffer
 LoadFileToBuffer(const char *RawPath)
 {
@@ -354,13 +319,14 @@ LoadFileToBuffer(const char *RawPath)
     
     u32 FileSize = (u32)GetFileLength(FullRawPath);
     Print("File size: %d", (int)FileSize);
+    
     char *FileData = LoadFileText(FullRawPath);
     
     free(FullRawPath);
     
     buffer Buffer = {};
     Buffer.FileName = FileName;
-    Buffer.Path = Path;
+    Buffer.DirPath = GetDirOfFile(Path);
     
     Buffer.Lines = StringList();
     printf("Gathering text\n");
@@ -379,17 +345,15 @@ LoadFileToBuffer(const char *RawPath)
             InLine++;
         }
     }
+    if(Buffer.Lines.Count == 0)
+    {
+        ListAdd(&Buffer.Lines, String(""));
+    }
     printf("Finished with text\n");
     
     UnloadFileText(FileData);
     
     return Buffer;
-}
-
-buffer
-GetExistingBufferForPath(string PathString)
-{
-    return {};
 }
 
 buffer *
@@ -403,7 +367,7 @@ GetBufferForPath(program_state *ProgramState, string PathString)
     
     for(int i = 0; i < ProgramState->Buffers.Count; i++)
     {
-        if(PathCopy == ProgramState->Buffers[i].Path)
+        if(PathCopy == ProgramState->Buffers[i].DirPath)
         {
             Index = i;
             break;
@@ -431,113 +395,31 @@ CloseLister(program_state *ProgramState, view *View)
     FreeString(Lister->InputLabel);
 }
 
-void
-ExecLister(program_state *ProgramState, view *View)
-{
-    Print("Exec lister!");
-    lister *Lister = &View->Lister;
-    switch(Lister->Purpose)
-    {
-        case ListerPurpose_EditFile: {
-            Print("Purpose: Edit file");
-            if(Lister->Type != ListerType_String) {
-                Print("Lister is for Edit File but type isn't String!");
-                break;
-            }
-            
-            if(Lister->MatchingEntries.Count == 0)
-            { // Create buffer for non-existant file
-                buffer NewBuffer;
-                // TODO: separate filename from path if input has slashes
-                NewBuffer.FileName = CopyString(Lister->Input);
-                NewBuffer.Path = CopyString(Lister->Input);
-                NewBuffer.Lines = StringList();
-                ListAdd(&NewBuffer.Lines, String(""));
-                ListAdd(&ProgramState->Buffers, NewBuffer);
-                View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
-            }
-            else
-            {
-                char *RawFileName = RawString(Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
-                buffer *ExistingBuffer = GetBufferForPath(ProgramState, Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
-                if(ExistingBuffer)
-                {
-                    View->Buffer = ExistingBuffer;
-                }
-                else
-                {
-                    ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
-                    View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
-                }
-                free(RawFileName);
-            }
-            
-        } break;
-        case ListerPurpose_SwitchBuffer: {
-            Print("Purpose: Switch buffer");
-            if(Lister->Type != ListerType_BufferPointer) {
-                Print("Lister is for Switch buffer but type isn't Buffer Pointer!");
-                break;
-            }
-            
-            View->Buffer = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].Buffer;
-            
-        } break;
-        case ListerPurpose_SwitchFontType: {
-            if(Lister->Type != ListerType_FontType) {
-                Print("Lister is for Switch font type but type isn't FontType!");
-                break;
-            }
-            
-            ProgramState->FontType = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].FontType;
-            
-        } break;
-        case ListerPurpose_RunCommand: {
-            if(Lister->Type != ListerType_Command) {
-                Print("Lister is for Switch font type but type isn't FontType!");
-                break;
-            }
-            Lister->ShouldExecute = false;
-            command CommandToExec = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].Command;
-            CloseLister(ProgramState, View);
-            
-            CommandToExec.Function(ProgramState, View);
-            
-            return;
-            
-        } break;
-        default: {
-            Print("Unknown lister purpose!");
-        }
-    }
-    
-    Lister->ShouldExecute = false;
-    CloseLister(ProgramState, View);
-}
 
 void
-OpenEditFileLister(program_state *ProgramState, view *View)
+OpenEditFileLister(program_state *ProgramState, view *View, const char *Directory)
 {
     View->Lister = Lister(ListerType_String);
     lister *Lister = &View->Lister;
     
     Lister->InputLabel = String("Open file: ");
-    Lister->Input = String("");
+    Lister->Input = String(Directory);
+    AbsolutizePath(&Lister->Input);
     Lister->Purpose = ListerPurpose_EditFile;
     
-    FilePathList FilesInDir = LoadDirectoryFiles("./");
-    
+    FilePathList FilesInDir = LoadDirectoryFiles(Directory);
     for(int i = 0; i < FilesInDir.count; i++)
     {
         lister_entry NewEntry;
         NewEntry.String = String(FilesInDir.paths[i]);
+        AbsolutizePath(&NewEntry.String);
         NewEntry.Name = NewEntry.String;
         ListAdd(&Lister->Entries, NewEntry);
         ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
         ListAdd(&Lister->MatchingEntries, i);
     }
-    
     UnloadDirectoryFiles(FilesInDir);
+    
     View->ListerIsOpen = true;
     Lister->ShouldExecute = false;
 }
@@ -558,7 +440,7 @@ OpenSwitchBufferLister(program_state *ProgramState, view *View)
     {
         lister_entry NewEntry;
         NewEntry.Buffer = &ProgramState->Buffers[i];
-        NewEntry.Name = CopyString(ProgramState->Buffers[i].Path);
+        NewEntry.Name = CopyString(ProgramState->Buffers[i].DirPath);
         ListAdd(&Lister->Entries, NewEntry);
         ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
         ListAdd(&Lister->MatchingEntries, i);
@@ -626,6 +508,113 @@ OpenSwitchFontTypeLister(program_state *ProgramState, view *View)
     Lister->ShouldExecute = false;
 }
 
+
+void
+ExecLister(program_state *ProgramState, view *View)
+{
+    Print("Exec lister!");
+    lister *Lister = &View->Lister;
+    switch(Lister->Purpose)
+    {
+        case ListerPurpose_EditFile: {
+            Print("Purpose: Edit file");
+            if(Lister->Type != ListerType_String) {
+                Print("Lister is for Edit File but type isn't String!");
+                break;
+            }
+            
+            if(Lister->MatchingEntries.Count == 0)
+            {
+                // Create buffer for non-existant file
+                buffer NewBuffer;
+                // TODO: separate filename from path if input has slashes
+                NewBuffer.FileName = CopyString(Lister->Input);
+                NewBuffer.DirPath = CopyString(Lister->Input);
+                NewBuffer.Lines = StringList();
+                ListAdd(&NewBuffer.Lines, String(""));
+                ListAdd(&ProgramState->Buffers, NewBuffer);
+                View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+            }
+            else
+            {
+                // If selection is a directory, we'll open a new lister for opening files in that
+                // directory, otherwise open the file
+                
+                string Selection = CopyString(Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
+                
+                if(DirectoryExists(TempRawString(Selection)))
+                {
+                    Print("Switching to directory");
+                    // We've selected a directory, so make a new lister for opening files in it
+                    
+                    Lister->ShouldExecute = false;
+                    CloseLister(ProgramState, View);
+                    
+                    OpenEditFileLister(ProgramState, View, TempRawString(Selection));
+                    
+                    return;
+                }
+                else
+                {
+                    // Open file
+                    char *RawFileName = TempRawString(Selection);
+                    buffer *ExistingBuffer = GetBufferForPath(ProgramState, Selection);
+                    
+                    if(ExistingBuffer)
+                    {
+                        View->Buffer = ExistingBuffer;
+                    }
+                    else
+                    {
+                        ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
+                        View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+                    }
+                }
+            }
+        } break;
+        case ListerPurpose_SwitchBuffer: {
+            Print("Purpose: Switch buffer");
+            if(Lister->Type != ListerType_BufferPointer) {
+                Print("Lister is for Switch buffer but type isn't Buffer Pointer!");
+                break;
+            }
+            
+            View->Buffer = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].Buffer;
+            
+        } break;
+        case ListerPurpose_SwitchFontType: {
+            if(Lister->Type != ListerType_FontType) {
+                Print("Lister is for Switch font type but type isn't FontType!");
+                break;
+            }
+            
+            ProgramState->FontType = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].FontType;
+            
+        } break;
+        case ListerPurpose_RunCommand: {
+            if(Lister->Type != ListerType_Command) {
+                Print("Lister is for Switch font type but type isn't FontType!");
+                break;
+            }
+            Lister->ShouldExecute = false;
+            command CommandToExec = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].Command;
+            CloseLister(ProgramState, View);
+            
+            CommandToExec.Function(ProgramState, View);
+            
+            return;
+            
+        } break;
+        default: {
+            Print("Unknown lister purpose!");
+        }
+    }
+    
+    Lister->ShouldExecute = false;
+    CloseLister(ProgramState, View);
+}
+
+
 DefineCommand(SwitchFontType)
 {
     OpenSwitchFontTypeLister(ProgramState, View);
@@ -635,7 +624,7 @@ DefineCommand(SwitchFontType)
 
 DefineCommand(EditFile)
 {
-    OpenEditFileLister(ProgramState, View);
+    OpenEditFileLister(ProgramState, View, "./");
     return 0;
 }
 
@@ -651,7 +640,8 @@ DrawSuperDebugMenu(program_state *ProgramState)
     Y += DrawString(ProgramState, TempString("Buffers"), V2(X, Y), BLACK, Style_Underline).y;
     for(int i = 0; i < ProgramState->Buffers.Count; i++)
     {
-        Y += DrawString(ProgramState, ProgramState->Buffers[i].FileName, V2(X + 20, Y), BLACK).y;
+        Y += DrawString(ProgramState, ProgramState->Buffers[i].FileName, V2(X, Y), BLACK).y;
+        Y += DrawString(ProgramState, ProgramState->Buffers[i].DirPath, V2(X + 20, Y), BLACK).y;
     }
     
 #if 0
@@ -891,10 +881,14 @@ extern "C"
                 
                 for(int i = 0; i < Lister->Entries.Count; i++)
                 {
+                    string StringToCheck = Lister->Entries[i].Name;
+                    if(Lister->Purpose == ListerPurpose_EditFile)
+                        StringToCheck = Lister->Entries[i].String;
+                    
                     b32 Matches = true;
-                    for(int j = 0; j < Lister->Input.Length && j < Lister->Entries[i].Name.Length; j++)
+                    for(int j = 0; j < Lister->Input.Length && j < StringToCheck.Length; j++)
                     {
-                        if(Lister->Input[j] != Lister->Entries[i].Name[j])
+                        if(Lister->Input[j] != StringToCheck[j])
                         {
                             Matches = false;
                             break;
@@ -904,7 +898,10 @@ extern "C"
                         ListAdd(&Lister->MatchingEntries, i);
                 }
             }
+            
+            Clamp(View->Lister.SelectedIndex, 0, View->Lister.MatchingEntries.Count - 1);
         }
+        
         
         v2 MousePos = V2(GetMousePosition());
         if(IsMouseButtonDown(0))
@@ -964,18 +961,18 @@ extern "C"
         Clamp(View->CursorPos.l, 0, LineCount(View)-1);
         Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
         
-        AdjustView(ProgramState, View);
-        
-        
         
         StartProfile(FillLineData);
         for(int i = 0; i < Views->Count; i++)
         {
             view *View = &Views->Data[i];
             FillLineData(View, ProgramState);
+            
             View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
-            View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
             View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
+            
+            AdjustView(ProgramState, View);
+            View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
         }
         EndProfile(FillLineData);
         
@@ -991,7 +988,7 @@ extern "C"
         int Y = 300;
         for(int i = 0; i < ProgramState->Buffers.Count; i++)
         {
-            string Str = String("%d: %S", i, ProgramState->Buffers[i].Path);
+            string Str = String("%d: %S", i, ProgramState->Buffers[i].DirPath);
             color BGColor = BLACK;
             if(ProgramState->Views[ProgramState->SelectedViewIndex].Buffer == &ProgramState->Buffers[i])
                 BGColor = GRAY;

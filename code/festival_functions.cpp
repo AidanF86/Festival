@@ -158,7 +158,16 @@ CharAt(view *View, buffer_pos Pos)
 void
 InsertLine(buffer *Buffer, int l, string S)
 {
-    ListInsert(&Buffer->Lines, l, S);
+    if(l > Buffer->Lines.Count - 1)
+    {
+        Print("Appending line");
+        ListAdd(&Buffer->Lines, S);
+    }
+    else
+    {
+        Print("Inserting line");
+        ListInsert(&Buffer->Lines, l, S);
+    }
 }
 
 line_data
@@ -253,37 +262,39 @@ ClosestBufferPos(view *View, rect Rect)
 void
 AdjustView(program_state *ProgramState, view *View)
 {
-    v2 CharDim = GetCharDim(ProgramState);
-    int CharWidth = CharDim.x;
-    int CharHeight = CharDim.y;
+    int CharHeight = ProgramState->FontSize;
     buffer_pos CursorPos = View->CursorPos;
     int Y = View->Y;
     int TargetY = View->TargetY;
     
-    rect CursorRect = CharRectAt(View, CursorPos.l, CursorPos.c);
+    rect CursorTargetRect = View->CursorTargetRect;
     b32 MovedCursorUpOrDown = false;
     
     if(ProgramState->UserMovedCursor)
     { // Adjust based on cursor
-        if(CursorRect.y < Y)
+        if(CursorTargetRect.y < TargetY)
         {
-            TargetY = CursorRect.y;
+            Print("1st");
+            TargetY = CursorTargetRect.y;
         }
-        else if(CursorRect.y > Y + View->TextRect.h - CharHeight)
+        else if(CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
         {
-            TargetY = CursorRect.y - View->TextRect.h + CharHeight;
+            TargetY = CursorTargetRect.y - View->TextRect.h + CharHeight;
+            Print("2nd");
         }
     }
     else
     { // Adjust based on view
         if(View->CursorTargetRect.y < TargetY)
         {
+            Print("3rd");
             // adjust cursor pos to new rect?
             View->CursorPos.l = YToLine(View, TargetY) + 2;
             MovedCursorUpOrDown = true;
         }
-        else if(View->CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
+        else if(View->CursorRect.y > TargetY + View->TextRect.h - CharHeight)
         {
+            Print("4th");
             View->CursorPos.l = YToLine(View, 
                                         TargetY + View->TextRect.h) - 2;
             MovedCursorUpOrDown = true;
@@ -297,6 +308,7 @@ AdjustView(program_state *ProgramState, view *View)
     Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
     
     
+#if 0
     if(MovedCursorUpOrDown && ColAt(ProgramState, View, View->CursorPos) < View->IdealCursorCol)
     {
         int Diff = View->IdealCursorCol - ColAt(ProgramState, View, View->CursorPos);
@@ -305,6 +317,7 @@ AdjustView(program_state *ProgramState, view *View)
             Diff = DistToEnd;
         View->CursorPos.c += Diff;
     }
+#endif
 }
 
 

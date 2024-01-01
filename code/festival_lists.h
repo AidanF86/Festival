@@ -62,6 +62,7 @@ for(int _i = (List)->Count; _i > Index; _i--)\
 (List)->Data[_i] = (List)->Data[_i - 1];\
 }\
 (List)->Data[(Index)] = (E);\
+(List)->Count++;\
 }
 
 #define ListFree(List) {\

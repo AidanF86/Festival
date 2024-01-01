@@ -40,7 +40,7 @@ DefineList(line_data, LineData)
 struct buffer
 {
     string FileName;
-    string Path;
+    string DirPath;
     string_list Lines;
 };
 DefineList(buffer, Buffer)

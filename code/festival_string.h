@@ -84,6 +84,15 @@ struct string
         }
     }
     
+    bool BeginningMatches(string Other)
+    {
+        for(int i = 0; i < Length && i < Other.Length; i++)
+        {
+            if(Data[i] != Other.Data[i]) return false;
+        }
+        return true;
+    }
+    
 };
 
 inline bool
@@ -395,6 +404,29 @@ TempString(const char *Format, ...)
     return Result;
 }
 
+// Janky backend nonsense
+struct raw_string
+{
+    char *Data;
+};
+raw_string RawString(char *Data)
+{
+    raw_string Result;
+    Result.Data = Data;
+    return Result;
+}
+DefineList(raw_string, RawString);
+
+raw_string_list TempRawStrings;
+
+char *
+TempRawString(string Str)
+{
+    char *Data = RawString(Str);
+    ListAdd(&TempRawStrings, RawString(Data));
+    return Data;
+}
+
 void
 PurgeTempStrings()
 {
@@ -404,6 +436,13 @@ PurgeTempStrings()
     }
     ListFree(&TempStrings);
     TempStrings = StringList();
+    
+    for(int i = 0; i < TempRawStrings.Count; i++)
+    {
+        free(TempRawStrings[i].Data);
+    }
+    ListFree(&TempRawStrings);
+    TempRawStrings = RawStringList();
 }
 
 #endif //FESTIVAL_STRING_H

@@ -237,7 +237,7 @@ HandleInput_Nav(program_state *ProgramState)
     
     
     if(KeyShouldExecute(ProgramState->EKey)) {
-        OpenEditFileLister(ProgramState, View);
+        OpenEditFileLister(ProgramState, View, "./");
     }
     else if(KeyShouldExecute(ProgramState->GKey)) {
         OpenSwitchBufferLister(ProgramState, View);
@@ -510,6 +510,7 @@ HandleInput_Insert(program_state *ProgramState)
                 Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
                 View->CursorPos.c++;
                 View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
+                ProgramState->ShouldChangeIdealCursorCol = true;
             }
             else if(i == 1)
             { // Backspace
@@ -519,10 +520,12 @@ HandleInput_Insert(program_state *ProgramState)
                     View->CursorPos.c--;
                     Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
                 }
+                ProgramState->ShouldChangeIdealCursorCol = true;
             }
             else if(i == 2)
             { // Delete
                 Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c);
+                ProgramState->ShouldChangeIdealCursorCol = true;
             }
             else if(i == 3)
             { // Tab
@@ -531,18 +534,23 @@ HandleInput_Insert(program_state *ProgramState)
                 {
                     Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
                     View->CursorPos.c++;
-                    View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
+                    //View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
+                    ProgramState->ShouldChangeIdealCursorCol = true;
                 }
             }
             else if(i == 4)
             { // Return
                 InsertLine(Buffer, View->CursorPos.l+1, CopyString(Buffer->Lines[View->CursorPos.l]));
-                Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
-                Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
+                if(Buffer->Lines[View->CursorPos.l].Length != 0)
+                {
+                    Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
+                    Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
+                }
                 View->CursorPos.l++;
                 View->CursorPos.c = 0;
                 
                 ProgramState->UserMovedCursor = true;
+                ProgramState->ShouldChangeIdealCursorCol = true;
             }
             else if(i == 5)
             { // Caps lock
