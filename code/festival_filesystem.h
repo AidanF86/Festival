@@ -50,7 +50,37 @@ GetDirOfFile(string Path)
     {
         if(Path[LastSlashIndex] == '/') break;
     }
-    Result.Slice(0, LastSlashIndex);
+    Result.Slice(0, LastSlashIndex + 1);
+    
+    return Result;
+}
+
+string
+GetFileName(string Path)
+{
+    string Result = CopyString(Path);
+    
+    int LastSlashIndex = Path.Length - 1;
+    for(; LastSlashIndex > 0; LastSlashIndex--)
+    {
+        if(Path[LastSlashIndex] == '/') break;
+    }
+    Result.Slice(LastSlashIndex + 1, Result.Length);
+    
+    return Result;
+}
+
+string
+GetFileOrDirectoryName(string Path)
+{
+    string Result = CopyString(Path);
+    
+    int LastSlashIndex = Path.Length - 1;
+    for(; LastSlashIndex > 0; LastSlashIndex--)
+    {
+        if(Path[LastSlashIndex] == '/') break;
+    }
+    Result.Slice(LastSlashIndex + 1, Result.Length);
     
     return Result;
 }

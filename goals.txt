@@ -49,8 +49,17 @@ DONE Views & Multiple buffers
 DONE (yippee! :smug:) rect spawn system :shiver:
 
 DONE Basic Modal system
+DONE Adjust view based on cursor when typing and when scrolling
+DONE Listers and commands
+DONE better path handling
+DONE touch up edit file lister
 
-Current Goal: Adjust view based on cursor when typing and when scrolling
+Current Goal: Undoing and redoing
+
+Add ctrl-backspace to lister and buffer
+
+File writing
+
 Better border seek :cry:
 
 Colorscheme (comes after/with treesitter)

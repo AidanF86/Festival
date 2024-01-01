@@ -274,27 +274,22 @@ AdjustView(program_state *ProgramState, view *View)
     { // Adjust based on cursor
         if(CursorTargetRect.y < TargetY)
         {
-            Print("1st");
             TargetY = CursorTargetRect.y;
         }
         else if(CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
         {
             TargetY = CursorTargetRect.y - View->TextRect.h + CharHeight;
-            Print("2nd");
         }
     }
     else
     { // Adjust based on view
         if(View->CursorTargetRect.y < TargetY)
         {
-            Print("3rd");
-            // adjust cursor pos to new rect?
             View->CursorPos.l = YToLine(View, TargetY) + 2;
             MovedCursorUpOrDown = true;
         }
         else if(View->CursorRect.y > TargetY + View->TextRect.h - CharHeight)
         {
-            Print("4th");
             View->CursorPos.l = YToLine(View, 
                                         TargetY + View->TextRect.h) - 2;
             MovedCursorUpOrDown = true;

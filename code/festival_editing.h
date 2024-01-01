@@ -175,6 +175,14 @@ buffer_pos
 SeekPrevEmptyLine(view *View, buffer_pos From)
 {
     int ResultLine = From.l;
+    
+    while(LineLength(View, ResultLine) == 0 && ResultLine > 0)
+    {
+        ResultLine--;
+        if(LineLength(View, ResultLine) != 0)
+            break;
+    }
+    
     while(ResultLine > 0)
     {
         ResultLine--;
@@ -187,6 +195,12 @@ buffer_pos
 SeekNextEmptyLine(view *View, buffer_pos From)
 {
     int ResultLine = From.l;
+    
+    while(LineLength(View, ResultLine) == 0 && ResultLine < LineCount(View) - 1)
+    {
+        ResultLine++;
+    }
+    
     while(ResultLine < LineCount(View) - 1)
     {
         ResultLine++;
@@ -576,7 +590,8 @@ HandleInput_EntryBar(program_state *ProgramState)
         return;
     }
     
-    if(KeyShouldExecute(ProgramState->Return_Key))
+    if(KeyShouldExecute(ProgramState->Return_Key) ||
+       KeyShouldExecute(ProgramState->Tab_Key))
     {
         Lister->ShouldExecute = true;
     }

@@ -251,7 +251,7 @@ DrawView(program_state *ProgramState, view *View)
             rect EntryRect = Lister->Rects[i];
             
             DrawRectangleRec(R(EntryRect), BGColor);
-            DrawString(ProgramState, Lister->Entries[Lister->MatchingEntries[i]].String,
+            DrawString(ProgramState, Lister->Entries[Lister->MatchingEntries[i]].Name,
                        V2(EntryRect.x, EntryRect.y), FGColor);
             Y += CharHeight;
         }
@@ -407,13 +407,28 @@ OpenEditFileLister(program_state *ProgramState, view *View, const char *Director
     AbsolutizePath(&Lister->Input);
     Lister->Purpose = ListerPurpose_EditFile;
     
+    // TODO: add / if it's a directory
     FilePathList FilesInDir = LoadDirectoryFiles(Directory);
     for(int i = 0; i < FilesInDir.count; i++)
     {
+        b32 IsDirectory = false;
+        
         lister_entry NewEntry;
         NewEntry.String = String(FilesInDir.paths[i]);
         AbsolutizePath(&NewEntry.String);
-        NewEntry.Name = NewEntry.String;
+        if(DirectoryExists(TempRawString(NewEntry.String)))
+        {
+            IsDirectory = true;
+            NewEntry.String.AppendChar('/');
+        }
+        
+        string Name = TempString(FilesInDir.paths[i]);
+        CleanUpPath(&Name);
+        NewEntry.Name = GetFileName(Name);
+        if(IsDirectory)
+            NewEntry.Name.AppendChar('/');
+        
+        
         ListAdd(&Lister->Entries, NewEntry);
         ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
         ListAdd(&Lister->MatchingEntries, i);
@@ -677,7 +692,7 @@ extern "C"
             ListAdd(Buffers, LoadFileToBuffer("./test.cpp"));
             
             
-            ProgramState->FontSize = 22;
+            ProgramState->FontSize = 18;
             LoadFonts(ProgramState);
             ProgramState->FontType = FontType_Monospace;
             
@@ -873,9 +888,31 @@ extern "C"
         for(int a = 0; a < Views->Count; a++)
         {
             view *View = &Views->Data[a];
+            lister *Lister = &View->Lister;
+            
             if(View->ListerIsOpen)
             {
-                lister *Lister = &View->Lister;
+                if(Lister->Purpose == ListerPurpose_EditFile)
+                {
+                    int SelectedIndex = Lister->SelectedIndex;
+                    b32 ShouldExecute = Lister->ShouldExecute;
+                    string FileName = GetFileName(Lister->Input);
+                    string DirToSearch = GetDirOfFile(Lister->Input);
+                    
+                    char *NewPath = TempRawString(DirToSearch);
+                    
+                    CloseLister(ProgramState, View);
+                    OpenEditFileLister(ProgramState, View, NewPath);
+                    
+                    Lister->Input.AppendString(FileName);
+                    Lister->SelectedIndex = SelectedIndex;
+                    Lister->ShouldExecute = ShouldExecute;
+                    
+                    FreeString(FileName);
+                    FreeString(DirToSearch);
+                }
+                
+                
                 ListFree(&Lister->MatchingEntries);
                 Lister->MatchingEntries = IntList();
                 
