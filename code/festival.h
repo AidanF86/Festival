@@ -41,7 +41,10 @@ struct buffer
 {
     string FileName;
     string DirPath;
+    
     string_list Lines;
+    
+    action_list ActionStack;
 };
 DefineList(buffer, Buffer)
 
@@ -135,6 +138,9 @@ struct view
     
     buffer_pos CursorPos;
     int IdealCursorCol;
+    
+    b32 Selecting;
+    buffer_pos SelectionStart;
     
     int Y;
     int TargetY;

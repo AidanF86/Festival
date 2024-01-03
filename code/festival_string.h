@@ -68,6 +68,15 @@ struct string
         }
     }
     
+    void RemoveRange(int Start, int End)
+    {
+        int OriginalLength = Length;
+        for(int i = Start; i < End && i < OriginalLength; i++)
+        {
+            RemoveChar(Start);
+        }
+    }
+    
     void AppendString(string Other)
     {
         for(int i = 0; i < Other.Length; i++)
@@ -289,7 +298,7 @@ _String(const char *Format, va_list Args)
                         Length = Sprintf(StringVarBuffer, "%s", TempStr);
                         free(TempStr);
                     }break;
-                    // TODO(cheryl): add our string (%S)
+                    // TODO(aidan): add our string (%S)
                     case 'v':
                     {
                         v2 Var = va_arg(Args, v2);
@@ -350,7 +359,7 @@ Print(string String)
 {
     for(int i = 0; i < String.Length; i++)
     {
-        // NOTE(cheryl): does stdout work on windows?
+        // NOTE(aidan): does stdout work on windows?
         putc(String.Data[i], stdout);
     }
     putc('\n', stdout);
@@ -371,7 +380,7 @@ PrintFile(FILE *File, string String)
 {
     for(int i = 0; i < String.Length; i++)
     {
-        // NOTE(cheryl): does stdout work on windows?
+        // NOTE(aidan): does stdout work on windows?
         putc(String.Data[i], File);
     }
     putc('\n', stdout);
@@ -443,6 +452,17 @@ PurgeTempStrings()
     }
     ListFree(&TempRawStrings);
     TempRawStrings = RawStringList();
+}
+
+string_list
+CopyStringList(string_list A)
+{
+    string_list Result = StringList();
+    for(int i = 0; i < A.Count; i++)
+    {
+        ListAdd(&Result, CopyString(A[i]));
+    }
+    return Result;
 }
 
 #endif //FESTIVAL_STRING_H

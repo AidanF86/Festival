@@ -249,6 +249,22 @@ HandleInput_Nav(program_state *ProgramState)
     
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
     
+    if(KeyShouldExecute(ProgramState->SKey))
+    {
+        View->Selecting = !View->Selecting;
+        View->SelectionStart = View->CursorPos;
+    }
+    
+    if(KeyShouldExecute(ProgramState->XKey))
+    {
+        buffer_pos Start = BufferPos(View->CursorPos.l, 0);
+        buffer_pos End = BufferPos(View->CursorPos.l+1, 0);
+        action Action = ActionForDeleteRange(Start, End);
+        ListAdd(&View->Buffer->ActionStack, Action);
+        
+        RedoAction(View->Buffer, Action);
+        //ListRemoveAt(&View->Buffer->Lines, View->CursorPos.l);
+    }
     
     if(KeyShouldExecute(ProgramState->EKey)) {
         OpenEditFileLister(ProgramState, View, "./");
@@ -560,6 +576,7 @@ HandleInput_Insert(program_state *ProgramState)
                     Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
                     Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
                 }
+                
                 View->CursorPos.l++;
                 View->CursorPos.c = 0;
                 

@@ -8,11 +8,48 @@
 #include "festival_lists.h"
 #include "festival_string.h"
 #include "festival_filesystem.h"
+#include "festival_undo.h"
 #include "festival.h"
 
 #include "festival_functions.cpp"
 #include "festival_profiling.h"
 #include "festival_commands.h"
+
+void
+UndoAction(buffer *Buffer, action A)
+{
+}
+
+void
+RedoAction(buffer *Buffer, action A)
+{
+    if(A.Delete)
+    {
+        buffer_pos Start = A.DeleteStart;
+        buffer_pos End = A.DeleteEnd;
+        Print("Deleting from %d,%d to %d,%d", Start.l, Start.c, End.l, End.c);
+        
+        // delete in-between lines
+        for(int i = Start.l + 1; i < End.l; i++)
+        {
+            ListRemoveAt(&Buffer->Lines, i);
+            End.l--;
+            i--;
+        }
+        
+        // slice start line
+        Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
+        
+        // slice and join next line
+        if(End.l > Start.l)
+        {
+            Buffer->Lines[End.l].RemoveRange(0, End.c);
+            Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
+            ListRemoveAt(&Buffer->Lines, End.l);
+        }
+    }
+}
+
 
 rect
 DrawChar(program_state *ProgramState, int Char, v2 Pos, color BGColor, color FGColor)
@@ -186,7 +223,14 @@ DrawView(program_state *ProgramState, view *View)
             Info = Font->RFont.glyphs[GlyphIndex];
             
             CursorDrawRect.w = Info.advanceX;
-            DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+            if(View->Selecting)
+            {
+                DrawRectangleRec(R(CursorDrawRect), RED);
+            }
+            else
+            {
+                DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+            }
         }
     }
     else
@@ -327,6 +371,7 @@ LoadFileToBuffer(const char *RawPath)
     buffer Buffer = {};
     Buffer.FileName = FileName;
     Buffer.DirPath = GetDirOfFile(Path);
+    Buffer.ActionStack = ActionList();
     
     Buffer.Lines = StringList();
     printf("Gathering text\n");
@@ -407,7 +452,6 @@ OpenEditFileLister(program_state *ProgramState, view *View, const char *Director
     AbsolutizePath(&Lister->Input);
     Lister->Purpose = ListerPurpose_EditFile;
     
-    // TODO: add / if it's a directory
     FilePathList FilesInDir = LoadDirectoryFiles(Directory);
     for(int i = 0; i < FilesInDir.count; i++)
     {
@@ -542,7 +586,6 @@ ExecLister(program_state *ProgramState, view *View)
             {
                 // Create buffer for non-existant file
                 buffer NewBuffer;
-                // TODO: separate filename from path if input has slashes
                 NewBuffer.FileName = CopyString(Lister->Input);
                 NewBuffer.DirPath = CopyString(Lister->Input);
                 NewBuffer.Lines = StringList();

@@ -504,7 +504,7 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
     
     if(ParentId == -1)
     {
-        // TODO(cheryl): check if there are any views in existence (there shouldn't be)
+        // TODO(aidan): check if there are any views in existence (there shouldn't be)
         View.Id = 0;
         View.Area = 1;
         View.SpawnLocation = Location_Below;
@@ -512,7 +512,7 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
     }
     else
     {
-        // TODO(cheryl): test :3
+        // TODO(aidan): test :3
         
         // Get a unique Id
         int Id = 0;
@@ -642,7 +642,7 @@ FillLineData(view *View, program_state *ProgramState)
     v2 CharDim = GetCharDim(ProgramState);
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
-    // TODO(cheryl): formalize char-exclusion-zone
+    // TODO(aidan): formalize char-exclusion-zone
     int WrapPoint = View->TextRect.w - CharWidth;
     
     // DeAllocation
