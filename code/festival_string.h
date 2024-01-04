@@ -298,7 +298,7 @@ _String(const char *Format, va_list Args)
                         Length = Sprintf(StringVarBuffer, "%s", TempStr);
                         free(TempStr);
                     }break;
-                    // TODO(aidan): add our string (%S)
+                    // TODO(cheryl): add our string (%S)
                     case 'v':
                     {
                         v2 Var = va_arg(Args, v2);
@@ -359,7 +359,7 @@ Print(string String)
 {
     for(int i = 0; i < String.Length; i++)
     {
-        // NOTE(aidan): does stdout work on windows?
+        // NOTE(cheryl): does stdout work on windows?
         putc(String.Data[i], stdout);
     }
     putc('\n', stdout);
@@ -380,7 +380,7 @@ PrintFile(FILE *File, string String)
 {
     for(int i = 0; i < String.Length; i++)
     {
-        // NOTE(aidan): does stdout work on windows?
+        // NOTE(cheryl): does stdout work on windows?
         putc(String.Data[i], File);
     }
     putc('\n', stdout);
