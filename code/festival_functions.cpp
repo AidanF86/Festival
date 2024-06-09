@@ -463,6 +463,8 @@ LoadFonts(program_state *ProgramState)
 {
     LoadFont(ProgramState, &ProgramState->FontMonospace, ProgramState->FontSize, "LiberationMono-Regular.ttf");
     LoadFont(ProgramState, &ProgramState->FontSerif, ProgramState->FontSize, "Georgia.ttf");
+    
+    //LoadFont(ProgramState, &ProgramState->FontSans, ProgramState->FontSize, "WHISKEY_ITC_STD_REGULAR.OTF");
     LoadFont(ProgramState, &ProgramState->FontSans, ProgramState->FontSize, "HelveticaNeue-Regular.otf");
 }
 
@@ -732,3 +734,221 @@ lister Lister(lister_type Type)
     Result.SelectedIndex = 0;
     return Result;
 }
+
+
+
+void
+MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
+{
+    // TODO: set ideal cursor pos
+    ProgramState->UserMovedCursor = true;
+    View->CursorPos += dPos;
+    Clamp(View->CursorPos.l, 0, LineCount(View));
+    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+}
+
+
+void
+MoveBackNonWhitespace(program_state *ProgramState, view *View)
+{
+    b32 StartedAtSpace = false;
+    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos - BufferPos(0, 1)) == ' ')
+        StartedAtSpace = true;
+    
+    if(StartedAtSpace)
+    {
+        do {
+            View->CursorPos -= BufferPos(0, 1);
+        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c > 0);
+    }
+    
+    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c > 0)
+    {
+        View->CursorPos -= BufferPos(0, 1);
+    }
+}
+
+void
+MoveForwardNonWhitespace(program_state *ProgramState, view *View)
+{
+    b32 StartedAtSpace = false;
+    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos + BufferPos(0, 1)) == ' ')
+        StartedAtSpace = true;
+    
+    if(StartedAtSpace)
+    {
+        do {
+            //View->CursorPos += BufferPos(0, 1);
+            MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l));
+    }
+    
+    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l))
+    {
+        //View->CursorPos += BufferPos(0, 1);
+        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+    }
+}
+
+buffer_pos
+SeekBackBorder(view *View, buffer_pos From)
+{
+    buffer_pos Result = From;
+    if(CharAt(View, Result) == 0)
+        Result.c--;
+    if(Result.c < 0 || (Result.c == 0 && Result.l == 0))
+        return From;
+    
+    b32 StartedAtSpace = false;
+    /*if(CharAt(View, Result) == ' ' ||*/ if(CharAt(View, Result + BufferPos(0, -1)) == ' ')
+        StartedAtSpace = true;
+    
+    if(StartedAtSpace)
+    {
+        Print("Started at space");
+        do {
+            Result.c--;
+        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        
+        return Result;
+    }
+    
+    b32 StartedAtSpecial = false;
+    if(!IsNonSpecial(CharAt(View, Result)))
+    {
+        Print("Special");
+        StartedAtSpecial = true;
+    }
+    
+    if(StartedAtSpecial)
+    {
+        while(!IsNonSpecial(CharAt(View, Result)) && 
+              Result.c < LineLength(View, Result.l))
+            Result.c--;
+        return Result;
+    }
+    
+    char c = CharAt(View, Result);
+    while(( c != ' ' && (IsNonSpecial(c)) )
+          && Result.c < LineLength(View, Result.l))
+    {
+        Result.c--;
+        c = CharAt(View, Result);
+    }
+    
+    return Result;
+}
+
+buffer_pos
+SeekForwardBorder(view *View, buffer_pos From)
+{
+    buffer_pos Result = From;
+    
+    b32 StartedAtSpace = false;
+    if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, 1)) == ' ')
+        StartedAtSpace = true;
+    
+    if(StartedAtSpace)
+    {
+        do {
+            Result.c++;
+        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        
+        return Result;
+    }
+    
+    b32 StartedAtSpecial = false;
+    if(!IsNonSpecial(CharAt(View, Result)))
+    {
+        StartedAtSpecial = true;
+    }
+    
+    if(StartedAtSpecial)
+    {
+        while(!IsNonSpecial(CharAt(View, Result))
+              && Result.c < LineLength(View, Result.l))
+            Result.c++;
+        return Result;
+    }
+    
+    char c = CharAt(View, Result);
+    while(( c != ' ' && (IsNonSpecial(c)) )
+          && Result.c < LineLength(View, Result.l))
+    {
+        Result.c++;
+        c = CharAt(View, Result);
+    }
+    
+    return Result;
+}
+
+b32
+AtLineBeginning(view *View, buffer_pos Pos)
+{
+    return Pos.c == 0;
+}
+b32
+AtLineEnd(view *View, buffer_pos Pos)
+{
+    return Pos.c == LineLength(View, Pos.l);
+}
+
+buffer_pos
+SeekLineBeginning(view *View, buffer_pos From)
+{
+    return BufferPos(From.l, 0);
+}
+buffer_pos
+SeekLineEnd(view *View, buffer_pos From)
+{
+    return BufferPos(From.l, LineLength(View, From.l));
+}
+
+buffer_pos
+SeekPrevEmptyLine(view *View, buffer_pos From)
+{
+    int ResultLine = From.l;
+    
+    while(LineLength(View, ResultLine) == 0 && ResultLine > 0)
+    {
+        ResultLine--;
+        if(LineLength(View, ResultLine) != 0)
+            break;
+    }
+    
+    while(ResultLine > 0)
+    {
+        ResultLine--;
+        if(LineLength(View, ResultLine) == 0)
+            break;
+    }
+    return BufferPos(ResultLine, 0);
+}
+buffer_pos
+SeekNextEmptyLine(view *View, buffer_pos From)
+{
+    int ResultLine = From.l;
+    
+    while(LineLength(View, ResultLine) == 0 && ResultLine < LineCount(View) - 1)
+    {
+        ResultLine++;
+    }
+    
+    while(ResultLine < LineCount(View) - 1)
+    {
+        ResultLine++;
+        if(LineLength(View, ResultLine) == 0)
+            break;
+    }
+    return BufferPos(ResultLine, LineLength(View, ResultLine));
+}
+
+void
+SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
+{
+    ProgramState->UserMovedCursor = true;
+    View->CursorPos = Pos;
+    Clamp(View->CursorPos.l, 0, LineCount(View));
+    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+}
+

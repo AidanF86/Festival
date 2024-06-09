@@ -14,7 +14,6 @@
 )
 #define IsNonSpecial(c) (IsAlphaNumeric(c) || \
 c == '_')
-
 typedef Color color;
 struct color_list;
 struct program_state;
@@ -44,6 +43,7 @@ struct buffer
     
     string_list Lines;
     
+    int ActionIndex;
     action_list ActionStack;
 };
 DefineList(buffer, Buffer)
@@ -148,7 +148,6 @@ struct view
     rect CursorTargetRect;
     
     line_data_list LineDataList;
-    
     
     b32 ListerIsOpen;
     lister Lister;

@@ -15,38 +15,164 @@
 #include "festival_profiling.h"
 #include "festival_commands.h"
 
-void
-UndoAction(buffer *Buffer, action A)
+
+action
+ActionForDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
 {
+    action Result;
+    
+    Result.Delete = true;
+    Result.DeleteStart = Start;
+    Result.DeleteEnd = End;
+    Result.DeleteContent = CopyStringListRange(Buffer->Lines, Start.l, Start.c, End.l, End.c);
+    
+    for(int i = 0; i < Result.DeleteContent.Count; i++)
+    {
+        Print(Result.DeleteContent[i]);
+    }
+    
+    Result.Add = false;
+    
+    return Result;
+}
+
+action
+ActionForDeleteLine(buffer *Buffer, int Line)
+{
+    action Result;
+    
+    Result.Delete = true;
+    Result.DeleteContent = CopyStringListRange(Buffer->Lines, Line, 0, Line + 1, 0);
+    Result.DeleteStart = BufferPos(Line, 0);
+    Result.DeleteEnd = BufferPos(Line + 1, 0);
+    
+    for(int i = 0; i < Result.DeleteContent.Count; i++)
+    {
+        Print(Result.DeleteContent[i]);
+    }
+    
+    Result.Add = false;
+    
+    return Result;
+}
+
+action
+ActionForInsertContent(buffer_pos Pos, string_list Content)
+{
+    action Result;
+    
+    Result.Delete = false;
+    Result.Add = true;
+    Result.AddPos = Pos;
+    Result.AddContent = CopyStringList(Content);
+    
+    return Result;
 }
 
 void
-RedoAction(buffer *Buffer, action A)
+AddAction(buffer *Buffer, action Action)
+{
+    Buffer->ActionStack.Count = Buffer->ActionIndex + 1;
+    ListAdd(&(Buffer->ActionStack), Action);
+    Buffer->ActionIndex++;
+    //Buffer->ActionIndex = Buffer->ActionStack.Count - 1;
+}
+
+void
+UndoAction(buffer *Buffer, action A)
 {
     if(A.Delete)
     {
-        buffer_pos Start = A.DeleteStart;
-        buffer_pos End = A.DeleteEnd;
-        Print("Deleting from %d,%d to %d,%d", Start.l, Start.c, End.l, End.c);
-        
-        // delete in-between lines
-        for(int i = Start.l + 1; i < End.l; i++)
+        if(A.DeleteSingleLine)
         {
-            ListRemoveAt(&Buffer->Lines, i);
-            End.l--;
-            i--;
+            Print("Re-placing line %d", A.DeleteStart.l);
+            Print(A.DeleteContent[0]);
+            ListInsert(&Buffer->Lines, A.DeleteStart.l, A.DeleteContent[0]);
         }
-        
-        // slice start line
-        Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
-        
-        // slice and join next line
-        if(End.l > Start.l)
+        else
         {
-            Buffer->Lines[End.l].RemoveRange(0, End.c);
-            Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
-            ListRemoveAt(&Buffer->Lines, End.l);
+            buffer_pos Start = A.DeleteStart;
+            buffer_pos End = A.DeleteEnd;
+            Print("Re-placing Text at %d,%d", Start.l, Start.c);
+            Print("%d lines", A.DeleteContent.Count);
+            InsertStringList(&Buffer->Lines, A.DeleteContent, Start.l, Start.c);
         }
+    }
+}
+
+void
+DoAction(buffer *Buffer, action A)
+{
+    if(A.Delete)
+    {
+        if(A.DeleteSingleLine)
+        {
+            Print("Deleting line %d", A.DeleteStart.l);
+            ListRemoveAt(&Buffer->Lines, A.DeleteStart.l);
+        }
+        else
+        {
+            buffer_pos Start = A.DeleteStart;
+            buffer_pos End = A.DeleteEnd;
+            Print("Deleting from %d,%d to %d,%d", Start.l, Start.c, End.l, End.c);
+            
+            // delete in-between lines
+            for(int i = Start.l + 1; i < End.l; i++)
+            {
+                ListRemoveAt(&Buffer->Lines, i);
+                End.l--;
+                i--;
+            }
+            
+            // slice start line
+            Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
+            
+            // slice and join next line
+            if(End.l > Start.l)
+            {
+                Buffer->Lines[End.l].RemoveRange(0, End.c);
+                Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
+                ListRemoveAt(&Buffer->Lines, End.l);
+            }
+        }
+    }
+    
+    if(A.Add)
+    {
+        // TODO
+    }
+}
+
+void
+DoAndAddAction(buffer *Buffer, action Action)
+{
+    AddAction(Buffer, Action);
+    DoAction(Buffer, Action);
+}
+
+// undo: index
+// redo: index + 1
+// index can be -1, in which case we're at the bottom
+
+void
+MoveBackActionStack(buffer *Buffer)
+{
+    if(Buffer->ActionStack.Count > 0 && Buffer->ActionIndex > -1)
+    {
+        Print("Moving back action stack!");
+        UndoAction(Buffer, Buffer->ActionStack[Buffer->ActionIndex]);
+        Buffer->ActionIndex--;
+    }
+}
+
+void
+MoveForwardActionStack(buffer *Buffer)
+{
+    Print("Moving forward action stack!");
+    if(Buffer->ActionStack.Count > 0 && Buffer->ActionIndex < Buffer->ActionStack.Count - 1)
+    {
+        DoAction(Buffer, Buffer->ActionStack[Buffer->ActionIndex + 1]);
+        Buffer->ActionIndex++;
     }
 }
 
@@ -199,38 +325,45 @@ DrawView(program_state *ProgramState, view *View)
     
     
     BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
-    // TODO: Cross-view cursor drawing
+    // TODO: Cross-view cursor interpolation
     // draw cursor
     rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
+    
+    font *Font = &ProgramState->FontMonospace;
+    if(ProgramState->FontType == FontType_Sans)
+        Font = &ProgramState->FontSans;
+    else if(ProgramState->FontType == FontType_Serif)
+        Font = &ProgramState->FontSerif;
+    
+    GlyphInfo Info = {0};
+    int GlyphIndex = CharIndex(Font, CharAt(View, View->CursorPos));
+    Info = Font->RFont.glyphs[GlyphIndex];
+    
+    CursorDrawRect.w = Info.advanceX;
+    
     if(ViewIsSelected)
     {
-        if(ProgramState->InputMode == InputMode_Insert)
+        switch(ProgramState->InputMode)
         {
-            DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
-                                    CursorDrawRect.w/3, CursorDrawRect.h)),
-                             ProgramState->CursorBGColor);
-        }
-        else
-        {
-            font *Font = &ProgramState->FontMonospace;
-            if(ProgramState->FontType == FontType_Sans)
-                Font = &ProgramState->FontSans;
-            else if(ProgramState->FontType == FontType_Serif)
-                Font = &ProgramState->FontSerif;
-            
-            GlyphInfo Info = {0};
-            int GlyphIndex = CharIndex(Font, CharAt(View, View->CursorPos));
-            Info = Font->RFont.glyphs[GlyphIndex];
-            
-            CursorDrawRect.w = Info.advanceX;
-            if(View->Selecting)
-            {
-                DrawRectangleRec(R(CursorDrawRect), RED);
-            }
-            else
+            case InputMode_Nav:
             {
                 DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
             }
+            break; case InputMode_Select:
+            {
+                DrawRectangleRec(R(CursorDrawRect), RED);
+            }
+            break; case InputMode_Insert:
+            {
+                DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
+                                        CursorDrawRect.w/3, CursorDrawRect.h)),
+                                 ProgramState->CursorBGColor);
+            }
+            break; case InputMode_EntryBar:
+            {
+                DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
+            }
+            break;
         }
     }
     else
@@ -321,17 +454,17 @@ DrawView(program_state *ProgramState, view *View)
         DrawRectangleRec(R(View->Rect), {0, 0, 0, 200});
         {
             v2 TextPos = V2(View->Rect.x + 10, View->Rect.y + 10);
-            DrawString(ProgramState, String("id"), TextPos, WHITE);
-            DrawString(ProgramState, String("%d", View->Id), TextPos + V2(KeyValueDistance, 0), YELLOW);
+            DrawString(ProgramState, TempString("id"), TextPos, WHITE);
+            DrawString(ProgramState, TempString("%d", View->Id), TextPos + V2(KeyValueDistance, 0), YELLOW);
             TextPos.y += InfoCharHeight;
-            DrawString(ProgramState, String("parent"), TextPos, WHITE);
-            DrawString(ProgramState, String("%d", View->ParentId), TextPos + V2(KeyValueDistance, 0), YELLOW);
+            DrawString(ProgramState, TempString("parent"), TextPos, WHITE);
+            DrawString(ProgramState, TempString("%d", View->ParentId), TextPos + V2(KeyValueDistance, 0), YELLOW);
             TextPos.y += InfoCharHeight;
-            DrawString(ProgramState, String("birth #"), TextPos, WHITE);
-            DrawString(ProgramState, String("%d", View->BirthOrdinal), TextPos + V2(KeyValueDistance, 0), YELLOW);
+            DrawString(ProgramState, TempString("birth #"), TextPos, WHITE);
+            DrawString(ProgramState, TempString("%d", View->BirthOrdinal), TextPos + V2(KeyValueDistance, 0), YELLOW);
             TextPos.y += InfoCharHeight;
-            DrawString(ProgramState, String("area"), TextPos, WHITE);
-            DrawString(ProgramState, String("%d", View->Area), TextPos + V2(KeyValueDistance, 0), YELLOW);
+            DrawString(ProgramState, TempString("area"), TextPos, WHITE);
+            DrawString(ProgramState, TempString("%d", View->Area), TextPos + V2(KeyValueDistance, 0), YELLOW);
         }
     }
     
@@ -341,6 +474,8 @@ DrawView(program_state *ProgramState, view *View)
     }
     
     EndScissorMode();
+    
+    DrawString(ProgramState, TempString("%d", View->CursorPos.c), V2(0, 0), RED);
 }
 
 
@@ -371,6 +506,7 @@ LoadFileToBuffer(const char *RawPath)
     buffer Buffer = {};
     Buffer.FileName = FileName;
     Buffer.DirPath = GetDirOfFile(Path);
+    Buffer.ActionIndex = -1;
     Buffer.ActionStack = ActionList();
     
     Buffer.Lines = StringList();
@@ -1062,6 +1198,20 @@ extern "C"
         {
             view *View = &Views->Data[i];
             DrawView(ProgramState, View);
+        }
+        
+        {
+            int Y = 300;
+            DrawString(ProgramState, TempString("%d Actions", View->Buffer->ActionStack.Count), V2(200, Y+=20), BLACK, PURPLE);
+            for(int i = 0; i < View->Buffer->ActionStack.Count; i++)
+            {
+                action A = View->Buffer->ActionStack[i];
+                
+                if(A.Delete)
+                {
+                    DrawString(ProgramState, TempString("Delete %d,%d to %d,%d", A.DeleteStart.l, A.DeleteStart.c, A.DeleteEnd.l, A.DeleteEnd.c), V2(200, Y+=20), BLACK, YELLOW);
+                }
+            }
         }
         
 #if 0

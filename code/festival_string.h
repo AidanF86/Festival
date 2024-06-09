@@ -77,6 +77,15 @@ struct string
         }
     }
     
+    void InsertString(int Index, string Other)
+    {
+        // TODO
+        for(int i = 0; i < Other.Length; i++)
+        {
+            InsertChar(i+Index, Other[i]);
+        }
+    }
+    
     void AppendString(string Other)
     {
         for(int i = 0; i < Other.Length; i++)
@@ -100,6 +109,11 @@ struct string
             if(Data[i] != Other.Data[i]) return false;
         }
         return true;
+    }
+    
+    void Free()
+    {
+        Data;
     }
     
 };
@@ -413,6 +427,14 @@ TempString(const char *Format, ...)
     return Result;
 }
 
+string
+TempString(string Str)
+{
+    string Result = CopyString(Str);
+    ListAdd(&TempStrings, Result);
+    return Result;
+}
+
 // Janky backend nonsense
 struct raw_string
 {
@@ -463,6 +485,69 @@ CopyStringList(string_list A)
         ListAdd(&Result, CopyString(A[i]));
     }
     return Result;
+}
+
+string_list
+CopyStringListRange(string_list A, int StartRow, int StartCol, int EndRow, int EndCol)
+{
+    string_list Result = StringList();
+    
+    // if only part of one line
+    if(StartRow == EndRow)
+    {
+        ListAdd(&Result, CopyString(A[StartRow]));
+        Result[0].Slice(StartCol, EndCol);
+        return Result;
+    }
+    // if only one whole line
+    if(StartCol == 0 && EndCol == 0 && EndRow == StartRow + 1)
+    {
+        ListAdd(&Result, CopyString(A[StartRow]));
+        return Result;
+    }
+    
+    if(StartCol < A[StartRow].Length - 1)
+    {
+        ListAdd(&Result, CopyString(A[StartRow]));
+        Result[0].Slice(StartCol, Result[0].Length);
+    }
+    for(int i = 0; i < EndRow - StartRow - 1; i++)
+    {
+        ListAdd(&Result, CopyString(A[StartRow + i]));
+    }
+    if(EndCol > 0)
+    {
+        ListAdd(&Result, CopyString(A[EndRow]));
+        Result[Result.Count-1].Slice(0, EndCol + 1);
+    }
+    
+    return Result;
+}
+
+void
+InsertStringList(string_list *Bottom, string_list Top, int Row, int Col)
+{
+    int MoveLinePos = 0;
+    for(int i = 0; i < Top.Count; i++)
+    {
+        if(i == 0)
+        {
+            Bottom->Data[Row].InsertString(Col, Top[0]);
+            MoveLinePos = Top[0].Length;
+        }
+        else
+        {
+            Print("AAAAA");
+            // TEARS
+            ListInsert(Bottom, Row+i, CopyString(Bottom->Data[Row+i-1]));
+            
+            Bottom->Data[Row+i-1].Slice(0, MoveLinePos);
+            Bottom->Data[Row+i].Slice(MoveLinePos, Bottom->Data[Row+i].Length);
+            
+            Bottom->Data[Row+i].InsertString(0, Top[i]);
+            MoveLinePos = Top[i].Length;
+        }
+    }
 }
 
 #endif //FESTIVAL_STRING_H
