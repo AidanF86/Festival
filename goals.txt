@@ -58,6 +58,8 @@ Current Goal: Selection
 
 Undoing and redoing
 
+Fix: not rendering partially visible chars
+
 Clean up some, c++-ify lists, count->length
 
 Add ctrl-backspace to lister and buffer

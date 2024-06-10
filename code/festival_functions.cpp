@@ -62,15 +62,18 @@ LineCount(view *View)
     return View->Buffer->Lines.Count;
 }
 
-rect
+inline rect
 CharRectAt(view *View, int l, int c)
 {
     if(c == LineLength(View, l))
         return View->LineDataList[l].EndLineRect;
     return View->LineDataList[l].CharRects[c];
 }
-
-rect CharRectAt(view *View, buffer_pos Pos) { return CharRectAt(View, Pos.l, Pos.c); }
+inline rect
+CharRectAt(view *View, buffer_pos p)
+{
+    return CharRectAt(View, p.l, p.c);
+}
 
 rect
 LineRect(view *View, int l)
@@ -950,5 +953,19 @@ SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
     View->CursorPos = Pos;
     Clamp(View->CursorPos.l, 0, LineCount(View));
     Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+}
+
+
+void
+SplitViewHorizontal(program_state *ProgramState)
+{
+    ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Right));
+    printf("splitting view horizontally\n");
+}
+void
+SplitViewVertical(program_state *ProgramState)
+{
+    ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Below));
+    printf("splitting view vertically\n");
 }
 

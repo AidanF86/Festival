@@ -19,17 +19,25 @@
 action
 ActionForDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
 {
+    buffer_pos ActualStart = Start.l < End.l || (Start.l == End.l && Start.c < End.c) ? Start : End;
+    buffer_pos ActualEnd = ActualStart == Start ? End : Start;
+    ActualEnd.c++;
+    
     action Result;
     
     Result.Delete = true;
-    Result.DeleteStart = Start;
-    Result.DeleteEnd = End;
-    Result.DeleteContent = CopyStringListRange(Buffer->Lines, Start.l, Start.c, End.l, End.c);
+    Result.DeleteSingleLine = false;
+    Result.DeleteStart = ActualStart;
+    Result.DeleteEnd = ActualEnd;
+    Result.DeleteContent = CopyStringListRange(Buffer->Lines, ActualStart.l, ActualStart.c, ActualEnd.l, ActualEnd.c);
     
+    Print("Deleted content:");
+    Print("=======================");
     for(int i = 0; i < Result.DeleteContent.Count; i++)
     {
         Print(Result.DeleteContent[i]);
     }
+    Print("=======================");
     
     Result.Add = false;
     
@@ -42,6 +50,7 @@ ActionForDeleteLine(buffer *Buffer, int Line)
     action Result;
     
     Result.Delete = true;
+    Result.DeleteSingleLine = true;
     Result.DeleteContent = CopyStringListRange(Buffer->Lines, Line, 0, Line + 1, 0);
     Result.DeleteStart = BufferPos(Line, 0);
     Result.DeleteEnd = BufferPos(Line + 1, 0);
@@ -107,32 +116,37 @@ DoAction(buffer *Buffer, action A)
     {
         if(A.DeleteSingleLine)
         {
-            Print("Deleting line %d", A.DeleteStart.l);
+            Print("Deleting single line: %d", A.DeleteStart.l);
             ListRemoveAt(&Buffer->Lines, A.DeleteStart.l);
         }
         else
         {
             buffer_pos Start = A.DeleteStart;
             buffer_pos End = A.DeleteEnd;
-            Print("Deleting from %d,%d to %d,%d", Start.l, Start.c, End.l, End.c);
+            Print("");
+            Print("Deleting range: %d,%d to %d,%d", Start.l, Start.c, End.l, End.c);
             
             // delete in-between lines
             for(int i = Start.l + 1; i < End.l; i++)
             {
+                Print("AA");
                 ListRemoveAt(&Buffer->Lines, i);
                 End.l--;
                 i--;
             }
             
-            // slice start line
-            Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
-            
             // slice and join next line
             if(End.l > Start.l)
             {
+                Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
+                Print("BB");
                 Buffer->Lines[End.l].RemoveRange(0, End.c);
                 Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
                 ListRemoveAt(&Buffer->Lines, End.l);
+            }
+            else
+            {
+                Buffer->Lines[Start.l].RemoveRange(Start.c, End.c);
             }
         }
     }
@@ -306,7 +320,6 @@ DrawView(program_state *ProgramState, view *View)
     
     // draw title bar
     // TODO: proper colors
-    
     if(View->ListerIsOpen)
     {
         lister *Lister = &View->Lister;
@@ -341,34 +354,38 @@ DrawView(program_state *ProgramState, view *View)
     
     CursorDrawRect.w = Info.advanceX;
     
-    if(ViewIsSelected)
+    color CursorColor = ProgramState->CursorBGColor;
+    color SelectionAreaColor = ORANGE;
+    if(!ViewIsSelected)
     {
-        switch(ProgramState->InputMode)
-        {
-            case InputMode_Nav:
-            {
-                DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
-            }
-            break; case InputMode_Select:
-            {
-                DrawRectangleRec(R(CursorDrawRect), RED);
-            }
-            break; case InputMode_Insert:
-            {
-                DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
-                                        CursorDrawRect.w/3, CursorDrawRect.h)),
-                                 ProgramState->CursorBGColor);
-            }
-            break; case InputMode_EntryBar:
-            {
-                DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
-            }
-            break;
-        }
+        CursorColor = GRAY;
+        SelectionAreaColor = LIGHTGRAY;
     }
-    else
+    
+    switch(ProgramState->InputMode)
     {
-        DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
+        case InputMode_Nav:
+        {
+            DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+        }
+        break; case InputMode_Select:
+        {
+            rect SelectionStartDrawRect = CharToScreenSpace(View, CharRectAt(View, View->SelectionStart));
+            DrawRectangleRec(R(SelectionStartDrawRect), RED);
+            DrawRectangleRec(R(CursorDrawRect), RED);
+        }
+        break; case InputMode_Insert:
+        {
+            DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
+                                    CursorDrawRect.w/3, CursorDrawRect.h)),
+                             ProgramState->CursorBGColor);
+        }
+        break; case InputMode_EntryBar:
+        {
+            // TODO: don't draw buffer if we're in a lister?
+            DrawRectangleLinesEx(R(CursorDrawRect), 2, ProgramState->CursorBGColor);
+        }
+        break;
     }
     EndScissorMode();
     
@@ -403,7 +420,20 @@ DrawView(program_state *ProgramState, view *View)
                 CharColor = ProgramState->CursorFGColor;
             }
             
-            DrawChar(ProgramState, CharAt(View, l, c), V2(Rect), CharColor);
+            buffer_pos SmallerPos = View->SelectionStart.l < View->CursorPos.l || (View->SelectionStart.l == View->CursorPos.l && View->SelectionStart.c < View->CursorPos.c) ? View->SelectionStart : View->CursorPos;
+            buffer_pos GreaterPos = SmallerPos == View->SelectionStart ? View->CursorPos : View->SelectionStart;
+            bool CharIsSelected = (l > SmallerPos.l && l < GreaterPos.l)
+                || (l == SmallerPos.l && l != GreaterPos.l && c > SmallerPos.c)
+                || (l == GreaterPos.l && l != SmallerPos.l && c < GreaterPos.c)
+                || (l == SmallerPos.l && l == GreaterPos.l && c > SmallerPos.c && c < GreaterPos.c);
+            
+            color CharBGColor = BLANK;
+            if(View->Selecting && CharIsSelected)
+            {
+                CharBGColor = ORANGE;
+            }
+            
+            DrawChar(ProgramState, CharAt(View, l, c), V2(Rect), CharBGColor, CharColor);
         }
         EndScissorMode();
     }
@@ -474,8 +504,6 @@ DrawView(program_state *ProgramState, view *View)
     }
     
     EndScissorMode();
-    
-    DrawString(ProgramState, TempString("%d", View->CursorPos.c), V2(0, 0), RED);
 }
 
 

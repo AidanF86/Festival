@@ -6,14 +6,12 @@
 struct action
 {
     b32 Delete;
-    // NOTE: end can be before start, the only difference is that end is where the cursor is
-    // inc, ex
-    
-    b32 DeleteSingleLine; // TODO
-    
+    // NOTE: end can be before start, the only difference is that end is where the cursor is. inc, ex
+    b32 DeleteSingleLine;
     buffer_pos DeleteStart;
     buffer_pos DeleteEnd;
     string_list DeleteContent;
+    
     
     b32 Add;
     buffer_pos AddPos;

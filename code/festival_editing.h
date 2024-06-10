@@ -119,6 +119,51 @@ GetStringToInsert(program_state *ProgramState)
     return Result;
     
 #if 0
+    
+#endif
+}
+
+
+
+void
+HandleInput_Insert(program_state *ProgramState)
+{
+    buffer *Buffer = ProgramState->Views[ProgramState->SelectedViewIndex].Buffer;
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    if(KeyShouldExecute(ProgramState->Escape_Key))
+    {
+        ProgramState->InputMode = InputMode_Nav;
+    }
+    
+    if(KeyShouldExecute(ProgramState->UpKey))
+    {
+        MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+    }
+    if(KeyShouldExecute(ProgramState->DownKey))
+    {
+        MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+    }
+    if(KeyShouldExecute(ProgramState->LeftKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
+        MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+    }
+    if(KeyShouldExecute(ProgramState->RightKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
+        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+    }
+    
+    string StringToInsert = GetStringToInsert(ProgramState);
+    if(StringToInsert.Length > 0)
+        ProgramState->ShouldChangeIdealCursorCol = true;
+    
+    Buffer->Lines[View->CursorPos.l].InsertString(View->CursorPos.c, StringToInsert);
+    View->CursorPos.c += StringToInsert.Length;
+    
+    StringToInsert.Free();
+    
     for(int i = 0; i < 7; i++)
     {
         if(KeyShouldExecute(ProgramState->SpecialKeys[i]))
@@ -180,49 +225,6 @@ GetStringToInsert(program_state *ProgramState)
             
         }
     }
-#endif
-}
-
-
-
-void
-HandleInput_Insert(program_state *ProgramState)
-{
-    buffer *Buffer = ProgramState->Views[ProgramState->SelectedViewIndex].Buffer;
-    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
-    
-    if(KeyShouldExecute(ProgramState->Escape_Key))
-    {
-        ProgramState->InputMode = InputMode_Nav;
-    }
-    
-    if(KeyShouldExecute(ProgramState->UpKey))
-    {
-        MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
-    }
-    if(KeyShouldExecute(ProgramState->DownKey))
-    {
-        MoveCursorPos(ProgramState, View, BufferPos(1, 0));
-    }
-    if(KeyShouldExecute(ProgramState->LeftKey))
-    {
-        ProgramState->ShouldChangeIdealCursorCol = true;
-        MoveCursorPos(ProgramState, View, BufferPos(0, -1));
-    }
-    if(KeyShouldExecute(ProgramState->RightKey))
-    {
-        ProgramState->ShouldChangeIdealCursorCol = true;
-        MoveCursorPos(ProgramState, View, BufferPos(0, 1));
-    }
-    
-    string StringToInsert = GetStringToInsert(ProgramState);
-    if(StringToInsert.Length > 0)
-        ProgramState->ShouldChangeIdealCursorCol = true;
-    
-    Buffer->Lines[View->CursorPos.l].InsertString(View->CursorPos.c, StringToInsert);
-    View->CursorPos.c += StringToInsert.Length;
-    
-    StringToInsert.Free();
 }
 
 void
@@ -267,73 +269,10 @@ HandleInput_EntryBar(program_state *ProgramState)
 
 
 
-
-
-
 void
-HandleInput_Nav(program_state *ProgramState)
+ProcessModalMovement(program_state *ProgramState)
 {
-    if(KeyShouldExecute(ProgramState->FKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
-    {
-        ProgramState->InputMode = InputMode_Insert;
-        return;
-    }
-    
-    if(KeyShouldExecute(ProgramState->Slash_Key) && IsAnyShiftKeyDown)
-    {
-        ProgramState->ShowSuperDebugMenu = true;
-    }
-    
-    if(KeyShouldExecute(ProgramState->NKey))
-    {
-        if(IsAnyShiftKeyDown)
-        {
-            ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Below));
-            printf("splitting view vertically\n");
-        }
-        else
-        {
-            ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Right));
-            printf("splitting view horizontally\n");
-        }
-    }
-    
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
-    
-    
-    if(KeyShouldExecute(ProgramState->YKey))
-    {
-        if(IsAnyShiftKeyDown)
-            MoveForwardActionStack(View->Buffer);
-        else
-            MoveBackActionStack(View->Buffer);
-    }
-    
-    
-    
-    if(KeyShouldExecute(ProgramState->SKey))
-    {
-        ProgramState->InputMode = InputMode_Select;
-        View->SelectionStart = View->CursorPos;
-    }
-    
-    if(KeyShouldExecute(ProgramState->XKey))
-    {
-        DoAndAddAction(View->Buffer, ActionForDeleteLine(View->Buffer, View->CursorPos.l));
-    }
-    
-    if(KeyShouldExecute(ProgramState->EKey)) {
-        OpenEditFileLister(ProgramState, View, "./");
-    }
-    else if(KeyShouldExecute(ProgramState->GKey)) {
-        OpenSwitchBufferLister(ProgramState, View);
-    }
-    else if(KeyShouldExecute(ProgramState->FKey) && IsAnyShiftKeyDown) {
-        OpenSwitchFontTypeLister(ProgramState, View);
-    }
-    else if(KeyShouldExecute(ProgramState->AKey)) {
-        OpenCommandLister(ProgramState, View);
-    }
     
     if(KeyShouldExecute(ProgramState->UpKey))
     {
@@ -400,6 +339,72 @@ HandleInput_Nav(program_state *ProgramState)
         else
             SetCursorPos(ProgramState, View, SeekNextEmptyLine(View, View->CursorPos));
     }
+}
+
+void
+HandleInput_Nav(program_state *ProgramState)
+{
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    if(KeyShouldExecute(ProgramState->FKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
+    {
+        ProgramState->InputMode = InputMode_Insert;
+        return;
+    }
+    if(KeyShouldExecute(ProgramState->SKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
+    {
+        ProgramState->InputMode = InputMode_Select;
+        View->SelectionStart = View->CursorPos;
+        View->Selecting = true;
+        return;
+    }
+    
+    ProcessModalMovement(ProgramState);
+    
+    if(KeyShouldExecute(ProgramState->Slash_Key) && IsAnyShiftKeyDown)
+    {
+        ProgramState->ShowSuperDebugMenu = true;
+    }
+    
+    if(KeyShouldExecute(ProgramState->NKey))
+    {
+        if(IsAnyShiftKeyDown)
+        {
+            SplitViewVertical(ProgramState);
+        }
+        else
+        {
+            SplitViewHorizontal(ProgramState);
+        }
+    }
+    
+    if(KeyShouldExecute(ProgramState->YKey))
+    {
+        if(IsAnyShiftKeyDown)
+            MoveForwardActionStack(View->Buffer);
+        else
+            MoveBackActionStack(View->Buffer);
+    }
+    
+    if(KeyShouldExecute(ProgramState->XKey))
+    {
+        DoAndAddAction(View->Buffer, ActionForDeleteLine(View->Buffer, View->CursorPos.l));
+    }
+    
+    if(KeyShouldExecute(ProgramState->EKey)) {
+        OpenEditFileLister(ProgramState, View, "./");
+    }
+    else if(KeyShouldExecute(ProgramState->GKey)) {
+        OpenSwitchBufferLister(ProgramState, View);
+    }
+    else if(KeyShouldExecute(ProgramState->FKey) && IsAnyShiftKeyDown) {
+        OpenSwitchFontTypeLister(ProgramState, View);
+    }
+    else if(KeyShouldExecute(ProgramState->AKey)) {
+        OpenCommandLister(ProgramState, View);
+    }
+    
+    
     
     if(KeyShouldExecute(ProgramState->WKey))
     {// TODO: write current buffer to file
@@ -423,6 +428,31 @@ HandleInput_Nav(program_state *ProgramState)
         }
     }
     
+}
+
+void
+HandleInput_Select(program_state *ProgramState)
+{
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    if((KeyShouldExecute(ProgramState->SKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown) || KeyShouldExecute(ProgramState->Escape_Key))
+    {
+        ProgramState->InputMode = InputMode_Nav;
+        View->Selecting = false;
+        return;
+    }
+    
+    ProcessModalMovement(ProgramState);
+    
+    if(KeyShouldExecute(ProgramState->XKey))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
+        DoAndAddAction(View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStart, View->CursorPos));
+        
+        ProgramState->InputMode = InputMode_Nav;
+        View->Selecting = false;
+        return;
+    }
 }
 
 void
@@ -455,6 +485,10 @@ HandleInput(program_state *ProgramState)
     else if(ProgramState->InputMode == InputMode_Insert)
     {
         HandleInput_Insert(ProgramState);
+    }
+    else if(ProgramState->InputMode == InputMode_Select)
+    {
+        HandleInput_Select(ProgramState);
     }
     
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
