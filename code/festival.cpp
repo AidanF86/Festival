@@ -8,6 +8,7 @@
 #include "festival_math.h"
 #include "festival_lists.h"
 #include "festival_string.h"
+#include "festival_input.h"
 
 #include "festival_filesystem.h"
 #include "festival_undo.h"
@@ -906,7 +907,7 @@ extern "C"
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;
             
-            FillKeyData(ProgramState);
+            FillKeyData(&ProgramState->Input);
             
             ProgramState->PrevFontSize = ProgramState->FontSize;
             ProgramState->CharsPerVirtualLine = 10;
@@ -965,7 +966,7 @@ extern "C"
         
         view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
         
-        UpdateKeyInput(ProgramState);
+        UpdateKeyInput(&ProgramState->Input);
         
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;

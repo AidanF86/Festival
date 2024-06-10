@@ -140,14 +140,6 @@ struct view
 };
 DefineList(view, View)
 
-struct key_data
-{
-    int KeyCode;
-    b32 JustPressed;
-    f32 PressTime;
-    f32 TimeTillNextRepeat;
-};
-
 enum input_mode
 {
     InputMode_Nav,
@@ -220,91 +212,8 @@ struct program_state
     RenderTexture2D CharTextures[256];
     b32 CharTexturesExist[256];
     
-    union
-    {
-        union
-        {
-            struct
-            {
-                key_data LeftKey;
-                key_data RightKey;
-                key_data UpKey;
-                key_data DownKey;
-                key_data PageUp_Key;
-                key_data PageDown_Key;
-                
-                key_data AKey;
-                key_data BKey;
-                key_data CKey;
-                key_data DKey;
-                key_data EKey;
-                key_data FKey;
-                key_data GKey;
-                key_data HKey;
-                key_data IKey;
-                key_data JKey;
-                key_data KKey;
-                key_data LKey;
-                key_data MKey;
-                key_data NKey;
-                key_data OKey;
-                key_data PKey;
-                key_data QKey;
-                key_data RKey;
-                key_data SKey;
-                key_data TKey;
-                key_data UKey;
-                key_data VKey;
-                key_data WKey;
-                key_data XKey;
-                key_data YKey;
-                key_data ZKey;
-                
-                key_data Number0Key;
-                key_data Number1Key;
-                key_data Number2Key;
-                key_data Number3Key;
-                key_data Number4Key;
-                key_data Number5Key;
-                key_data Number6Key;
-                key_data Number7Key;
-                key_data Number8Key;
-                key_data Number9Key;
-                
-                key_data Grave_Key;
-                key_data Minus_Key;
-                key_data Equals_Key;
-                key_data LeftBracket_Key;
-                key_data RightBracket_Key;
-                key_data Backslash_Key;
-                key_data Semicolon_Key;
-                key_data Quote_Key;
-                key_data Slash_Key;
-                key_data Comma_Key;
-                key_data Period_Key;
-                
-                key_data Space_Key;
-                key_data Backspace_Key;
-                key_data Delete_Key;
-                key_data Tab_Key;
-                key_data Return_Key;
-                key_data CapsLock_Key;
-                key_data Escape_Key;
-            };
-            struct
-            {
-                key_data NavKeys[6];
-                key_data LetterKeys[26];
-                key_data NumberKeys[10];
-                key_data SymbolKeys[11];
-                key_data SpecialKeys[7];
-            };
-        };
-        key_data KeyData[6+26+10+11+7];
-    };
+    input Input;
 };
 
-
-#define KeyShouldExecute(Key) ((Key).JustPressed || ((Key).PressTime >= ProgramState->KeyFirstRepeatTime && Key.TimeTillNextRepeat <= 0))
 
 #endif //FESTIVAL_H

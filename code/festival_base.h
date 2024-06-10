@@ -25,19 +25,6 @@ typedef Color color;
 #define Assert(X) if(!X) { *0 = 0; }
 #endif
 
-#define IsAnyShiftKeyDown (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) 
-#define IsAnyAltKeyDown (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) 
-#define IsAnyControlKeyDown (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
-
-#define IsAlphaNumeric(c) (\
-((c) >= 'a' && (c) <= 'z') || \
-((c) >= 'A' && (c) <= 'Z') || \
-((c) >= '0' && (c) <= '9')\
-)
-#define IsNonSpecial(c) (IsAlphaNumeric(c) || \
-c == '_')
-
-
 struct v2
 {
     union
