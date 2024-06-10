@@ -4,9 +4,11 @@
 
 #include "festival_platform.h"
 
+#include "festival_base.h"
 #include "festival_math.h"
 #include "festival_lists.h"
 #include "festival_string.h"
+
 #include "festival_filesystem.h"
 #include "festival_undo.h"
 #include "festival.h"
@@ -129,7 +131,6 @@ DoAction(buffer *Buffer, action A)
             // delete in-between lines
             for(int i = Start.l + 1; i < End.l; i++)
             {
-                Print("AA");
                 ListRemoveAt(&Buffer->Lines, i);
                 End.l--;
                 i--;
@@ -139,7 +140,6 @@ DoAction(buffer *Buffer, action A)
             if(End.l > Start.l)
             {
                 Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
-                Print("BB");
                 Buffer->Lines[End.l].RemoveRange(0, End.c);
                 Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
                 ListRemoveAt(&Buffer->Lines, End.l);
@@ -182,9 +182,9 @@ MoveBackActionStack(buffer *Buffer)
 void
 MoveForwardActionStack(buffer *Buffer)
 {
-    Print("Moving forward action stack!");
     if(Buffer->ActionStack.Count > 0 && Buffer->ActionIndex < Buffer->ActionStack.Count - 1)
     {
+        Print("Moving forward action stack!");
         DoAction(Buffer, Buffer->ActionStack[Buffer->ActionIndex + 1]);
         Buffer->ActionIndex++;
     }
@@ -370,7 +370,7 @@ DrawView(program_state *ProgramState, view *View)
         }
         break; case InputMode_Select:
         {
-            rect SelectionStartDrawRect = CharToScreenSpace(View, CharRectAt(View, View->SelectionStart));
+            rect SelectionStartDrawRect = CharToScreenSpace(View, CharRectAt(View, View->SelectionStartPos));
             DrawRectangleRec(R(SelectionStartDrawRect), RED);
             DrawRectangleRec(R(CursorDrawRect), RED);
         }
@@ -420,8 +420,8 @@ DrawView(program_state *ProgramState, view *View)
                 CharColor = ProgramState->CursorFGColor;
             }
             
-            buffer_pos SmallerPos = View->SelectionStart.l < View->CursorPos.l || (View->SelectionStart.l == View->CursorPos.l && View->SelectionStart.c < View->CursorPos.c) ? View->SelectionStart : View->CursorPos;
-            buffer_pos GreaterPos = SmallerPos == View->SelectionStart ? View->CursorPos : View->SelectionStart;
+            buffer_pos SmallerPos = View->SelectionStartPos.l < View->CursorPos.l || (View->SelectionStartPos.l == View->CursorPos.l && View->SelectionStartPos.c < View->CursorPos.c) ? View->SelectionStartPos : View->CursorPos;
+            buffer_pos GreaterPos = SmallerPos == View->SelectionStartPos ? View->CursorPos : View->SelectionStartPos;
             bool CharIsSelected = (l > SmallerPos.l && l < GreaterPos.l)
                 || (l == SmallerPos.l && l != GreaterPos.l && c > SmallerPos.c)
                 || (l == GreaterPos.l && l != SmallerPos.l && c < GreaterPos.c)

@@ -3,26 +3,9 @@
 #ifndef FESTIVAL_H
 #define FESTIVAL_H
 
-#define IsAnyShiftKeyDown (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) 
-#define IsAnyAltKeyDown (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) 
-#define IsAnyControlKeyDown (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
 
-#define IsAlphaNumeric(c) (\
-((c) >= 'a' && (c) <= 'z') || \
-((c) >= 'A' && (c) <= 'Z') || \
-((c) >= '0' && (c) <= '9')\
-)
-#define IsNonSpecial(c) (IsAlphaNumeric(c) || \
-c == '_')
-typedef Color color;
-struct color_list;
 struct program_state;
 struct view;
-
-DefineList(int, Int)
-DefineList(f32, f32)
-DefineList(rect, Rect)
-DefineList(color, Color)
 
 struct line_data
 {
@@ -140,7 +123,10 @@ struct view
     int IdealCursorCol;
     
     b32 Selecting;
-    buffer_pos SelectionStart;
+    buffer_pos SelectionStartPos;
+    
+    buffer_pos InsertStartPos;
+    string TotalInsertString;
     
     int Y;
     int TargetY;

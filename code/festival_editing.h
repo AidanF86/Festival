@@ -133,7 +133,9 @@ HandleInput_Insert(program_state *ProgramState)
     
     if(KeyShouldExecute(ProgramState->Escape_Key))
     {
-        ProgramState->InputMode = InputMode_Nav;
+        SwitchToNavMode(ProgramState);
+        View->TotalInsertString.Free();
+        return;
     }
     
     if(KeyShouldExecute(ProgramState->UpKey))
@@ -348,14 +350,12 @@ HandleInput_Nav(program_state *ProgramState)
     
     if(KeyShouldExecute(ProgramState->FKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {
-        ProgramState->InputMode = InputMode_Insert;
+        SwitchToInsertMode(ProgramState);
         return;
     }
     if(KeyShouldExecute(ProgramState->SKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {
-        ProgramState->InputMode = InputMode_Select;
-        View->SelectionStart = View->CursorPos;
-        View->Selecting = true;
+        SwitchToSelectMode(ProgramState);
         return;
     }
     
@@ -437,8 +437,7 @@ HandleInput_Select(program_state *ProgramState)
     
     if((KeyShouldExecute(ProgramState->SKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown) || KeyShouldExecute(ProgramState->Escape_Key))
     {
-        ProgramState->InputMode = InputMode_Nav;
-        View->Selecting = false;
+        SwitchToNavMode(ProgramState);
         return;
     }
     
@@ -447,10 +446,9 @@ HandleInput_Select(program_state *ProgramState)
     if(KeyShouldExecute(ProgramState->XKey))
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
-        DoAndAddAction(View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStart, View->CursorPos));
+        DoAndAddAction(View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStartPos, View->CursorPos));
         
-        ProgramState->InputMode = InputMode_Nav;
-        View->Selecting = false;
+        SwitchToNavMode(ProgramState);
         return;
     }
 }

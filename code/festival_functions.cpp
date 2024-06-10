@@ -969,3 +969,34 @@ SplitViewVertical(program_state *ProgramState)
     printf("splitting view vertically\n");
 }
 
+
+
+void
+SwitchToNavMode(program_state *ProgramState)
+{
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    ProgramState->InputMode = InputMode_Nav;
+    View->Selecting = false;
+}
+
+void
+SwitchToSelectMode(program_state *ProgramState)
+{
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    ProgramState->InputMode = InputMode_Select;
+    View->SelectionStartPos = View->CursorPos;
+    View->Selecting = true;
+}
+
+void
+SwitchToInsertMode(program_state *ProgramState)
+{
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    
+    ProgramState->InputMode = InputMode_Insert;
+    View->Selecting = false;
+    View->InsertStartPos = View->CursorPos;
+    View->TotalInsertString = String("");
+}
