@@ -55,12 +55,11 @@ DONE better path handling
 DONE touch up edit file lister
 DONE selection delete
 
-Current Goal: insert (add) action
+Current Goal: insert (add) action // Done?
+					Get command system working
 Undoing and redoing
 
 Fix: not rendering partially visible chars
-
-Clean up some, c++-ify lists, count->length
 
 Add ctrl-backspace to lister and buffer
 

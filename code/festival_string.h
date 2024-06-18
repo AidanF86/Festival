@@ -21,12 +21,28 @@ struct string
         
         if(Length + 5 >= ArraySize)
         { // realloc
-            int NewSize = (ArraySize+64)*sizeof(32);
-            Data = (u32 *)realloc(Data, NewSize);
-            ArraySize = NewSize;
+            int NewSize = (ArraySize+64)*sizeof(u32);
+            
+            u32 *Temp = (u32 *)realloc(Data, NewSize);
+            if(Temp != NULL)
+            {
+                Data = Temp;
+                ArraySize = NewSize;
+            }
+            else
+            {
+                printf("ERROR: failed string reallocation!\n");
+                return;
+            }
         }
         
         // shift right
+        if(Length >= ArraySize)
+        {
+            printf("ERROR: Length is >= ArraySize (%d Length vs %d ArraySize)\n", Length, ArraySize);
+            return;
+        }
+        
         for(int i = Length; i > Index; i--)
         {
             Data[i] = Data[i-1];
@@ -113,7 +129,7 @@ struct string
     
     void Free()
     {
-        Data;
+        free(Data);
     }
     
 };
@@ -224,14 +240,19 @@ __String(u32 *Contents)
     return Result;
 }
 
-u32 StringFormatBuffer[1024];
-u32 StringVarBuffer[1024];
-char SprintfBuffer[1024];
+#define StringFormatBufferLength 1024
+u32 StringFormatBuffer[StringFormatBufferLength];
+u32 StringVarBuffer[StringFormatBufferLength];
+char SprintfBuffer[StringFormatBufferLength];
 
 int
 _U32_Sprintf(u32 *Dest, const char *Format, va_list Args)
 {
     int Length = vsprintf(SprintfBuffer, Format, Args);
+    if(Length >= StringFormatBufferLength)
+    {
+        printf("ERROR (_U32_Sprintf): Length >= StringFormatBufferLength\n");
+    }
     int i;
     for(i = 0; i < Length; i++)
     {
@@ -336,7 +357,6 @@ _String(const char *Format, va_list Args)
                 {
                     StringFormatBuffer[Index+i] = StringVarBuffer[i];
                 }
-                //strcpy(&(StringFormatBuffer[Index]), StringVarBuffer);
                 if(StringDebug)
                     printf("length %d\n", Length);
                 Index += Length;//NullTerminatedStringLength(StringVarBuffer);
@@ -506,19 +526,30 @@ CopyStringListRange(string_list A, int StartRow, int StartCol, int EndRow, int E
         return Result;
     }
     
-    if(StartCol < A[StartRow].Length - 1)
+    Print("BBBBBBBBB");
+    if(StartCol < A[StartRow].Length)
     {
+        Print("111111.1");
         ListAdd(&Result, CopyString(A[StartRow]));
         Result[0].Slice(StartCol, Result[0].Length);
     }
-    for(int i = 0; i < EndRow - StartRow - 1; i++)
+    else if(A[StartRow].Length == 0 || StartCol == A[StartRow].Length)
     {
+        Print("111111.2");
+        ListAdd(&Result, String(""));
+    }
+    
+    for(int i = 1; i < EndRow - StartRow; i++)
+    {
+        Print("2222222");
         ListAdd(&Result, CopyString(A[StartRow + i]));
     }
+    
     if(EndCol > 0)
     {
+        Print("3333333");
         ListAdd(&Result, CopyString(A[EndRow]));
-        Result[Result.Count-1].Slice(0, EndCol + 1);
+        Result[Result.Count-1].Slice(0, EndCol);
     }
     
     return Result;
@@ -528,16 +559,22 @@ void
 InsertStringList(string_list *Bottom, string_list Top, int Row, int Col)
 {
     int MoveLinePos = 0;
+    
     for(int i = 0; i < Top.Count; i++)
     {
         if(i == 0)
         {
+            Print("CCCCCCCCCC");
             Bottom->Data[Row].InsertString(Col, Top[0]);
-            MoveLinePos = Top[0].Length;
+            MoveLinePos = Col + Top[0].Length;
+            /*
+                        if(Top[0].Length == 0)
+                            MoveLinePos = Bottom->Data[Row].Length;
+            */
+            //if(MoveLinePos
         }
         else
         {
-            Print("AAAAA");
             // TEARS
             ListInsert(Bottom, Row+i, CopyString(Bottom->Data[Row+i-1]));
             

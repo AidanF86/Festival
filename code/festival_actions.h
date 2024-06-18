@@ -15,7 +15,8 @@ struct action
     
     b32 Add;
     buffer_pos AddPos;
-    string_list AddContent;
+    string AddContent;
+    b32 AddLineBelow;
 };
 
 DefineList(action, Action);

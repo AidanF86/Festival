@@ -250,6 +250,13 @@ inline int Interpolate(int a, int b, f32 speed)
 #define Clamp(Value, Min, Max) { if(Value < Min){Value = Min;} if(Value > Max){Value = Max;} }
 
 
+u32
+RandomU32InRange(u32 Min, u32 Max)
+{
+    // TODO: is this inclusive???
+    f64 RandF = (f64)(rand()) / (f64)RAND_MAX;
+    return (Max-Min)*RandF + Min;
+}
 
 
 #endif //FESTIVAL_MATH_H

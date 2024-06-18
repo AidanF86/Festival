@@ -33,11 +33,13 @@ DefineCommand(TestCommand)
 
 DefineCommand(SwitchFontType);
 DefineCommand(EditFile);
+DefineCommand(RandomSelectAndDeleteTest);
 
-command Commands[2] =
+command Commands[3] =
 {
     Command(SwitchFontTypeCommand, "Switch Font Type"),
     Command(EditFileCommand, "Open File"),
+    Command(RandomSelectAndDeleteTestCommand, "Test Random Select and Delete"),
 };
 
 

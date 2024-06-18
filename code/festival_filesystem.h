@@ -85,4 +85,89 @@ GetFileOrDirectoryName(string Path)
     return Result;
 }
 
+buffer *
+GetBufferForPath(program_state *ProgramState, string PathString)
+{
+    // see if we already have a buffer
+    
+    string PathCopy = CopyString(PathString);
+    AbsolutizePath(&PathCopy);
+    int Index = -1;
+    
+    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    {
+        if(PathCopy == ProgramState->Buffers[i].DirPath)
+        {
+            Index = i;
+            break;
+        }
+    }
+    
+    FreeString(PathCopy);
+    
+    if(Index != -1)
+        return &ProgramState->Buffers[Index];
+    return 0;
+}
+
+
+buffer
+LoadFileToBuffer(const char *RawPath)
+{
+    if(!RawPath || RawPath[0] == 0)
+        return {};
+    
+    string FileName = String(RawPath);
+    CleanUpPath(&FileName);
+    string Path = String(RawPath);
+    AbsolutizePath(&Path);
+    
+    char *FullRawPath = RawString(Path);
+    
+    // TODO: check if file exists and is readable, etc
+    if(!FileExists(FullRawPath))
+        Print("ERROR: no such file exists!");
+    
+    u32 FileSize = (u32)GetFileLength(FullRawPath);
+    Print("File size: %d", (int)FileSize);
+    
+    char *FileData = LoadFileText(FullRawPath);
+    
+    free(FullRawPath);
+    
+    buffer Buffer = {};
+    Buffer.FileName = FileName;
+    Buffer.DirPath = GetDirOfFile(Path);
+    Buffer.ActionIndex = -1;
+    Buffer.ActionStack = ActionList();
+    
+    Buffer.Lines = StringList();
+    printf("Gathering text\n");
+    for(int i = 0; i < FileSize; i++)
+    {
+        int LineStart = i;
+        // TODO: need to add AppendString to easily do this
+        for(; FileData[i] != '\n' && i < FileSize; i++) {}
+        
+        ListAdd(&(Buffer.Lines), AllocString(i-LineStart));
+        
+        int InLine = 0;
+        for(int a = LineStart; a < i; a++)
+        {
+            Buffer.Lines[Buffer.Lines.Count-1].Data[InLine] = FileData[a];
+            InLine++;
+        }
+    }
+    if(Buffer.Lines.Count == 0)
+    {
+        ListAdd(&Buffer.Lines, String(""));
+    }
+    printf("Finished with text\n");
+    
+    UnloadFileText(FileData);
+    
+    return Buffer;
+}
+
+
 #endif //FESTIVAL_FILESYSTEM_H

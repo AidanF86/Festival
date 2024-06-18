@@ -614,29 +614,26 @@ FillLineData(view *View, program_state *ProgramState)
     //Print("%d", CharsProcessed);
 }
 
-lister Lister(lister_type Type)
-{
-    lister Result;
-    Result.Type = Type;
-    Result.Entries = ListerEntryList();
-    Result.MatchingEntries = IntList();
-    Result.Y = 0;
-    Result.Y = Result.TargetY;
-    Result.Rects = RectList();
-    Result.SelectedIndex = 0;
-    return Result;
-}
-
 
 
 void
 MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
 {
-    // TODO: set ideal cursor pos
     ProgramState->UserMovedCursor = true;
     View->CursorPos += dPos;
     Clamp(View->CursorPos.l, 0, LineCount(View));
     Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+    
+    if(ProgramState->ShouldChangeIdealCursorCol)
+    {
+        // TODO: change this to a function argument
+        ProgramState->ShouldChangeIdealCursorCol = false;
+        View->IdealCursorCol = View->CursorPos.c;
+    }
+    else
+    {
+        View->CursorPos.c = View->IdealCursorCol;
+    }
 }
 
 
@@ -859,33 +856,28 @@ SplitViewVertical(program_state *ProgramState)
 }
 
 
-
 void
-SwitchToNavMode(program_state *ProgramState)
+SwitchInputMode(program_state *ProgramState, input_mode NewMode)
 {
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    if(ProgramState->InputMode == InputMode_Insert)
+        View->InsertString.Free();
     
-    ProgramState->InputMode = InputMode_Nav;
-    View->Selecting = false;
-}
-
-void
-SwitchToSelectMode(program_state *ProgramState)
-{
-    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    if(NewMode == InputMode_Select)
+    {
+        View->Selecting = true;
+        View->SelectionStartPos = View->CursorPos;
+    }
+    else
+    {
+        View->Selecting = false;
+    }
     
-    ProgramState->InputMode = InputMode_Select;
-    View->SelectionStartPos = View->CursorPos;
-    View->Selecting = true;
-}
-
-void
-SwitchToInsertMode(program_state *ProgramState)
-{
-    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    if(NewMode == InputMode_Insert)
+    {
+        View->InsertStartPos = View->CursorPos;
+        View->InsertString = String("");
+    }
     
-    ProgramState->InputMode = InputMode_Insert;
-    View->Selecting = false;
-    View->InsertStartPos = View->CursorPos;
-    View->TotalInsertString = String("");
+    ProgramState->InputMode = NewMode;
 }

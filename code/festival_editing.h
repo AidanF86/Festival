@@ -117,6 +117,11 @@ GetStringToInsert(program_state *ProgramState)
         }
     }
     
+    if(KeyShouldExecute(Input->Space_Key))
+        Result.AppendChar(' ');
+    if(KeyShouldExecute(Input->Tab_Key))
+        Result.AppendChar('\t');
+    
     return Result;
     
 #if 0
@@ -135,99 +140,92 @@ HandleInput_Insert(program_state *ProgramState)
     
     if(KeyShouldExecute(Input->Escape_Key))
     {
-        SwitchToNavMode(ProgramState);
-        View->TotalInsertString.Free();
+        SwitchInputMode(ProgramState, InputMode_Nav);
         return;
     }
     
     if(KeyShouldExecute(Input->UpKey))
     {
         MoveCursorPos(ProgramState, View, BufferPos(-1, 0));
+        SwitchInputMode(ProgramState, InputMode_Insert);
     }
     if(KeyShouldExecute(Input->DownKey))
     {
         MoveCursorPos(ProgramState, View, BufferPos(1, 0));
+        SwitchInputMode(ProgramState, InputMode_Insert);
     }
     if(KeyShouldExecute(Input->LeftKey))
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, -1));
+        SwitchInputMode(ProgramState, InputMode_Insert);
     }
     if(KeyShouldExecute(Input->RightKey))
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+        SwitchInputMode(ProgramState, InputMode_Insert);
     }
     
     string StringToInsert = GetStringToInsert(ProgramState);
     if(StringToInsert.Length > 0)
         ProgramState->ShouldChangeIdealCursorCol = true;
     
+    
+    if(KeyShouldExecute(Input->Backspace_Key))
+    { // Backspace
+        if(View->CursorPos.c > 0)
+        {
+            Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
+            View->CursorPos.c--;
+            Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+        }
+        ProgramState->ShouldChangeIdealCursorCol = true;
+    }
+    
+    if(KeyShouldExecute(Input->Delete_Key))
+    {
+        // TODO: merge lines
+        Print("%d, %d", Buffer->Lines[View->CursorPos.l].Length, View->CursorPos.c + 1);
+        if(Buffer->Lines[View->CursorPos.l].Length > View->CursorPos.c)
+        {
+            Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c);
+            
+            SwitchInputMode(ProgramState, InputMode_Insert);
+        }
+        else if(View->CursorPos.l < Buffer->Lines.Count)
+        {
+            buffer_pos PStart = BufferPos(View->CursorPos.l, View->CursorPos.c + 1);
+            buffer_pos PEnd = BufferPos(View->CursorPos.l + 1, -1);
+            DoAndAddAction(Buffer, ActionForDeleteRange(Buffer, PStart, PEnd));
+            
+            SwitchInputMode(ProgramState, InputMode_Insert);
+        }
+        //ProgramState->ShouldChangeIdealCursorCol = true;
+    }
+    
+    
     Buffer->Lines[View->CursorPos.l].InsertString(View->CursorPos.c, StringToInsert);
     View->CursorPos.c += StringToInsert.Length;
     
     StringToInsert.Free();
     
-    for(int i = 0; i < 7; i++)
+    
+    // TODO: improve key names
+    if(KeyShouldExecute(Input->Return_Key))
     {
-        if(KeyShouldExecute(Input->SpecialKeys[i]))
+        InsertLine(Buffer, View->CursorPos.l+1, CopyString(Buffer->Lines[View->CursorPos.l]));
+        if(Buffer->Lines[View->CursorPos.l].Length != 0)
         {
-            char CharToAdd = ' ';
-            if(i == 0)
-            {// Space
-                Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
-                View->CursorPos.c++;
-                View->IdealCursorCol = ColAt(ProgramState, View, View->CursorPos);
-                ProgramState->ShouldChangeIdealCursorCol = true;
-            }
-            else if(i == 1)
-            { // Backspace
-                if(View->CursorPos.c > 0)
-                {
-                    Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
-                    View->CursorPos.c--;
-                    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-                }
-                ProgramState->ShouldChangeIdealCursorCol = true;
-            }
-            else if(i == 2)
-            { // Delete
-                Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c);
-                ProgramState->ShouldChangeIdealCursorCol = true;
-            }
-            else if(i == 3)
-            { // Tab
-                // TODO: handling tab char
-                for(int a = 0; a < 4; a++)
-                {
-                    Buffer->Lines[View->CursorPos.l].InsertChar(View->CursorPos.c, ' ');
-                    View->CursorPos.c++;
-                    ProgramState->ShouldChangeIdealCursorCol = true;
-                }
-            }
-            else if(i == 4)
-            { // Return
-                InsertLine(Buffer, View->CursorPos.l+1, CopyString(Buffer->Lines[View->CursorPos.l]));
-                if(Buffer->Lines[View->CursorPos.l].Length != 0)
-                {
-                    Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
-                    Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
-                }
-                
-                View->CursorPos.l++;
-                View->CursorPos.c = 0;
-                
-                ProgramState->UserMovedCursor = true;
-                ProgramState->ShouldChangeIdealCursorCol = true;
-            }
-            else if(i == 5)
-            { // Caps lock
-            }
-            else if(i == 6)
-            { // Escape
-            }
-            
+            Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
+            Buffer->Lines[View->CursorPos.l+1].Slice(View->CursorPos.c, Buffer->Lines[View->CursorPos.l+1].Length);
         }
+        
+        View->CursorPos.l++;
+        View->CursorPos.c = 0;
+        
+        ProgramState->UserMovedCursor = true;
+        ProgramState->ShouldChangeIdealCursorCol = true;
     }
 }
 
@@ -355,12 +353,12 @@ HandleInput_Nav(program_state *ProgramState)
     
     if(KeyShouldExecute(Input->FKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {
-        SwitchToInsertMode(ProgramState);
+        SwitchInputMode(ProgramState, InputMode_Insert);
         return;
     }
     if(KeyShouldExecute(Input->SKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {
-        SwitchToSelectMode(ProgramState);
+        SwitchInputMode(ProgramState, InputMode_Select);
         return;
     }
     
@@ -443,7 +441,7 @@ HandleInput_Select(program_state *ProgramState)
     
     if((KeyShouldExecute(Input->SKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown) || KeyShouldExecute(Input->Escape_Key))
     {
-        SwitchToNavMode(ProgramState);
+        SwitchInputMode(ProgramState, InputMode_Nav);
         return;
     }
     
@@ -454,7 +452,7 @@ HandleInput_Select(program_state *ProgramState)
         ProgramState->ShouldChangeIdealCursorCol = true;
         DoAndAddAction(View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStartPos, View->CursorPos));
         
-        SwitchToNavMode(ProgramState);
+        SwitchInputMode(ProgramState, InputMode_Nav);
         return;
     }
 }
@@ -504,18 +502,6 @@ HandleInput(program_state *ProgramState)
         View->TargetY += ScrollAmount;
     else if(GetMouseWheelMoveV().y > 0)
         View->TargetY -= ScrollAmount;
-    
-    if(ProgramState->ShouldChangeIdealCursorCol)
-    {
-        ProgramState->ShouldChangeIdealCursorCol = false;
-        View->IdealCursorCol = View->CursorPos.c;
-    }
-    else
-    {
-        View->CursorPos.c = View->IdealCursorCol;
-        //Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-    }
-    
     
     if(IsAnyControlKeyDown)
     {
