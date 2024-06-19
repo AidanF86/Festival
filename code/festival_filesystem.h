@@ -9,7 +9,7 @@ CleanUpPath(string *Path)
     // remove duplicate '/'s
     for(int i = 0; i < Path->Length - 1; i++)
     {
-        if(Path->Data[i] == '/' && Path->Data[i+1] == '/')
+        if(Path->CharAt(i) == '/' && Path->CharAt(i+1) == '/')
         {
             Path->RemoveChar(i+1);
             i--;
@@ -17,7 +17,7 @@ CleanUpPath(string *Path)
     }
     
     // remove beginning './'
-    if(Path->Length >= 2 && Path->Data[0] == '.' && Path->Data[1] == '/')
+    if(Path->Length >= 2 && Path->CharAt(0) == '.' && Path->CharAt(1) == '/')
     {
         Path->RemoveChar(0);
         Path->RemoveChar(0);
@@ -27,15 +27,25 @@ CleanUpPath(string *Path)
 void
 AbsolutizePath(string *Path)
 {
+    Print("ABSOLUTIZING");
     CleanUpPath(Path);
     
     // If Path doesn't start with '/', we assume it's relative to the working directory
-    if(Path->Length == 0 || Path->Data[0] != '/')
+    if(Path->Length == 0 || Path->CharAt(0) != '/')
     {
         Path->InsertChar(0, '/');
+        
         string DirStr = String(GetWorkingDirectory());
+        
+        Print(*Path);
+        Print("AAAA");
+        Print(DirStr);
+        
         Path->PrependString(DirStr);
-        FreeString(DirStr);
+        
+        Print(*Path);
+        
+        DirStr.Free();
     }
 }
 
@@ -94,7 +104,7 @@ GetBufferForPath(program_state *ProgramState, string PathString)
     AbsolutizePath(&PathCopy);
     int Index = -1;
     
-    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    for(int i = 0; i < ProgramState->Buffers.Length; i++)
     {
         if(PathCopy == ProgramState->Buffers[i].DirPath)
         {
@@ -119,17 +129,23 @@ LoadFileToBuffer(const char *RawPath)
     
     string FileName = String(RawPath);
     CleanUpPath(&FileName);
+    
     string Path = String(RawPath);
+    Print(Path);
     AbsolutizePath(&Path);
     
     char *FullRawPath = RawString(Path);
     
+    Print("(LoadFileBuffer): Loading file %s", FullRawPath);
     // TODO: check if file exists and is readable, etc
     if(!FileExists(FullRawPath))
-        Print("ERROR: no such file exists!");
+    {
+        printerror("file \"%s\" doesn't exist", FullRawPath);
+        return {};
+    }
     
     u32 FileSize = (u32)GetFileLength(FullRawPath);
-    Print("File size: %d", (int)FileSize);
+    Print("\tFile load successful. Total size: %d", (int)FileSize);
     
     char *FileData = LoadFileText(FullRawPath);
     
@@ -142,7 +158,6 @@ LoadFileToBuffer(const char *RawPath)
     Buffer.ActionStack = ActionList();
     
     Buffer.Lines = StringList();
-    printf("Gathering text\n");
     for(int i = 0; i < FileSize; i++)
     {
         int LineStart = i;
@@ -154,17 +169,18 @@ LoadFileToBuffer(const char *RawPath)
         int InLine = 0;
         for(int a = LineStart; a < i; a++)
         {
-            Buffer.Lines[Buffer.Lines.Count-1].Data[InLine] = FileData[a];
+            Buffer.Lines[Buffer.Lines.Length-1].SetChar(InLine, FileData[a]);
             InLine++;
         }
     }
-    if(Buffer.Lines.Count == 0)
+    if(Buffer.Lines.Length == 0)
     {
         ListAdd(&Buffer.Lines, String(""));
     }
-    printf("Finished with text\n");
     
     UnloadFileText(FileData);
+    
+    Print("\tFile buffer successfully set up");
     
     return Buffer;
 }

@@ -68,7 +68,7 @@ OpenSwitchBufferLister(program_state *ProgramState, view *View)
     Lister->Input = String("");
     Lister->Purpose = ListerPurpose_SwitchBuffer;
     
-    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    for(int i = 0; i < ProgramState->Buffers.Length; i++)
     {
         lister_entry NewEntry;
         NewEntry.Buffer = &ProgramState->Buffers[i];
@@ -155,7 +155,7 @@ ExecLister(program_state *ProgramState, view *View)
                 break;
             }
             
-            if(Lister->MatchingEntries.Count == 0)
+            if(Lister->MatchingEntries.Length == 0)
             {
                 // Create buffer for non-existant file
                 buffer NewBuffer;
@@ -164,7 +164,7 @@ ExecLister(program_state *ProgramState, view *View)
                 NewBuffer.Lines = StringList();
                 ListAdd(&NewBuffer.Lines, String(""));
                 ListAdd(&ProgramState->Buffers, NewBuffer);
-                View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+                View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Length - 1];
             }
             else
             {
@@ -198,7 +198,7 @@ ExecLister(program_state *ProgramState, view *View)
                     else
                     {
                         ListAdd(&ProgramState->Buffers, LoadFileToBuffer(RawFileName));
-                        View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Count - 1];
+                        View->Buffer = &ProgramState->Buffers[ProgramState->Buffers.Length - 1];
                     }
                 }
             }

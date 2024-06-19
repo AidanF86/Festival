@@ -13,15 +13,10 @@ ActionForDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
     Result.DeleteSingleLine = false;
     Result.DeleteStart = ActualStart;
     Result.DeleteEnd = ActualEnd;
+    //Result.DeleteContent = StringList();
+#if 1
     Result.DeleteContent = CopyStringListRange(Buffer->Lines, ActualStart.l, ActualStart.c, ActualEnd.l, ActualEnd.c);
-    
-    Print("Deleted content:");
-    Print("=======================");
-    for(int i = 0; i < Result.DeleteContent.Count; i++)
-    {
-        Print(Result.DeleteContent[i]);
-    }
-    Print("=======================");
+#endif
     
     Result.Add = false;
     
@@ -39,7 +34,7 @@ ActionForDeleteLine(buffer *Buffer, int Line)
     Result.DeleteStart = BufferPos(Line, 0);
     Result.DeleteEnd = BufferPos(Line + 1, 0);
     
-    for(int i = 0; i < Result.DeleteContent.Count; i++)
+    for(int i = 0; i < Result.DeleteContent.Length; i++)
     {
         Print(Result.DeleteContent[i]);
     }
@@ -66,10 +61,9 @@ ActionForInsertString(buffer_pos Pos, string Text, b32 LineBelow)
 void
 AddAction(buffer *Buffer, action Action)
 {
-    Buffer->ActionStack.Count = Buffer->ActionIndex + 1;
+    Buffer->ActionStack.Length = Buffer->ActionIndex + 1;
     ListAdd(&(Buffer->ActionStack), Action);
     Buffer->ActionIndex++;
-    //Buffer->ActionIndex = Buffer->ActionStack.Count - 1;
 }
 
 void
@@ -87,8 +81,7 @@ UndoAction(buffer *Buffer, action A)
         {
             buffer_pos Start = A.DeleteStart;
             buffer_pos End = A.DeleteEnd;
-            Print("Re-placing Text at %d,%d", Start.l, Start.c);
-            Print("%d lines", A.DeleteContent.Count);
+            Print("Re-placing Text at %d,%d: %d lines", Start.l, Start.c, A.DeleteContent.Length);
             InsertStringList(&Buffer->Lines, A.DeleteContent, Start.l, Start.c);
         }
     }
@@ -101,15 +94,25 @@ DoAction(buffer *Buffer, action A)
     {
         if(A.DeleteSingleLine)
         {
-            Print("Deleting single line: %d", A.DeleteStart.l);
+            Print("Deleting single line: %d", AnsiColor_Red, A.DeleteStart.l);
             ListRemoveAt(&Buffer->Lines, A.DeleteStart.l);
         }
         else
         {
             buffer_pos Start = A.DeleteStart;
             buffer_pos End = A.DeleteEnd;
+            
             Print("");
-            Print("Deleting range: %d,%d to %d,%d", Start.l, Start.c, End.l, End.c);
+            Print("Deleting content in range %d,%d to %d,%d:",
+                  Start.l, Start.c, End.l, End.c);
+            Print("=======================");
+            for(int i = 0; i < A.DeleteContent.Length; i++)
+            {
+                Print("\t%S", A.DeleteContent[i]);
+            }
+            Print("=======================");
+            Print("");
+            
             
             // delete in-between lines
             for(int i = Start.l + 1; i < End.l; i++)
@@ -154,7 +157,7 @@ DoAndAddAction(buffer *Buffer, action Action)
 void
 MoveBackActionStack(buffer *Buffer)
 {
-    if(Buffer->ActionStack.Count > 0 && Buffer->ActionIndex > -1)
+    if(Buffer->ActionStack.Length > 0 && Buffer->ActionIndex > -1)
     {
         Print("Moving back action stack!");
         UndoAction(Buffer, Buffer->ActionStack[Buffer->ActionIndex]);
@@ -165,7 +168,7 @@ MoveBackActionStack(buffer *Buffer)
 void
 MoveForwardActionStack(buffer *Buffer)
 {
-    if(Buffer->ActionStack.Count > 0 && Buffer->ActionIndex < Buffer->ActionStack.Count - 1)
+    if(Buffer->ActionStack.Length > 0 && Buffer->ActionIndex < Buffer->ActionStack.Length - 1)
     {
         Print("Moving forward action stack!");
         DoAction(Buffer, Buffer->ActionStack[Buffer->ActionIndex + 1]);

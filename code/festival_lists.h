@@ -14,7 +14,7 @@
 struct snake_name##_list\
 {\
 b32 IsAllocated;\
-int Count;\
+int Length;\
 int ArraySize;\
 snake_name *Data;\
 inline snake_name& operator[](size_t Index) { return Data[Index]; }\
@@ -22,13 +22,13 @@ inline const snake_name& operator[](size_t Index) const { return Data[Index]; }\
 \
 int Remove(int Index)\
 {\
-if(Index >= 0 && Index < Count)\
+if(Index >= 0 && Index < Length)\
 {\
-for(int i = Index; i < Count; i++)\
+for(int i = Index; i < Length; i++)\
 {\
 Data[i] = Data[i+1];\
 }\
-Count--;\
+Length--;\
 return 1;\
 }\
 return 0;\
@@ -42,24 +42,24 @@ Data = (snake_name*)realloc(Data, sizeof(snake_name) * ArraySize);\
 \
 void Add(snake_name E)\
 {\
-if(Count + 1 > ArraySize) { DoubleSize(); }\
-Data[Count] = E;\
-Count++;\
+if(Length + 1 > ArraySize) { DoubleSize(); }\
+Data[Length] = E;\
+Length++;\
 }\
 \
 void Insert(int Index, snake_name E) {\
-if(Count + 1 > ArraySize) { DoubleSize(); }\
-for(int i = Count; i > Index; i--)\
+if(Length + 1 > ArraySize) { DoubleSize(); }\
+for(int i = Length; i > Index; i--)\
 { /* shift right */\
 Data[i] = Data[i-1];\
 }\
 Data[Index] = E;\
-Count++;\
+Length++;\
 }\
 \
 void Free() {\
 free(Data);\
-Count = 0;\
+Length = 0;\
 }\
 \
 \
@@ -74,10 +74,10 @@ Count = 0;\
 snake_name##_list pascal_name##List(int Size)\
 {\
 snake_name##_list Result;\
-Result.Count = 0;\
+Result.Length = 0;\
 Result.ArraySize = Size;\
 Result.IsAllocated = true;\
-Result.Data = (snake_name *)malloc(Size * sizeof(snake_name));\
+Result.Data = (snake_name *)TryMalloc(Size * sizeof(snake_name));\
 return Result;\
 }\
 \
@@ -88,13 +88,13 @@ return pascal_name##List(20);\
 \
 int ListRemoveAt(snake_name##_list *List, int Index)\
 {\
-if(Index >= 0 && Index < List->Count)\
+if(Index >= 0 && Index < List->Length)\
 {\
-for(int i = Index; i < List->Count; i++)\
+for(int i = Index; i < List->Length; i++)\
 {\
 List->Data[i] = List->Data[i+1];\
 }\
-List->Count--;\
+List->Length--;\
 return 1;\
 }\
 return 0;\
@@ -103,28 +103,28 @@ return 0;\
 
 #define ListDoubleSize(List) {\
 (List)->ArraySize *= 2;\
-(List)->Data = (typeof((List)->Data))realloc((List)->Data, sizeof((List)->Data[0]) * (List)->ArraySize);\
+(List)->Data = (typeof((List)->Data))TryRealloc((List)->Data, sizeof((List)->Data[0]) * (List)->ArraySize);\
 }
 
 #define ListAdd(List, E) {\
-if((List)->Count + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
-(List)->Data[(List)->Count] = (E);\
-(List)->Count++;\
+if((List)->Length + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
+(List)->Data[(List)->Length] = (E);\
+(List)->Length++;\
 }
 
 #define ListInsert(List, Index, E) {\
-if((List)->Count + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
-for(int _i = (List)->Count; _i > Index; _i--)\
+if((List)->Length + 1 > (List)->ArraySize) { ListDoubleSize(List); }\
+for(int _i = (List)->Length; _i > Index; _i--)\
 { /* shift right */\
 (List)->Data[_i] = (List)->Data[_i - 1];\
 }\
 (List)->Data[(Index)] = (E);\
-(List)->Count++;\
+(List)->Length++;\
 }
 
 #define ListFree(List) {\
 free((List)->Data);\
-(List)->Count = 0;\
+(List)->Length = 0;\
 }
 
 

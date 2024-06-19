@@ -94,7 +94,7 @@ void DrawProfiles(program_state *ProgramState) {
     int Y = 400;
     v2 CharDim = GetCharDim(ProgramState);
     int CharHeight = CharDim.y;
-    for(int i = 0; i < ProfileNames.Count; i++)
+    for(int i = 0; i < ProfileNames.Length; i++)
     {
         double Total = 0;
         for(int a = 0; a < ProfileCycleFrameCount; a++)
@@ -218,7 +218,7 @@ DrawView(program_state *ProgramState, view *View)
         EndScissorMode();
         
         BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
-        for(int c = 0; c < LineData.CharRects.Count; c++)
+        for(int c = 0; c < LineData.CharRects.Length; c++)
         {
             rect Rect = ScreenRectAt(View, l, c);
             
@@ -249,10 +249,10 @@ DrawView(program_state *ProgramState, view *View)
     if(View->ListerIsOpen) {
         lister *Lister = &View->Lister;
         
-        DrawRectangle(ViewRect.x, TextRect.y, ViewRect.w, Lister->MatchingEntries.Count*CharHeight, GRAY);
+        DrawRectangle(ViewRect.x, TextRect.y, ViewRect.w, Lister->MatchingEntries.Length*CharHeight, GRAY);
         
         int Y = TextRect.y;
-        for(int i = 0; i < Lister->MatchingEntries.Count; i++) {
+        for(int i = 0; i < Lister->MatchingEntries.Length; i++) {
             Color BGColor = GRAY;
             Color FGColor = WHITE;
             
@@ -328,7 +328,7 @@ DrawSuperDebugMenu(program_state *ProgramState)
     Y += DrawString(ProgramState, TempString("Super Debug Menu"), V2(X, Y), BLACK).y;
     Y += ProgramState->FontSize;
     Y += DrawString(ProgramState, TempString("Buffers"), V2(X, Y), BLACK, Style_Underline).y;
-    for(int i = 0; i < ProgramState->Buffers.Count; i++)
+    for(int i = 0; i < ProgramState->Buffers.Length; i++)
     {
         Y += DrawString(ProgramState, ProgramState->Buffers[i].FileName, V2(X, Y), BLACK).y;
         Y += DrawString(ProgramState, ProgramState->Buffers[i].DirPath, V2(X + 20, Y), BLACK).y;

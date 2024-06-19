@@ -2,9 +2,9 @@
 
 #include "raylib.h"
 
+#include "festival_base.h"
 #include "festival_platform.h"
 
-#include "festival_base.h"
 #include "festival_math.h"
 #include "festival_lists.h"
 #include "festival_string.h"
@@ -97,7 +97,7 @@ extern "C"
         
         PurgeTempStrings();
         
-        for(int i = 0; i < Views->Count; i++)
+        for(int i = 0; i < Views->Length; i++)
         {
             view *View = &ProgramState->Views[i];
             if(View->ListerIsOpen && View->Lister.ShouldExecute)
@@ -140,7 +140,7 @@ extern "C"
         // Compute root view
         b32 FoundRootView;
         view *RootView;
-        for(int i = 0; i < Views->Count; i++)
+        for(int i = 0; i < Views->Length; i++)
         {
             if(Views->Data[i].Id == 0)
             {
@@ -153,7 +153,7 @@ extern "C"
             printf("MAJOR ERROR: CAN'T FIND ROOT VIEW\n");
         
         
-        for(int i = 0; i < Views->Count; i++)
+        for(int i = 0; i < Views->Length; i++)
         {
             Views->Data[i].ComputedFromParentThisFrame = false;
         }
@@ -165,12 +165,12 @@ extern "C"
         ComputeTextRect(ProgramState, RootView);
         RootView->ComputedFromParentThisFrame = true;
         
-        for(int ViewIndex = 0; ViewIndex < Views->Count; ViewIndex++)
+        for(int ViewIndex = 0; ViewIndex < Views->Length; ViewIndex++)
         {
             int Id = Views->Data[ViewIndex].Id;
             // Compute child count
             int ChildCount = 0;
-            for(int i = 0; i < Views->Count; i++)
+            for(int i = 0; i < Views->Length; i++)
             {
                 if(Views->Data[i].ParentId == Id)
                     ChildCount++;
@@ -186,7 +186,7 @@ extern "C"
                 view *NextChild = NULL;
                 int LowestBirthOrdinal = 1000000;
                 // get next child to operate on
-                for(int i = 0; i < Views->Count; i++)
+                for(int i = 0; i < Views->Length; i++)
                 {
                     view *TestView = &Views->Data[i];
                     if((NextChild == NULL && TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame) || (TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame && TestView->BirthOrdinal < LowestBirthOrdinal))
@@ -242,7 +242,7 @@ extern "C"
         // lister set matchingentries
         // TODO: only do this when Input has changed
         // TODO: better string matching
-        for(int a = 0; a < Views->Count; a++)
+        for(int a = 0; a < Views->Length; a++)
         {
             view *View = &Views->Data[a];
             lister *Lister = &View->Lister;
@@ -273,7 +273,7 @@ extern "C"
                 ListFree(&Lister->MatchingEntries);
                 Lister->MatchingEntries = IntList();
                 
-                for(int i = 0; i < Lister->Entries.Count; i++)
+                for(int i = 0; i < Lister->Entries.Length; i++)
                 {
                     string StringToCheck = Lister->Entries[i].Name;
                     if(Lister->Purpose == ListerPurpose_EditFile)
@@ -293,7 +293,7 @@ extern "C"
                 }
             }
             
-            Clamp(View->Lister.SelectedIndex, 0, View->Lister.MatchingEntries.Count - 1);
+            Clamp(View->Lister.SelectedIndex, 0, View->Lister.MatchingEntries.Length - 1);
         }
         
         
@@ -301,7 +301,7 @@ extern "C"
         if(IsMouseButtonDown(0))
         {
             int NewViewIndex = 0;
-            for(int i = 0; i < Views->Count; i++)
+            for(int i = 0; i < Views->Length; i++)
             {
                 rect Rect = Views->Data[i].Rect;
                 if(MousePos.x >= Rect.x && MousePos.y >= Rect.y &&
@@ -314,7 +314,7 @@ extern "C"
             View = &ProgramState->Views[ProgramState->SelectedViewIndex];
         }
         
-        for(int i = 0; i < Views->Count; i++)
+        for(int i = 0; i < Views->Length; i++)
         {
             view *View = &Views->Data[i];
             if(View->ListerIsOpen)
@@ -322,10 +322,10 @@ extern "C"
                 lister *Lister = &View->Lister;
                 int Y = View->TextRect.y;
                 ListFree(&Lister->Rects);
-                Lister->Rects = RectList();//Lister->MatchingEntries.Count);
-                for(int i = 0; i < Lister->MatchingEntries.Count; i++)
+                Lister->Rects = RectList(Lister->MatchingEntries.Length);
+                for(int i = 0; i < Lister->MatchingEntries.Length; i++)
                 {
-                    /*Lister->Rects[i] = */ListAdd(&Lister->Rects, Rect(View->Rect.x, Y, View->Rect.w, CharHeight));
+                    ListAdd(&Lister->Rects, Rect(View->Rect.x, Y, View->Rect.w, CharHeight));
                     
                     Y += CharHeight;
                     if(CheckCollisionPointRec(V(MousePos), R(Lister->Rects[i])))
@@ -357,7 +357,7 @@ extern "C"
         
         
         StartProfile(FillLineData);
-        for(int i = 0; i < Views->Count; i++)
+        for(int i = 0; i < Views->Length; i++)
         {
             view *View = &Views->Data[i];
             FillLineData(View, ProgramState);
@@ -372,29 +372,30 @@ extern "C"
         
         StartProfile(Rendering);
         BeginDrawing();
-        for(int i = 0; i < Views->Count; i++)
+        for(int i = 0; i < Views->Length; i++)
         {
             view *View = &Views->Data[i];
             DrawView(ProgramState, View);
         }
         
         {
-            int Y = 300;
-            DrawString(ProgramState, TempString("%d Actions", View->Buffer->ActionStack.Count), V2(200, Y+=20), BLACK, PURPLE);
-            for(int i = 0; i < View->Buffer->ActionStack.Count; i++)
+            int X = ProgramState->ScreenWidth - 200;
+            int Y = 20;
+            DrawString(ProgramState, TempString("%d Actions", View->Buffer->ActionStack.Length), V2(X, Y+=20), BLACK, PURPLE);
+            for(int i = 0; i < View->Buffer->ActionStack.Length; i++)
             {
                 action A = View->Buffer->ActionStack[i];
                 
                 if(A.Delete)
                 {
-                    DrawString(ProgramState, TempString("Delete %d,%d to %d,%d", A.DeleteStart.l, A.DeleteStart.c, A.DeleteEnd.l, A.DeleteEnd.c), V2(200, Y+=20), BLACK, YELLOW);
+                    DrawString(ProgramState, TempString("Delete %d,%d to %d,%d", A.DeleteStart.l, A.DeleteStart.c, A.DeleteEnd.l, A.DeleteEnd.c), V2(X, Y+=20), BLACK, YELLOW);
                 }
             }
         }
         
 #if 0
         int Y = 300;
-        for(int i = 0; i < ProgramState->Buffers.Count; i++)
+        for(int i = 0; i < ProgramState->Buffers.Length; i++)
         {
             string Str = String("%d: %S", i, ProgramState->Buffers[i].DirPath);
             color BGColor = BLACK;

@@ -14,36 +14,50 @@ struct string
     u32 *Data;
     inline u32& operator[](size_t Index) { return Data[Index]; }
     
+    u32 CharAt(int Index)
+    {
+        if(Index < 0 || Index >= Length)
+        {
+            // TODO: warning logging?
+            printerror("Attempting to access out-of-bounds index");
+            return 0;
+        }
+        return Data[Index];
+    }
+    void SetChar(int Index, u32 NewChar)
+    {
+        if(Index < 0 || Index >= Length)
+        {
+            // TODO: warning logging?
+            printerror("Attempting to set out-of-bounds index");
+            return;
+        }
+        Data[Index] = NewChar;
+    }
+    
     void InsertChar(int Index, u32 Char)
     {
-        if(Index < 0 || Index > Length)
+        if(Index < 0 || Index >= Length)
+        {
+            // TODO: warning logging?
             return;
+        }
         
         if(Length + 5 >= ArraySize)
-        { // realloc
-            int NewSize = (ArraySize+64)*sizeof(u32);
-            
-            u32 *Temp = (u32 *)realloc(Data, NewSize);
-            if(Temp != NULL)
-            {
-                Data = Temp;
-                ArraySize = NewSize;
-            }
-            else
-            {
-                printf("ERROR: failed string reallocation!\n");
-                return;
-            }
+        {
+            printf("Reallocating string\n");
+            ArraySize = ArraySize+64;
+            Data = (u32 *)TryRealloc(Data, sizeof(u32) * ArraySize);
+        }
+        
+        if(Length >= ArraySize)
+        {
+            printerror("Length is >= ArraySize (%d Length vs %d ArraySize)", Length, ArraySize);
+            return;
         }
         
         // shift right
-        if(Length >= ArraySize)
-        {
-            printf("ERROR: Length is >= ArraySize (%d Length vs %d ArraySize)\n", Length, ArraySize);
-            return;
-        }
-        
-        for(int i = Length; i > Index; i--)
+        for(int i = Length; i > Index && i > 0; i--)
         {
             Data[i] = Data[i-1];
         }
@@ -74,6 +88,12 @@ struct string
     // inc, ex
     void Slice(int Start, int End)
     {
+        if(Start >= End || Start < 0 || End > Length)
+        {
+            printwarning("Invalid slice range: %d-%d", Start, End);
+            Assert(false);
+            return;
+        }
         for(int i = 0; i < Start; i++)
         {
             RemoveChar(0);
@@ -84,8 +104,15 @@ struct string
         }
     }
     
+    // inc, ex
     void RemoveRange(int Start, int End)
     {
+        if(Start >= End || Start < 0 || End > Length)
+        {
+            printwarning("Invalid removal range: %d-%d", Start, End);
+            return;
+        }
+        
         int OriginalLength = Length;
         for(int i = Start; i < End && i < OriginalLength; i++)
         {
@@ -95,7 +122,6 @@ struct string
     
     void InsertString(int Index, string Other)
     {
-        // TODO
         for(int i = 0; i < Other.Length; i++)
         {
             InsertChar(i+Index, Other[i]);
@@ -129,7 +155,7 @@ struct string
     
     void Free()
     {
-        free(Data);
+        TryFree(Data);
     }
     
 };
@@ -173,11 +199,12 @@ AllocString(int Length)
     string Result;
     
     Result.Length = Length;
-    if(Length < 10)
-        Result.ArraySize = 10;
+    if(Length < 32)
+        Result.ArraySize = 32;
     else
         Result.ArraySize = Length;
-    Result.Data = (u32 *)malloc(sizeof(u32) * Result.ArraySize);
+    
+    Result.Data = (u32 *)TryMalloc(sizeof(u32) * Result.ArraySize);
     
     return Result;
 }
@@ -187,7 +214,7 @@ CopyString(string S)
 {
     string Copy = AllocString(S.Length);
     
-    memcpy(Copy.Data, S.Data, sizeof(u32) * Copy.Length);
+    memcpy(Copy.Data, S.Data, sizeof(u32) * S.Length);
     Copy.Length = S.Length;
     Copy.ArraySize = Copy.Length;
     
@@ -197,13 +224,13 @@ CopyString(string S)
 void
 FreeString(string String)
 {
-    free(String.Data);
+    String.Free();
 }
 
 char *
 RawString(string String)
 {
-    char *Result = (char *)malloc(String.Length + 1);
+    char *Result = (char *)TryMalloc(sizeof(char) * (String.Length + 1));
     for(int i = 0; i < String.Length; i++)
     {
         Result[i] = (char)String.Data[i];
@@ -251,7 +278,7 @@ _U32_Sprintf(u32 *Dest, const char *Format, va_list Args)
     int Length = vsprintf(SprintfBuffer, Format, Args);
     if(Length >= StringFormatBufferLength)
     {
-        printf("ERROR (_U32_Sprintf): Length >= StringFormatBufferLength\n");
+        printf("Length >= StringFormatBufferLength");
     }
     int i;
     for(i = 0; i < Length; i++)
@@ -331,7 +358,7 @@ _String(const char *Format, va_list Args)
                         if(StringDebug)
                             printf("value \"%s\"", TempStr);
                         Length = Sprintf(StringVarBuffer, "%s", TempStr);
-                        free(TempStr);
+                        TryFree(TempStr);
                     }break;
                     // TODO(cheryl): add our string (%S)
                     case 'v':
@@ -430,6 +457,8 @@ Print(FILE *File, const char *Format, ...)
     FreeString(Str);
 }
 
+//#define PrintError(...) Print("%s", AnsiColor_Red); Print(__VA_ARGS__); Print("%s", AnsiColor_Reset);
+
 DefineList(string, String);
 
 
@@ -481,16 +510,16 @@ TempRawString(string Str)
 void
 PurgeTempStrings()
 {
-    for(int i = 0; i < TempStrings.Count; i++)
+    for(int i = 0; i < TempStrings.Length; i++)
     {
         FreeString(TempStrings[i]);
     }
     ListFree(&TempStrings);
     TempStrings = StringList();
     
-    for(int i = 0; i < TempRawStrings.Count; i++)
+    for(int i = 0; i < TempRawStrings.Length; i++)
     {
-        free(TempRawStrings[i].Data);
+        TryFree(TempRawStrings[i].Data);
     }
     ListFree(&TempRawStrings);
     TempRawStrings = RawStringList();
@@ -500,7 +529,7 @@ string_list
 CopyStringList(string_list A)
 {
     string_list Result = StringList();
-    for(int i = 0; i < A.Count; i++)
+    for(int i = 0; i < A.Length; i++)
     {
         ListAdd(&Result, CopyString(A[i]));
     }
@@ -549,7 +578,7 @@ CopyStringListRange(string_list A, int StartRow, int StartCol, int EndRow, int E
     {
         Print("3333333");
         ListAdd(&Result, CopyString(A[EndRow]));
-        Result[Result.Count-1].Slice(0, EndCol);
+        Result[Result.Length-1].Slice(0, EndCol);
     }
     
     return Result;
@@ -560,11 +589,10 @@ InsertStringList(string_list *Bottom, string_list Top, int Row, int Col)
 {
     int MoveLinePos = 0;
     
-    for(int i = 0; i < Top.Count; i++)
+    for(int i = 0; i < Top.Length; i++)
     {
         if(i == 0)
         {
-            Print("CCCCCCCCCC");
             Bottom->Data[Row].InsertString(Col, Top[0]);
             MoveLinePos = Col + Top[0].Length;
             /*

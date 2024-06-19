@@ -16,8 +16,8 @@ DefineCommand(RandomSelectAndDeleteTest)
     {
         buffer *Buffer = ProgramState->Views[ProgramState->SelectedViewIndex].Buffer;
         
-        u32 StartL = RandomU32InRange(0, Buffer->Lines.Count);
-        u32 EndL = RandomU32InRange(0, Buffer->Lines.Count);
+        u32 StartL = RandomU32InRange(0, Buffer->Lines.Length);
+        u32 EndL = RandomU32InRange(0, Buffer->Lines.Length);
         buffer_pos Start = BufferPos(StartL, RandomU32InRange(0, Buffer->Lines[StartL].Length));
         buffer_pos End = BufferPos(EndL, RandomU32InRange(0, Buffer->Lines[EndL].Length));
         

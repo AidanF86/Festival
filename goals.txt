@@ -56,7 +56,7 @@ DONE touch up edit file lister
 DONE selection delete
 
 Current Goal: insert (add) action // Done?
-					Get command system working
+				Heap issue might be due to deleting when file is empty
 Undoing and redoing
 
 Fix: not rendering partially visible chars

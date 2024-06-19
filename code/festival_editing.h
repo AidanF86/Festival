@@ -186,14 +186,13 @@ HandleInput_Insert(program_state *ProgramState)
     if(KeyShouldExecute(Input->Delete_Key))
     {
         // TODO: merge lines
-        Print("%d, %d", Buffer->Lines[View->CursorPos.l].Length, View->CursorPos.c + 1);
         if(Buffer->Lines[View->CursorPos.l].Length > View->CursorPos.c)
         {
             Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c);
             
             SwitchInputMode(ProgramState, InputMode_Insert);
         }
-        else if(View->CursorPos.l < Buffer->Lines.Count)
+        else if(View->CursorPos.l < Buffer->Lines.Length)
         {
             buffer_pos PStart = BufferPos(View->CursorPos.l, View->CursorPos.c + 1);
             buffer_pos PEnd = BufferPos(View->CursorPos.l + 1, -1);
@@ -255,7 +254,7 @@ HandleInput_EntryBar(program_state *ProgramState)
     }
     if(KeyShouldExecute(Input->DownKey))
     {
-        if(Lister->SelectedIndex < Lister->MatchingEntries.Count - 1)
+        if(Lister->SelectedIndex < Lister->MatchingEntries.Length - 1)
             Lister->SelectedIndex++;
     }
     
@@ -273,7 +272,7 @@ HandleInput_EntryBar(program_state *ProgramState)
 
 
 void
-ProcessModalMovement(program_state *ProgramState)
+ProcessNavMovement(program_state *ProgramState)
 {
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
     input *Input = &ProgramState->Input;
@@ -331,17 +330,27 @@ ProcessModalMovement(program_state *ProgramState)
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
         if(!AtLineBeginning(View, View->CursorPos))
-            SetCursorPos(ProgramState, View, SeekLineBeginning(View, View->CursorPos));
+            SetCursorPos(ProgramState, View, SeekLineBeginning(View, View->CursorPos.l));
         else
-            SetCursorPos(ProgramState, View, SeekPrevEmptyLine(View, View->CursorPos));
+            SetCursorPos(ProgramState, View, SeekPrevEmptyLine(View, View->CursorPos.l));
     }
     if(KeyShouldExecute(Input->Semicolon_Key))
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
         if(!AtLineEnd(View, View->CursorPos))
-            SetCursorPos(ProgramState, View, SeekLineEnd(View, View->CursorPos));
+            SetCursorPos(ProgramState, View, SeekLineEnd(View, View->CursorPos.l));
         else
-            SetCursorPos(ProgramState, View, SeekNextEmptyLine(View, View->CursorPos));
+            SetCursorPos(ProgramState, View, SeekNextEmptyLine(View, View->CursorPos.l));
+    }
+    if(KeyShouldExecute(Input->PageDown_Key))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
+        SetCursorPos(ProgramState, View, SeekLineEnd(View, View->Buffer->Lines.Length - 1));
+    }
+    if(KeyShouldExecute(Input->PageUp_Key))
+    {
+        ProgramState->ShouldChangeIdealCursorCol = true;
+        SetCursorPos(ProgramState, View, SeekLineBeginning(View, 0));
     }
 }
 
@@ -362,7 +371,7 @@ HandleInput_Nav(program_state *ProgramState)
         return;
     }
     
-    ProcessModalMovement(ProgramState);
+    ProcessNavMovement(ProgramState);
     
     if(KeyShouldExecute(Input->Slash_Key) && IsAnyShiftKeyDown)
     {
@@ -445,7 +454,7 @@ HandleInput_Select(program_state *ProgramState)
         return;
     }
     
-    ProcessModalMovement(ProgramState);
+    ProcessNavMovement(ProgramState);
     
     if(KeyShouldExecute(Input->XKey))
     {

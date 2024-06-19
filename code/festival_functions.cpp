@@ -40,7 +40,7 @@ LineData() {
 int 
 LineLength(buffer *Buffer, int l)
 {
-    if(l < 0 || l >= Buffer->Lines.Count)
+    if(l < 0 || l >= Buffer->Lines.Length)
         return 0;
     return Buffer->Lines.Data[l].Length;
 }
@@ -52,14 +52,14 @@ LineLength(view *View, int l)
 int
 LineCount(buffer *Buffer)
 {
-    return Buffer->Lines.Count;
+    return Buffer->Lines.Length;
 }
 int
 LineCount(view *View)
 {
     if(!View->Buffer)
         return 0;
-    return View->Buffer->Lines.Count;
+    return View->Buffer->Lines.Length;
 }
 
 inline rect
@@ -135,7 +135,7 @@ ScreenRectAt(view *View, buffer_pos Pos)
 char
 CharAt(buffer *Buffer, int l, int c)
 {
-    if(l < 0 || l >= Buffer->Lines.Count ||
+    if(l < 0 || l >= Buffer->Lines.Length ||
        c < 0 || c >= LineLength(Buffer, l))
         return 0;
     return Buffer->Lines[l].Data[c];
@@ -161,7 +161,7 @@ CharAt(view *View, buffer_pos Pos)
 void
 InsertLine(buffer *Buffer, int l, string S)
 {
-    if(l > Buffer->Lines.Count - 1)
+    if(l > Buffer->Lines.Length - 1)
     {
         Print("Appending line");
         ListAdd(&Buffer->Lines, S);
@@ -237,7 +237,7 @@ ClosestBufferPos(view *View, v2 P)
     rect ClosestRect = CharRectAt(View, ClosestBufferP);
     v2 ClosestP = V2(ClosestRect.x+ClosestRect.w/2, ClosestRect.y+ClosestRect.h/2);
     
-    for(int c = 0; c <= View->LineDataList[l].CharRects.Count; c++)
+    for(int c = 0; c <= View->LineDataList[l].CharRects.Length; c++)
     {
         rect TestRect = CharRectAt(View, l, c);
         v2 TestP = V2(TestRect.x+TestRect.w/2, TestRect.y+TestRect.h/2);
@@ -275,6 +275,7 @@ AdjustView(program_state *ProgramState, view *View)
     
     if(ProgramState->UserMovedCursor)
     { // Adjust based on cursor
+        Print("Adjusting based on cursor");
         if(CursorTargetRect.y < TargetY)
         {
             TargetY = CursorTargetRect.y;
@@ -291,11 +292,12 @@ AdjustView(program_state *ProgramState, view *View)
             View->CursorPos.l = YToLine(View, TargetY) + 2;
             MovedCursorUpOrDown = true;
         }
-        else if(View->CursorRect.y > TargetY + View->TextRect.h - CharHeight)
+        else if(View->CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
         {
             View->CursorPos.l = YToLine(View, 
                                         TargetY + View->TextRect.h) - 2;
             MovedCursorUpOrDown = true;
+            Print("Adjusting based on view");
         }
     }
     
@@ -410,10 +412,10 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
         
         // Get a unique Id
         int Id = 0;
-        for(; Id <= ProgramState->Views.Count; Id++)
+        for(; Id <= ProgramState->Views.Length; Id++)
         {
             b32 IsIdTaken = false;
-            for(int a = 0; a < ProgramState->Views.Count; a++)
+            for(int a = 0; a < ProgramState->Views.Length; a++)
             {
                 if(ProgramState->Views[a].Id == Id)
                     IsIdTaken = true;
@@ -427,7 +429,7 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
         View.Area = 0.5f; // Default
         
         int SiblingCount = 0;
-        for(int i = 0; i < ProgramState->Views.Count; i++)
+        for(int i = 0; i < ProgramState->Views.Length; i++)
         {
             if(ProgramState->Views[i].ParentId == ParentId)
                 SiblingCount++;
@@ -463,7 +465,7 @@ RemoveView(program_state *ProgramState, int Index)
     // TODO: decrement birth ordinal of children?
     
     view_list *Views = &ProgramState->Views;
-    if(Views->Count <= 1)
+    if(Views->Length <= 1)
     {
         // TODO: set view to no buffer?
         return;
@@ -480,7 +482,7 @@ RemoveView(program_state *ProgramState, int Index)
     int HeirIndex = 0;
     int ChildCount = 0;
     int SmallestBirthOrdinal = 256;
-    for(int i = 0; i < Views->Count; i++)
+    for(int i = 0; i < Views->Length; i++)
     {
         view *View = &Views->Data[i];
         if(View->ParentId == RemovedViewId)
@@ -502,17 +504,17 @@ RemoveView(program_state *ProgramState, int Index)
         Heir->ParentId = RemovedViewParentId;
         Heir->SpawnLocation = RemovedViewSpawnLocation;
         
-        if(ProgramState->SelectedViewIndex == Index || ProgramState->SelectedViewIndex >= Views->Count)
+        if(ProgramState->SelectedViewIndex == Index || ProgramState->SelectedViewIndex >= Views->Length)
         {
             // set to heir
             ProgramState->SelectedViewIndex = HeirIndex;
         }
     }
-    if(ProgramState->SelectedViewIndex >= Views->Count)
+    if(ProgramState->SelectedViewIndex >= Views->Length)
     {
         // set to parent
         int ParentIndex = 0;
-        for(int i = 0; i < Views->Count; i++)
+        for(int i = 0; i < Views->Length; i++)
         {
             view *View = &Views->Data[i];
             if(View->Id == RemovedViewParentId)
@@ -543,7 +545,7 @@ FillLineData(view *View, program_state *ProgramState)
     if(DataList->IsAllocated)
     {
         // Deallocate all lists
-        for(int i = 0; i < DataList->Count; i++)
+        for(int i = 0; i < DataList->Length; i++)
         {
             if(DataList->Data[i].CharRects.IsAllocated)
             {
@@ -783,20 +785,20 @@ AtLineEnd(view *View, buffer_pos Pos)
 }
 
 buffer_pos
-SeekLineBeginning(view *View, buffer_pos From)
+SeekLineBeginning(view *View, int L)
 {
-    return BufferPos(From.l, 0);
+    return BufferPos(L, 0);
 }
 buffer_pos
-SeekLineEnd(view *View, buffer_pos From)
+SeekLineEnd(view *View, int L)
 {
-    return BufferPos(From.l, LineLength(View, From.l));
+    return BufferPos(L, LineLength(View, L));
 }
 
 buffer_pos
-SeekPrevEmptyLine(view *View, buffer_pos From)
+SeekPrevEmptyLine(view *View, int L)
 {
-    int ResultLine = From.l;
+    int ResultLine = L;
     
     while(LineLength(View, ResultLine) == 0 && ResultLine > 0)
     {
@@ -814,9 +816,9 @@ SeekPrevEmptyLine(view *View, buffer_pos From)
     return BufferPos(ResultLine, 0);
 }
 buffer_pos
-SeekNextEmptyLine(view *View, buffer_pos From)
+SeekNextEmptyLine(view *View, int L)
 {
-    int ResultLine = From.l;
+    int ResultLine = L;
     
     while(LineLength(View, ResultLine) == 0 && ResultLine < LineCount(View) - 1)
     {

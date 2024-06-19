@@ -3,6 +3,10 @@
 #ifndef CCC_BASE_H
 #define CCC_BASE_H
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 #define True 1
 #define False 0
 
@@ -21,9 +25,70 @@ typedef u64 b64;
 
 typedef Color color;
 
+// From https://stackoverflow.com/questions/3219393/stdlib-and-colored-output-in-c
+#define AnsiColor_Red     "\x1b[31m"
+#define AnsiColor_Green   "\x1b[32m"
+#define AnsiColor_Yellow  "\x1b[33m"
+#define AnsiColor_Blue    "\x1b[34m"
+#define AnsiColor_Magenta "\x1b[35m"
+#define AnsiColor_Cyan    "\x1b[36m"
+#define AnsiColor_Reset   "\x1b[0m"
+
+#define printerror(...) printf("%s", AnsiColor_Red); printf("ERROR (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset);
+#define printwarning(...) printf("%s", AnsiColor_Yellow); printf("WARNING (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset);
+
 #ifndef Assert
-#define Assert(X) if(!X) { *0 = 0; }
+#define Assert(X) if(!X) {\
+printerror("Assert Called by: %s, %s, line %d", __FILE__, __func__, __LINE__);\
+char *NullAddr = (char *) 0; *NullAddr = 0;\
+}
 #endif
+
+
+
+void *
+_TryMalloc(u64 Size, const char *CalledByFunction, int CalledByLine, const char *CalledByFile)
+{
+    void *Result = (void *)malloc(Size);
+    if(Result != NULL)
+    {
+        return Result;
+    }
+    else
+    {
+        printerror("failed malloc!");
+        printerror("\tCalled by: %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
+        return NULL;
+    }
+}
+
+void *
+_TryRealloc(void *Data, u64 Size, const char *CalledByFunction, int CalledByLine, const char *CalledByFile)
+{
+    void *Result = (void *)realloc(Data, Size);
+    if(Result != NULL)
+    {
+        return Result;
+    }
+    else
+    {
+        printerror("ERROR (_TryMalloc): failed malloc!");
+        printerror("\tCalled by: %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
+        return NULL;
+    }
+}
+
+void
+_TryFree(void *Data, const char *CalledByFunction, int CalledByLine, const char *CalledByFile)
+{
+    //printerror("Freeing data: called by : %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
+    free(Data);
+}
+
+#define TryMalloc(Size) _TryMalloc(Size, __func__, __LINE__, __FILE__)
+#define TryRealloc(Data, Size) _TryRealloc(Data, Size, __func__, __LINE__, __FILE__)
+#define TryFree(Data) _TryFree(Data, __func__, __LINE__, __FILE__)
+
 
 struct v2
 {
