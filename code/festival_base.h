@@ -34,15 +34,17 @@ typedef Color color;
 #define AnsiColor_Cyan    "\x1b[36m"
 #define AnsiColor_Reset   "\x1b[0m"
 
-#define printerror(...) printf("%s", AnsiColor_Red); printf("ERROR (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset);
-#define printwarning(...) printf("%s", AnsiColor_Yellow); printf("WARNING (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset);
-
-#ifndef Assert
-#define Assert(X) if(!X) {\
-printerror("Assert Called by: %s, %s, line %d", __FILE__, __func__, __LINE__);\
+#define _Assert(X) if(!X) {\
 char *NullAddr = (char *) 0; *NullAddr = 0;\
 }
-#endif
+
+#define printerror(...) printf("%s", AnsiColor_Red); printf("ERROR (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset);
+#define printwarning(...) printf("%s", AnsiColor_Yellow); printf("WARNING (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset); _Assert(false);
+
+#define Assert(X) if(!X) {\
+printerror("Assert Called by: %s, %s, line %d", __FILE__, __func__, __LINE__);\
+_Assert(X)\
+}
 
 
 

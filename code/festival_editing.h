@@ -178,7 +178,7 @@ HandleInput_Insert(program_state *ProgramState)
         {
             Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
             View->CursorPos.c--;
-            Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+            View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
         }
         ProgramState->ShouldChangeIdealCursorCol = true;
     }

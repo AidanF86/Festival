@@ -275,7 +275,6 @@ AdjustView(program_state *ProgramState, view *View)
     
     if(ProgramState->UserMovedCursor)
     { // Adjust based on cursor
-        Print("Adjusting based on cursor");
         if(CursorTargetRect.y < TargetY)
         {
             TargetY = CursorTargetRect.y;
@@ -297,15 +296,14 @@ AdjustView(program_state *ProgramState, view *View)
             View->CursorPos.l = YToLine(View, 
                                         TargetY + View->TextRect.h) - 2;
             MovedCursorUpOrDown = true;
-            Print("Adjusting based on view");
         }
     }
     
     View->TargetY = TargetY;
     
-    Clamp(View->TargetY, 0, LineDataAt(View, LineCount(View)-1).EndLineRect.y);
-    Clamp(View->CursorPos.l, 0, LineCount(View)-1);
-    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+    View->TargetY = Clamp(View->TargetY, 0, LineDataAt(View, LineCount(View)-1).EndLineRect.y);
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View)-1);
+    View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
     
     
 #if 0
@@ -623,8 +621,8 @@ MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
 {
     ProgramState->UserMovedCursor = true;
     View->CursorPos += dPos;
-    Clamp(View->CursorPos.l, 0, LineCount(View));
-    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View));
+    View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
     
     if(ProgramState->ShouldChangeIdealCursorCol)
     {
@@ -839,8 +837,8 @@ SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
 {
     ProgramState->UserMovedCursor = true;
     View->CursorPos = Pos;
-    Clamp(View->CursorPos.l, 0, LineCount(View));
-    Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View));
+    View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
 }
 
 

@@ -37,9 +37,10 @@ struct string
     
     void InsertChar(int Index, u32 Char)
     {
-        if(Index < 0 || Index >= Length)
+        if(Index < 0 || Index > Length)
         {
             // TODO: warning logging?
+            printerror("Trying to insert at an out-of-bounds index: %d", Index);
             return;
         }
         
@@ -88,7 +89,7 @@ struct string
     // inc, ex
     void Slice(int Start, int End)
     {
-        if(Start >= End || Start < 0 || End > Length)
+        if(Start > End || Start < 0 || End > Length)
         {
             printwarning("Invalid slice range: %d-%d", Start, End);
             Assert(false);
@@ -107,7 +108,7 @@ struct string
     // inc, ex
     void RemoveRange(int Start, int End)
     {
-        if(Start >= End || Start < 0 || End > Length)
+        if(Start > End || Start < 0 || End > Length)
         {
             printwarning("Invalid removal range: %d-%d", Start, End);
             return;
@@ -545,7 +546,8 @@ CopyStringListRange(string_list A, int StartRow, int StartCol, int EndRow, int E
     if(StartRow == EndRow)
     {
         ListAdd(&Result, CopyString(A[StartRow]));
-        Result[0].Slice(StartCol, EndCol);
+        if(A[StartRow].Length > 0)
+            Result[0].Slice(StartCol, EndCol);
         return Result;
     }
     // if only one whole line
@@ -578,7 +580,7 @@ CopyStringListRange(string_list A, int StartRow, int StartCol, int EndRow, int E
     {
         Print("3333333");
         ListAdd(&Result, CopyString(A[EndRow]));
-        Result[Result.Length-1].Slice(0, EndCol);
+        Result[Result.Length-1].Slice(0, Min(EndCol, Result[Result.Length-1].Length));
     }
     
     return Result;
@@ -589,6 +591,7 @@ InsertStringList(string_list *Bottom, string_list Top, int Row, int Col)
 {
     int MoveLinePos = 0;
     
+    Print("===================");
     for(int i = 0; i < Top.Length; i++)
     {
         if(i == 0)
@@ -606,13 +609,22 @@ InsertStringList(string_list *Bottom, string_list Top, int Row, int Col)
             // TEARS
             ListInsert(Bottom, Row+i, CopyString(Bottom->Data[Row+i-1]));
             
-            Bottom->Data[Row+i-1].Slice(0, MoveLinePos);
-            Bottom->Data[Row+i].Slice(MoveLinePos, Bottom->Data[Row+i].Length);
+            int AboveIndex = Row+i-1;
+            int Index = Row+i;
             
-            Bottom->Data[Row+i].InsertString(0, Top[i]);
+#if 1
+            if(Bottom->Data[AboveIndex].Length > 0)
+                Bottom->Data[AboveIndex].Slice(0, Min(Bottom->Data[AboveIndex].Length, MoveLinePos));
+            if(Bottom->Data[Index].Length > 0)
+                Bottom->Data[Index].Slice(MoveLinePos, Bottom->Data[Index].Length);
+#endif
+            
+            Print(Top[i]);
+            Bottom->Data[Index].InsertString(0, Top[i]);
             MoveLinePos = Top[i].Length;
         }
     }
+    Print("===================");
 }
 
 #endif //FESTIVAL_STRING_H

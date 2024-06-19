@@ -20,6 +20,10 @@ snake_name *Data;\
 inline snake_name& operator[](size_t Index) { return Data[Index]; }\
 inline const snake_name& operator[](size_t Index) const { return Data[Index]; }\
 \
+snake_name ElementAt(int Index)\
+{\
+return Data[Index];\
+}\
 int Remove(int Index)\
 {\
 if(Index >= 0 && Index < Length)\

@@ -6,6 +6,7 @@ ActionForDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
     buffer_pos ActualStart = Start.l < End.l || (Start.l == End.l && Start.c < End.c) ? Start : End;
     buffer_pos ActualEnd = ActualStart == Start ? End : Start;
     ActualEnd.c++;
+    ActualEnd.c = Clamp(ActualEnd.c, 0, LineLength(Buffer, ActualEnd.l));
     
     action Result;
     
@@ -13,10 +14,8 @@ ActionForDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
     Result.DeleteSingleLine = false;
     Result.DeleteStart = ActualStart;
     Result.DeleteEnd = ActualEnd;
-    //Result.DeleteContent = StringList();
-#if 1
+    
     Result.DeleteContent = CopyStringListRange(Buffer->Lines, ActualStart.l, ActualStart.c, ActualEnd.l, ActualEnd.c);
-#endif
     
     Result.Add = false;
     
@@ -125,14 +124,17 @@ DoAction(buffer *Buffer, action A)
             // slice and join next line
             if(End.l > Start.l)
             {
-                Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
-                Buffer->Lines[End.l].RemoveRange(0, End.c);
+                if(Buffer->Lines[Start.l].Length > 0)
+                    Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
+                if(Buffer->Lines[End.l].Length > 0)
+                    Buffer->Lines[End.l].RemoveRange(0, End.c);
                 Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
                 ListRemoveAt(&Buffer->Lines, End.l);
             }
             else
             {
-                Buffer->Lines[Start.l].RemoveRange(Start.c, End.c);
+                if(Buffer->Lines[Start.l].Length > 0)
+                    Buffer->Lines[Start.l].RemoveRange(Start.c, End.c);
             }
         }
     }

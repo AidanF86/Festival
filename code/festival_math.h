@@ -247,8 +247,10 @@ inline int Interpolate(int a, int b, f32 speed)
     return Result;
 }
 
-#define Clamp(Value, Min, Max) { if(Value < Min){Value = Min;} if(Value > Max){Value = Max;} }
+#define Clamp(Value, Min, Max) ((Value >= Min && Value <= Max) ? Value : (Value < Min ? Min : Max))
 
+#define Max(a, b) a > b ? a : b
+#define Min(a, b) a < b ? a : b
 
 u32
 RandomU32InRange(u32 Min, u32 Max)

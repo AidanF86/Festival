@@ -293,7 +293,7 @@ extern "C"
                 }
             }
             
-            Clamp(View->Lister.SelectedIndex, 0, View->Lister.MatchingEntries.Length - 1);
+            View->Lister.SelectedIndex = Clamp(View->Lister.SelectedIndex, 0, View->Lister.MatchingEntries.Length - 1);
         }
         
         
@@ -352,8 +352,8 @@ extern "C"
         }
         
         
-        Clamp(View->CursorPos.l, 0, LineCount(View)-1);
-        Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+        View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View)-1);
+        View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
         
         
         StartProfile(FillLineData);
