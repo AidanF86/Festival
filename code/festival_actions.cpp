@@ -1,5 +1,6 @@
 
 
+// inc, inc
 action
 ActionForDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
 {
@@ -146,7 +147,7 @@ DoAction(buffer *Buffer, action A)
 }
 
 void
-DoAndAddAction(buffer *Buffer, action Action)
+AddAndDoAction(buffer *Buffer, action Action)
 {
     AddAction(Buffer, Action);
     DoAction(Buffer, Action);

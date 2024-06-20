@@ -3,6 +3,42 @@
 #ifndef FESTIVAL_EDITING_H
 #define FESTIVAL_EDITING_H
 
+void
+SwitchInputMode(program_state *ProgramState, input_mode NewMode)
+{
+    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    if(ProgramState->InputMode == InputMode_Insert)
+    {
+        if(View->InsertModeString.Length > 0)
+        {
+            AddAndDoAction(View->Buffer,
+                           ActionForInsertString(View->InsertModeStartPos,
+                                                 View->InsertModeString,
+                                                 View->InsertModeLineBelow));
+        }
+        View->InsertModeString.Free();
+    }
+    
+    if(NewMode == InputMode_Select)
+    {
+        View->Selecting = true;
+        View->SelectionStartPos = View->CursorPos;
+    }
+    else
+    {
+        View->Selecting = false;
+    }
+    
+    if(NewMode == InputMode_Insert)
+    {
+        View->InsertModeStartPos = View->CursorPos;
+        View->InsertModeLineBelow = false;
+        View->InsertModeString = String("");
+    }
+    
+    ProgramState->InputMode = NewMode;
+}
+
 string
 GetStringToInsert(program_state *ProgramState)
 {
@@ -123,10 +159,6 @@ GetStringToInsert(program_state *ProgramState)
         Result.AppendChar('\t');
     
     return Result;
-    
-#if 0
-    
-#endif
 }
 
 
@@ -164,6 +196,7 @@ HandleInput_Insert(program_state *ProgramState)
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
         MoveCursorPos(ProgramState, View, BufferPos(0, 1));
+        
         SwitchInputMode(ProgramState, InputMode_Insert);
     }
     
@@ -174,11 +207,20 @@ HandleInput_Insert(program_state *ProgramState)
     
     if(KeyShouldExecute(Input->Backspace_Key))
     { // Backspace
-        if(View->CursorPos.c > 0)
+        if(StringToInsert.Length > 0)
         {
+            StringToInsert.RemoveCharFromEnd();
+        }
+        else if(View->CursorPos.c > 0)
+        {
+#if 0
             Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
+#endif
             View->CursorPos.c--;
             View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+            AddAndDoAction(View->Buffer,
+                           ActionForDeleteRange(View->Buffer, View->CursorPos, View->CursorPos));
+            SwitchInputMode(ProgramState, InputMode_Insert);
         }
         ProgramState->ShouldChangeIdealCursorCol = true;
     }
@@ -196,7 +238,7 @@ HandleInput_Insert(program_state *ProgramState)
         {
             buffer_pos PStart = BufferPos(View->CursorPos.l, View->CursorPos.c + 1);
             buffer_pos PEnd = BufferPos(View->CursorPos.l + 1, -1);
-            DoAndAddAction(Buffer, ActionForDeleteRange(Buffer, PStart, PEnd));
+            AddAndDoAction(Buffer, ActionForDeleteRange(Buffer, PStart, PEnd));
             
             SwitchInputMode(ProgramState, InputMode_Insert);
         }
@@ -225,6 +267,9 @@ HandleInput_Insert(program_state *ProgramState)
         
         ProgramState->UserMovedCursor = true;
         ProgramState->ShouldChangeIdealCursorCol = true;
+        
+        View->InsertModeLineBelow = true;
+        SwitchInputMode(ProgramState, InputMode_Insert);
     }
 }
 
@@ -400,7 +445,7 @@ HandleInput_Nav(program_state *ProgramState)
     
     if(KeyShouldExecute(Input->XKey))
     {
-        DoAndAddAction(View->Buffer, ActionForDeleteLine(View->Buffer, View->CursorPos.l));
+        AddAndDoAction(View->Buffer, ActionForDeleteLine(View->Buffer, View->CursorPos.l));
     }
     
     if(KeyShouldExecute(Input->EKey)) {
@@ -459,7 +504,7 @@ HandleInput_Select(program_state *ProgramState)
     if(KeyShouldExecute(Input->XKey))
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
-        DoAndAddAction(View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStartPos, View->CursorPos));
+        AddAndDoAction(View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStartPos, View->CursorPos));
         
         SwitchInputMode(ProgramState, InputMode_Nav);
         return;

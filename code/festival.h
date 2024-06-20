@@ -72,8 +72,9 @@ struct view
     b32 Selecting;
     buffer_pos SelectionStartPos;
     
-    buffer_pos InsertStartPos;
-    string InsertString;
+    string InsertModeString;
+    buffer_pos InsertModeStartPos;
+    b32 InsertModeLineBelow;
     
     int Y;
     int TargetY;

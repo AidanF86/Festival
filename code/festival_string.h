@@ -86,6 +86,11 @@ struct string
         Length--;
     }
     
+    void RemoveCharFromEnd()
+    {
+        RemoveChar(Length);
+    }
+    
     // inc, ex
     void Slice(int Start, int End)
     {

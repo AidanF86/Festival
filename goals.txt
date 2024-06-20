@@ -59,6 +59,10 @@ Current Goal: insert (add) action // Done?
 				Heap issue might be due to deleting when file is empty
 Undoing and redoing
 
+Copy and pasting
+
+Better lister matching
+
 Fix: not rendering partially visible chars
 
 Add ctrl-backspace to lister and buffer

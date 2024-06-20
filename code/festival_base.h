@@ -38,8 +38,24 @@ typedef Color color;
 char *NullAddr = (char *) 0; *NullAddr = 0;\
 }
 
-#define printerror(...) printf("%s", AnsiColor_Red); printf("ERROR (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset);
-#define printwarning(...) printf("%s", AnsiColor_Yellow); printf("WARNING (%s, %s, line %d): ", __FILE__, __func__, __LINE__); printf(__VA_ARGS__); printf("%s\n", AnsiColor_Reset); _Assert(false);
+b32 Logging_StopOnWarning = 1;
+b32 Logging_StopOnError = 1;
+
+#define printwarning(...) \
+printf("%s", AnsiColor_Yellow);\
+printf("WARNING (%s, %s, line %d): ", __FILE__, __func__, __LINE__);\
+printf(__VA_ARGS__);\
+printf("%s\n", AnsiColor_Reset);\
+if(Logging_StopOnWarning) { _Assert(false); }
+
+#define printerror(...) \
+printf("%s", AnsiColor_Red);\
+printf("ERROR (%s, %s, line %d): ", __FILE__, __func__, __LINE__);\
+printf(__VA_ARGS__);\
+printf("%s\n", AnsiColor_Reset);\
+if(Logging_StopOnError) { _Assert(false); }
+
+
 
 #define Assert(X) if(!X) {\
 printerror("Assert Called by: %s, %s, line %d", __FILE__, __func__, __LINE__);\
@@ -58,8 +74,7 @@ _TryMalloc(u64 Size, const char *CalledByFunction, int CalledByLine, const char 
     }
     else
     {
-        printerror("failed malloc!");
-        printerror("\tCalled by: %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
+        printerror("Failed malloc. Called by: %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
         return NULL;
     }
 }
@@ -74,8 +89,7 @@ _TryRealloc(void *Data, u64 Size, const char *CalledByFunction, int CalledByLine
     }
     else
     {
-        printerror("ERROR (_TryMalloc): failed malloc!");
-        printerror("\tCalled by: %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
+        printerror("Failed realloc. Called by: %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
         return NULL;
     }
 }
@@ -83,7 +97,6 @@ _TryRealloc(void *Data, u64 Size, const char *CalledByFunction, int CalledByLine
 void
 _TryFree(void *Data, const char *CalledByFunction, int CalledByLine, const char *CalledByFile)
 {
-    //printerror("Freeing data: called by : %s, %s, line %d", CalledByFile, CalledByFunction, CalledByLine);
     free(Data);
 }
 
@@ -117,8 +130,6 @@ R(rect a)
     Rectangle Result = {(f32)a.x, (f32)a.y, (f32)a.w, (f32)a.h};
     return Result;
 }
-
-
 
 inline Vector2
 V(v2 P)

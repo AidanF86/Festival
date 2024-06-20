@@ -41,7 +41,10 @@ int
 LineLength(buffer *Buffer, int l)
 {
     if(l < 0 || l >= Buffer->Lines.Length)
+    {
+        printerror("Line index out of bounds");
         return 0;
+    }
     return Buffer->Lines.Data[l].Length;
 }
 int 
@@ -79,7 +82,10 @@ rect
 LineRect(view *View, int l)
 {
     if(l < 0 || l >= LineCount(View))
+    {
+        printerror("Line index out of bounds");
         return {0};
+    }
     return View->LineDataList.Data[l].LineRect;
 }
 
@@ -135,8 +141,16 @@ ScreenRectAt(view *View, buffer_pos Pos)
 char
 CharAt(buffer *Buffer, int l, int c)
 {
-    if(l < 0 || l >= Buffer->Lines.Length ||
-       c < 0 || c >= LineLength(Buffer, l))
+    if(l < 0 || l >= Buffer->Lines.Length)
+    {
+        printerror("Line index out of bounds: %d", l);
+        return 0;
+    }
+    if(c < 0 || c > LineLength(Buffer, l))
+    {
+        printerror("Char index out of bounds: %d", c);
+    }
+    if(c == LineLength(Buffer, l))
         return 0;
     return Buffer->Lines[l].Data[c];
 }
@@ -144,7 +158,10 @@ char
 CharAt(view *View, int l, int c)
 {
     if(!View->Buffer)
+    {
+        printerror("View->Buffer is NULL");
         return 0;
+    }
     return CharAt(View->Buffer, l, c);
 }
 char
@@ -163,12 +180,10 @@ InsertLine(buffer *Buffer, int l, string S)
 {
     if(l > Buffer->Lines.Length - 1)
     {
-        Print("Appending line");
         ListAdd(&Buffer->Lines, S);
     }
     else
     {
-        Print("Inserting line");
         ListInsert(&Buffer->Lines, l, S);
     }
 }
@@ -178,7 +193,7 @@ LineDataAt(view *View, int l)
 {
     if(l < 0 || l >= LineCount(View))
     {
-        printf("GetLineData: Out of bounds!\n");
+        printerror("Line index out of bounds");
         return {0};
     }
     return View->LineDataList[l];
@@ -685,19 +700,22 @@ SeekBackBorder(view *View, buffer_pos From)
     buffer_pos Result = From;
     if(CharAt(View, Result) == 0)
         Result.c--;
-    if(Result.c < 0 || (Result.c == 0 && Result.l == 0))
+    if(Result.c <= 0 || (Result.c == 0 && Result.l == 0))
         return From;
     
     b32 StartedAtSpace = false;
-    /*if(CharAt(View, Result) == ' ' ||*/ if(CharAt(View, Result + BufferPos(0, -1)) == ' ')
+    // TODO: go to prev line
+    if(CharAt(View, Result + BufferPos(0, -1)) == ' ')
         StartedAtSpace = true;
     
     if(StartedAtSpace)
     {
         Print("Started at space");
-        do {
+        Result.c--;
+        while(Result.c > 0 && CharAt(View, BufferPos(Result.l, Result.c - 1)))
+        {
             Result.c--;
-        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        }
         
         return Result;
     }
@@ -732,6 +750,9 @@ buffer_pos
 SeekForwardBorder(view *View, buffer_pos From)
 {
     buffer_pos Result = From;
+    
+    if(Result.c == LineLength(View->Buffer, Result.l))
+        return From;
     
     b32 StartedAtSpace = false;
     if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, 1)) == ' ')
@@ -855,29 +876,3 @@ SplitViewVertical(program_state *ProgramState)
     printf("splitting view vertically\n");
 }
 
-
-void
-SwitchInputMode(program_state *ProgramState, input_mode NewMode)
-{
-    view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
-    if(ProgramState->InputMode == InputMode_Insert)
-        View->InsertString.Free();
-    
-    if(NewMode == InputMode_Select)
-    {
-        View->Selecting = true;
-        View->SelectionStartPos = View->CursorPos;
-    }
-    else
-    {
-        View->Selecting = false;
-    }
-    
-    if(NewMode == InputMode_Insert)
-    {
-        View->InsertStartPos = View->CursorPos;
-        View->InsertString = String("");
-    }
-    
-    ProgramState->InputMode = NewMode;
-}

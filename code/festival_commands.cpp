@@ -21,7 +21,7 @@ DefineCommand(RandomSelectAndDeleteTest)
         buffer_pos Start = BufferPos(StartL, RandomU32InRange(0, Buffer->Lines[StartL].Length));
         buffer_pos End = BufferPos(EndL, RandomU32InRange(0, Buffer->Lines[EndL].Length));
         
-        DoAndAddAction(Buffer, ActionForDeleteRange(Buffer, Start, End));
+        AddAndDoAction(Buffer, ActionForDeleteRange(Buffer, Start, End));
     }
     return 0;
 }
