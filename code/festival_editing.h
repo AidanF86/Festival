@@ -11,12 +11,13 @@ SwitchInputMode(program_state *ProgramState, input_mode NewMode)
     {
         if(View->InsertModeString.Length > 0)
         {
-            AddAndDoAction(View->Buffer,
-                           ActionForInsertString(View->InsertModeStartPos,
-                                                 View->InsertModeString,
-                                                 View->InsertModeLineBelow));
+            AddAction(View->Buffer,
+                      ActionForInsertString(View->InsertModeStartPos,
+                                            View->InsertModeString,
+                                            View->InsertModeLineBelow));
         }
         View->InsertModeString.Free();
+        // check adlinebelow
     }
     
     if(NewMode == InputMode_Select)
@@ -218,7 +219,7 @@ HandleInput_Insert(program_state *ProgramState)
 #endif
             View->CursorPos.c--;
             View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-            AddAndDoAction(View->Buffer,
+            AddAndDoAction(ProgramState, View->Buffer,
                            ActionForDeleteRange(View->Buffer, View->CursorPos, View->CursorPos));
             SwitchInputMode(ProgramState, InputMode_Insert);
         }
@@ -238,13 +239,14 @@ HandleInput_Insert(program_state *ProgramState)
         {
             buffer_pos PStart = BufferPos(View->CursorPos.l, View->CursorPos.c + 1);
             buffer_pos PEnd = BufferPos(View->CursorPos.l + 1, -1);
-            AddAndDoAction(Buffer, ActionForDeleteRange(Buffer, PStart, PEnd));
+            AddAndDoAction(ProgramState, Buffer, ActionForDeleteRange(Buffer, PStart, PEnd));
             
             SwitchInputMode(ProgramState, InputMode_Insert);
         }
         //ProgramState->ShouldChangeIdealCursorCol = true;
     }
     
+    View->InsertModeString.AppendString(StringToInsert);
     
     Buffer->Lines[View->CursorPos.l].InsertString(View->CursorPos.c, StringToInsert);
     View->CursorPos.c += StringToInsert.Length;
@@ -438,14 +440,14 @@ HandleInput_Nav(program_state *ProgramState)
     if(KeyShouldExecute(Input->YKey))
     {
         if(IsAnyShiftKeyDown)
-            MoveForwardActionStack(View->Buffer);
+            MoveForwardActionStack(ProgramState, View->Buffer);
         else
-            MoveBackActionStack(View->Buffer);
+            MoveBackActionStack(ProgramState, View->Buffer);
     }
     
     if(KeyShouldExecute(Input->XKey))
     {
-        AddAndDoAction(View->Buffer, ActionForDeleteLine(View->Buffer, View->CursorPos.l));
+        AddAndDoAction(ProgramState, View->Buffer, ActionForDeleteLine(View->Buffer, View->CursorPos.l));
     }
     
     if(KeyShouldExecute(Input->EKey)) {
@@ -504,7 +506,7 @@ HandleInput_Select(program_state *ProgramState)
     if(KeyShouldExecute(Input->XKey))
     {
         ProgramState->ShouldChangeIdealCursorCol = true;
-        AddAndDoAction(View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStartPos, View->CursorPos));
+        AddAndDoAction(ProgramState, View->Buffer, ActionForDeleteRange(View->Buffer, View->SelectionStartPos, View->CursorPos));
         
         SwitchInputMode(ProgramState, InputMode_Nav);
         return;

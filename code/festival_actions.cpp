@@ -67,7 +67,7 @@ AddAction(buffer *Buffer, action Action)
 }
 
 void
-UndoAction(buffer *Buffer, action A)
+UndoAction(program_state *ProgramState, buffer *Buffer, action A)
 {
     if(A.Delete)
     {
@@ -85,10 +85,17 @@ UndoAction(buffer *Buffer, action A)
             InsertStringList(&Buffer->Lines, A.DeleteContent, Start.l, Start.c);
         }
     }
+    if(A.Add)
+    {
+        Buffer->Lines[A.AddPos.l].RemoveRange(A.AddPos.c, A.AddPos.c + A.AddContent.Length);
+        // TODO: move cursor
+        ProgramState->ShouldChangeIdealCursorCol = true;
+        SetCursorPos(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex], A.AddPos);
+    }
 }
 
 void
-DoAction(buffer *Buffer, action A)
+DoAction(program_state *ProgramState, buffer *Buffer, action A)
 {
     if(A.Delete)
     {
@@ -143,14 +150,19 @@ DoAction(buffer *Buffer, action A)
     if(A.Add)
     {
         // TODO
+        Buffer->Lines[A.AddPos.l].InsertString(A.AddPos.c, A.AddContent);
+        // TODO: move cursor
+        ProgramState->ShouldChangeIdealCursorCol = true;
+        SetCursorPos(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex],
+                     BufferPos(A.AddPos.l, A.AddPos.c + A.AddContent.Length));
     }
 }
 
 void
-AddAndDoAction(buffer *Buffer, action Action)
+AddAndDoAction(program_state *ProgramState, buffer *Buffer, action Action)
 {
     AddAction(Buffer, Action);
-    DoAction(Buffer, Action);
+    DoAction(ProgramState, Buffer, Action);
 }
 
 // undo: index
@@ -158,23 +170,23 @@ AddAndDoAction(buffer *Buffer, action Action)
 // index can be -1, in which case we're at the bottom
 
 void
-MoveBackActionStack(buffer *Buffer)
+MoveBackActionStack(program_state *ProgramState, buffer *Buffer)
 {
     if(Buffer->ActionStack.Length > 0 && Buffer->ActionIndex > -1)
     {
         Print("Moving back action stack!");
-        UndoAction(Buffer, Buffer->ActionStack[Buffer->ActionIndex]);
+        UndoAction(ProgramState, Buffer, Buffer->ActionStack[Buffer->ActionIndex]);
         Buffer->ActionIndex--;
     }
 }
 
 void
-MoveForwardActionStack(buffer *Buffer)
+MoveForwardActionStack(program_state *ProgramState, buffer *Buffer)
 {
     if(Buffer->ActionStack.Length > 0 && Buffer->ActionIndex < Buffer->ActionStack.Length - 1)
     {
         Print("Moving forward action stack!");
-        DoAction(Buffer, Buffer->ActionStack[Buffer->ActionIndex + 1]);
+        DoAction(ProgramState, Buffer, Buffer->ActionStack[Buffer->ActionIndex + 1]);
         Buffer->ActionIndex++;
     }
 }

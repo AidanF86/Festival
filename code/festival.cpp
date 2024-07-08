@@ -46,7 +46,7 @@ extern "C"
             
             // TEXT FILE
             ProgramState->Buffers = BufferList();
-            ListAdd(Buffers, LoadFileToBuffer("./test.cpp"));
+            ListAdd(Buffers, LoadFileToBuffer("./testing_files/utf-8.txt"));
             
             
             ProgramState->FontSize = 18;
@@ -389,6 +389,10 @@ extern "C"
                 if(A.Delete)
                 {
                     DrawString(ProgramState, TempString("Delete %d,%d to %d,%d", A.DeleteStart.l, A.DeleteStart.c, A.DeleteEnd.l, A.DeleteEnd.c), V2(X, Y+=20), BLACK, YELLOW);
+                }
+                else if(A.Add)
+                {
+                    DrawString(ProgramState, TempString("Add %S", A.AddContent), V2(X, Y+=20), BLACK, YELLOW);
                 }
             }
         }
