@@ -1,6 +1,8 @@
 #include <stdio.h>
 
 #include "raylib.h"
+#include "chardet.h"
+#include <sys/stat.h>
 
 #include "festival_base.h"
 #include "festival_platform.h"
@@ -11,6 +13,8 @@
 #include "festival_input.h"
 
 #include "festival_actions.h"
+#include "festival_encoding.h"
+#include "festival_encoding.cpp"
 #include "festival.h"
 #include "festival_filesystem.h"
 
@@ -416,6 +420,11 @@ extern "C"
         
         //DrawFPS(400, 100);
         //DrawProfiles(ProgramState);
+        
+#if 0
+        DrawRectangle(0, 0, 500, 500, WHITE);
+        DrawTexture(ProgramState->FontMonospace.RFont.texture, 0, 0, BLACK);
+#endif
         
         EndDrawing();
         EndProfile(Rendering);

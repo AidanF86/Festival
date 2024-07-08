@@ -105,6 +105,22 @@ _TryFree(void *Data, const char *CalledByFunction, int CalledByLine, const char 
 #define TryFree(Data) _TryFree(Data, __func__, __LINE__, __FILE__)
 
 
+// 0 is left (highest), 7 is right (highest)
+// endianness :(
+inline char
+IsolateBitInByte(char Byte, int BitIndex)
+{
+    if(BitIndex < 0 || BitIndex > 7)
+        return Byte;
+    char mask = 1 << (7 - BitIndex);
+    char val = Byte & mask;
+    if(val)
+        return 1;
+    else
+        return 0;
+}
+
+
 struct v2
 {
     union

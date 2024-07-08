@@ -121,6 +121,7 @@ GetBufferForPath(program_state *ProgramState, string PathString)
 }
 
 
+
 buffer
 LoadFileToBuffer(const char *RawPath)
 {
@@ -157,11 +158,16 @@ LoadFileToBuffer(const char *RawPath)
     Buffer.ActionIndex = -1;
     Buffer.ActionStack = ActionList();
     
+    // TODO: convert to fixed-width 32-bit unicode based on encoding
+    
+    Buffer.FileEncoding = GetTextEncodingType(FileData);
+    u32 *FileDataUTF32 = ConvertUTF8ToUTF32(FileData);
+    
     Buffer.Lines = StringList();
     for(int i = 0; i < FileSize; i++)
     {
         int LineStart = i;
-        // TODO: need to add AppendString to easily do this
+        // TODO: use AppendString
         for(; FileData[i] != '\n' && i < FileSize; i++) {}
         
         ListAdd(&(Buffer.Lines), AllocString(i-LineStart));
@@ -169,7 +175,8 @@ LoadFileToBuffer(const char *RawPath)
         int InLine = 0;
         for(int a = LineStart; a < i; a++)
         {
-            Buffer.Lines[Buffer.Lines.Length-1].SetChar(InLine, FileData[a]);
+            //Buffer.Lines[Buffer.Lines.Length-1].SetChar(InLine, FileData[a]);
+            Buffer.Lines[Buffer.Lines.Length-1].SetChar(InLine, FileDataUTF32[a]);
             InLine++;
         }
     }

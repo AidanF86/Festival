@@ -521,6 +521,11 @@ HandleInput_SuperDebugMenu(program_state *ProgramState)
     {
         ProgramState->ShowSuperDebugMenu = false;
     }
+    
+    int ScrollAmount = ProgramState->FontSize * 3;
+    ProgramState->SuperDebugMenuY += GetMouseWheelMove() * ScrollAmount * -1;
+    ProgramState->SuperDebugMenuY = Clamp(ProgramState->SuperDebugMenuY,
+                                          0, ProgramState->SuperDebugMenuH - 100);
 }
 
 
@@ -565,6 +570,9 @@ HandleInput(program_state *ProgramState)
         if(ProgramState->FontSize < 6) ProgramState->FontSize = 6;
         if(ProgramState->FontSize > 100) ProgramState->FontSize = 100;
     }
+    
+    
+    
 }
 
 

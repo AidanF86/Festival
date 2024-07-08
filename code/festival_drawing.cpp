@@ -1,6 +1,6 @@
 
 rect
-DrawChar(program_state *ProgramState, int Char, v2 Pos, color BGColor, color FGColor)
+DrawChar(program_state *ProgramState, u32 Codepoint, v2 Pos, color BGColor, color FGColor)
 {
     font *Font = &ProgramState->FontMonospace;
     if(ProgramState->FontType == FontType_Sans)
@@ -9,7 +9,7 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, color BGColor, color FGC
         Font = &ProgramState->FontSerif;
     
     GlyphInfo Info = {0};
-    int GlyphIndex = CharIndex(Font, Char);
+    int GlyphIndex = CodepointIndex(Font, Codepoint);
     Info = Font->RFont.glyphs[GlyphIndex];
     
     
@@ -60,7 +60,7 @@ DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, co
     {
         DrawChar(ProgramState, String[i], Pos, BGColor, FGColor);
         
-        int GlyphIndex = CharIndex(Font, String[i]);
+        int GlyphIndex = CodepointIndex(Font, String[i]);
         GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
         Pos.x += Info.advanceX;
     }
@@ -157,7 +157,7 @@ DrawView(program_state *ProgramState, view *View)
         Font = &ProgramState->FontSerif;
     
     GlyphInfo Info = {0};
-    int GlyphIndex = CharIndex(Font, CharAt(View, View->CursorPos));
+    int GlyphIndex = CodepointIndex(Font, CharAt(View, View->CursorPos));
     Info = Font->RFont.glyphs[GlyphIndex];
     
     CursorDrawRect.w = Info.advanceX;
@@ -321,9 +321,11 @@ DrawView(program_state *ProgramState, view *View)
 void
 DrawSuperDebugMenu(program_state *ProgramState)
 {
-    DrawRectangleRec(R(Rect(0, 0, ProgramState->ScreenWidth, ProgramState->ScreenHeight)), ORANGE);
-    int Y = -ProgramState->SuperDebugMenuY;
-    int X = 0;
+    int Margin = 10;
+    DrawRectangle(0, 0, ProgramState->ScreenWidth, ProgramState->ScreenHeight, WHITE);
+    DrawRectangleLinesEx(R(Rect(0, 0, ProgramState->ScreenWidth, ProgramState->ScreenHeight)), Margin, YELLOW);
+    int Y = -ProgramState->SuperDebugMenuY + Margin;
+    int X = Margin;
     
     Y += DrawString(ProgramState, TempString("Super Debug Menu"), V2(X, Y), BLACK).y;
     Y += ProgramState->FontSize;
@@ -338,5 +340,17 @@ DrawSuperDebugMenu(program_state *ProgramState)
     Y += DrawString(ProgramState, String, v2 Pos, color FGColor).y;
     Y += DrawString(ProgramState, String, v2 Pos, color FGColor).y;
 #endif
+    
+    Y += 20;
+    Y += DrawString(ProgramState, TempString("Font Texture"), V2(X, Y), BLACK, Style_Underline).y;
+    DrawTexture(ProgramState->FontMonospace.RFont.texture, X, Y, BLACK);
+    DrawTexture(ProgramState->FontMonospace.RFont.texture, X, Y, BLACK);
+    DrawRectangleLinesEx(R(Rect(X, Y,
+                                ProgramState->FontMonospace.RFont.texture.width,
+                                ProgramState->FontMonospace.RFont.texture.height)),
+                         3, BLACK);
+    Y += ProgramState->FontMonospace.RFont.texture.height;
+    
+    ProgramState->SuperDebugMenuH = Y + ProgramState->SuperDebugMenuY;
 }
 

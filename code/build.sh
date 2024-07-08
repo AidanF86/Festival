@@ -1,8 +1,8 @@
 pushd ../build/
 
-INCLUDE="-I../code/include/raylib -I../code/include/tree-sitter/lib/include"
-LIBS="-L. libraylib.a libtree-sitter.a"
-SHARED_OBJECTS="./libraylib.so.450"
+INCLUDE="-I../code/include/raylib -I../code/include/libchardet"
+LIBS="-L. libraylib.a libchardet.a"
+SHARED_OBJECTS="./libraylib.so.450 ./libchardet.so.1.0.0"
 
 # -O3 the big guns, if we ever need them
 g++ -fstack-protector-all -fno-gnu-unique -rdynamic -shared -fPIC -o festival.so $INCLUDE  ../code/festival.cpp -g

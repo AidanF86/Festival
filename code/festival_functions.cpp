@@ -334,22 +334,27 @@ AdjustView(program_state *ProgramState, view *View)
 }
 
 
-void
-LoadFont(program_state *ProgramState, font *OurFont, int Size, const char *FileName)
+font
+LoadFont(program_state *ProgramState, int Size, const char *FileName)
 {
+    font LoadedFont = {0};
+    
     u32 FontFileSize = 0;
     u8 *FontFileData = LoadFileData(FileName, &FontFileSize);
     
-    font *LoadedFont = OurFont;
-    Font *RLoadedFont = &OurFont->RFont;
-    *LoadedFont = {0};
+    Font *RLoadedFont = &(LoadedFont.RFont);
+    
     RLoadedFont->baseSize = Size;
-    RLoadedFont->glyphCount = 95;
-    RLoadedFont->glyphs = LoadFontData(FontFileData, FontFileSize, RLoadedFont->baseSize, 0, 95, FONT_DEFAULT);
-    Image Atlas = GenImageFontAtlas(RLoadedFont->glyphs, &RLoadedFont->recs, 95, RLoadedFont->baseSize, 4, 0);
+    //RLoadedFont->glyphCount = 95;
+    int GlyphCount = 250;
+    RLoadedFont->glyphCount = GlyphCount;
+    RLoadedFont->glyphs = LoadFontData(FontFileData, FontFileSize, RLoadedFont->baseSize, 0, GlyphCount, FONT_DEFAULT);
+    Image Atlas = GenImageFontAtlas(RLoadedFont->glyphs, &RLoadedFont->recs, GlyphCount, RLoadedFont->baseSize, 4, 0);
     RLoadedFont->texture = LoadTextureFromImage(Atlas);
+    
     UnloadImage(Atlas);
     UnloadFileData(FontFileData);
+    
     
     int GlyphIndex = 0;
     for(int i = 0; i < 256; i++)
@@ -358,39 +363,38 @@ LoadFont(program_state *ProgramState, font *OurFont, int Size, const char *FileN
         {
             if(RLoadedFont->glyphs[a].value == i)
             {
-                LoadedFont->AsciiGlyphIndexes[i] = a;
+                LoadedFont.AsciiGlyphIndexes[i] = a;
                 break;
             }
         }
     }
+    
+    return LoadedFont;
 }
 
 void
 LoadFonts(program_state *ProgramState)
 {
-    LoadFont(ProgramState, &ProgramState->FontMonospace, ProgramState->FontSize, "LiberationMono-Regular.ttf");
-    LoadFont(ProgramState, &ProgramState->FontSerif, ProgramState->FontSize, "Georgia.ttf");
-    
-    //LoadFont(ProgramState, &ProgramState->FontSans, ProgramState->FontSize, "WHISKEY_ITC_STD_REGULAR.OTF");
-    LoadFont(ProgramState, &ProgramState->FontSans, ProgramState->FontSize, "HelveticaNeue-Regular.otf");
+    ProgramState->FontMonospace = LoadFont(ProgramState, ProgramState->FontSize, "LiberationMono-Regular.ttf");
+    ProgramState->FontSerif = LoadFont(ProgramState, ProgramState->FontSize, "Georgia.ttf");
+    ProgramState->FontSans = LoadFont(ProgramState, ProgramState->FontSize, "HelveticaNeue-Regular.otf");
 }
 
-int
-CharIndex(font *Font, int Char) {
-    if(Char <= 0)
-        return 0;
-    if(Char < 256)
+inline int
+CodepointIndex(font *Font, u32 Codepoint)
+{
+    if(Codepoint < 256)
     {
-        return Font->AsciiGlyphIndexes[Char];
+        return Font->AsciiGlyphIndexes[Codepoint];
     }
     else
     {
-        return 0;
-        Print("Searching for non-ascii char index (%d)", Char);
+        // TODO: make more efficient! Hash map?
+        //Print("Searching for non-ascii char index (%d)", Codepoint);
         int GlyphIndex = 0;
         for(int i = 0; i < Font->RFont.glyphCount; i++)
         {
-            if(Font->RFont.glyphs[i].value == Char)
+            if(Font->RFont.glyphs[i].value == Codepoint)
             {
                 GlyphIndex = i;
                 break;
@@ -606,7 +610,7 @@ FillLineData(view *View, program_state *ProgramState)
             // so when drawing, offset by textrect.x and textrect.y
             // as well as buffer viewpos
             
-            int GlyphIndex = CharIndex(Font, CharAt(View, BufferPos(l, c)));
+            int GlyphIndex = CodepointIndex(Font, CharAt(View, BufferPos(l, c)));
             GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
             
             if(x+Info.advanceX >= WrapPoint)

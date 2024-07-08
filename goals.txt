@@ -59,6 +59,9 @@ Current Goal: insert (add) action // Done?
 				Heap issue might be due to deleting when file is empty
 Undoing and redoing
 
+Temporary Detour: find file encoding type and convert to 32-bit fixed-width
+	Issue: font loading often crashes
+
 Copy and pasting
 
 Better lister matching

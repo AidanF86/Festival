@@ -24,6 +24,8 @@ struct buffer
     string FileName;
     string DirPath;
     
+    file_encoding FileEncoding;
+    
     string_list Lines;
     
     int ActionIndex;
@@ -139,8 +141,10 @@ struct program_state
     
     b32 ShowViewInfo;
     b32 ShowViewRects;
+    
     b32 ShowSuperDebugMenu;
     int SuperDebugMenuY;
+    int SuperDebugMenuH;
     
     // modal system
     input_mode InputMode;
