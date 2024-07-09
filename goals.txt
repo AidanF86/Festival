@@ -61,6 +61,7 @@ Undoing and redoing
 
 Temporary Detour: find file encoding type and convert to 32-bit fixed-width
 	Issue: font loading often crashes
+	Scroll bar
 
 Copy and pasting
 

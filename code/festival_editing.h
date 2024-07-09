@@ -425,15 +425,15 @@ HandleInput_Nav(program_state *ProgramState)
         ProgramState->ShowSuperDebugMenu = true;
     }
     
-    if(KeyShouldExecute(Input->NKey))
+    if(KeyShouldExecute(Input->NKey) && IsAnyControlKeyDown)
     {
         if(IsAnyShiftKeyDown)
         {
-            SplitViewVertical(ProgramState);
+            SplitView(ProgramState, Location_Below);
         }
         else
         {
-            SplitViewHorizontal(ProgramState);
+            SplitView(ProgramState, Location_Right);
         }
     }
     

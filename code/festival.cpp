@@ -53,7 +53,7 @@ extern "C"
             
             // TEXT FILE
             ProgramState->Buffers = BufferList();
-            ListAdd(Buffers, LoadFileToBuffer("./testing_files/utf-8.txt"));
+            ListAdd(Buffers, LoadFileToBuffer("./data/testing_files/utf-8.txt"));
             
             
             ProgramState->FontSize = 18;
@@ -204,7 +204,7 @@ extern "C"
                 }
                 if(NextChild == NULL)
                 {
-                    printf("ERROR: Couldn't find next child!\n");
+                    printerror("Couldn't find next child view");
                     break;
                 }
                 

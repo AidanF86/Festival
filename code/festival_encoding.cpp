@@ -35,9 +35,8 @@ GetTextEncodingType(char *Data)
     return Result;
 }
 
-#if 1
 u32 *
-ConvertTextToUTF32(char *Data, char *Encoding)
+ConvertTextToUTF32(char *Data, char *Encoding, u64 *FinalCharCount)
 {
     print("Converting text from %s to UTF-32");
     print(Data);
@@ -87,92 +86,11 @@ ConvertTextToUTF32(char *Data, char *Encoding)
     
     iconv_close(cd);
     
-    return (u32 *)Result;
-}
-
-#else
-inline char
-GetUTF8CodePointByteCount(char FirstByte)
-{
-    if(IsolateBitInByte(FirstByte, 0) == 0)
-    {
-        return 1;
-    }
-    else if(IsolateBitInByte(FirstByte, 0) == 1 &&
-            IsolateBitInByte(FirstByte, 1) == 1 &&
-            IsolateBitInByte(FirstByte, 2) == 0)
-    {
-        return 2;
-    }
-    else if(IsolateBitInByte(FirstByte, 0) == 1 &&
-            IsolateBitInByte(FirstByte, 1) == 1 &&
-            IsolateBitInByte(FirstByte, 2) == 1 &&
-            IsolateBitInByte(FirstByte, 3) == 0)
-    {
-        return 3;
-    }
-    else if(IsolateBitInByte(FirstByte, 0) == 1 &&
-            IsolateBitInByte(FirstByte, 1) == 0)
-    {
-        printerror("Trying to get UTF-8 codepoint byte count in a non-first byte");
-        return 1;
-    }
-    return 4;
-}
-
-u32 *
-ConvertUTF8ToUTF32(char *Data)
-{
-    // Allocate for largest scenario: every codepoint is 1 byte
-    u32 *Result = (u32 *)TryMalloc(strlen(Data));
+    size_t FinalSize = OutputBufferSize - OutBytesLeft;
+    *FinalCharCount = (u64)(FinalSize / 4);
+    //print("%ld vs %ld", OutputBufferSize, FinalSize);
+    // TODO: we're assuming this size aligns with 4 bytes, but we should probably check
+    u32 *FinalResult = (u32 *)TryRealloc(Result, FinalSize);
     
-    int CodePointCount = 0;
-    int Length = strlen(Data);
-    for(int i = 0; i < Length; i++)
-    {
-        u32 CodePoint = 0;
-        int CodePointByteCount = GetUTF8CodePointByteCount(Data[i]);
-        if(CodePointByteCount == 1)
-        {
-            CodePoint = Data[i];
-        }
-        else if(CodePointByteCount == 2)
-        {
-            CodePoint |= Data[i] & 31;
-            CodePoint << 6;
-            CodePoint |= Data[i+1] & 63;
-        }
-        else if(CodePointByteCount == 3)
-        {
-            CodePoint |= Data[i] & 15;
-            CodePoint << 6;
-            CodePoint |= Data[i+1] & 63;
-            CodePoint << 6;
-            CodePoint |= Data[i+2] & 63;
-        }
-        else if(CodePointByteCount == 4)
-        {
-            CodePoint |= Data[i] & 7;
-            CodePoint << 6;
-            CodePoint |= Data[i+1] & 63;
-            CodePoint << 6;
-            CodePoint |= Data[i+2] & 63;
-            CodePoint << 6;
-            CodePoint |= Data[i+3] & 63;
-        }
-        Result[CodePointCount] = CodePoint;
-        CodePointCount++;
-        i += CodePointByteCount - 1;
-    }
-    
-    // TODO: realloc to shrink Result accordingly
-    
-    return Result;
+    return FinalResult;
 }
-
-char *
-ConvertUTF32ToUTF8(char *Data)
-{
-    return NULL;
-}
-#endif

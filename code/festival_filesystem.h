@@ -154,15 +154,16 @@ LoadFileToBuffer(const char *RawPath)
     // TODO: convert to fixed-width 32-bit unicode based on encoding
     
     Buffer.FileEncoding = GetTextEncodingType(FileData);
-    u32 *FileDataUTF32 = ConvertTextToUTF32(FileData, Buffer.FileEncoding);
+    u64 CharCount = 0;
+    u32 *FileDataUTF32 = ConvertTextToUTF32(FileData, Buffer.FileEncoding, &CharCount);
     //u32 *FileDataUTF32 = ConvertUTF8ToUTF32(FileData);
     
     Buffer.Lines = StringList();
-    for(int i = 0; i < FileSize; i++)
+    for(int i = 0; i < CharCount; i++)
     {
         int LineStart = i;
         // TODO: use AppendString
-        for(; FileData[i] != '\n' && i < FileSize; i++) {}
+        for(; FileDataUTF32[i] != '\n' && i < CharCount; i++) {}
         
         ListAdd(&(Buffer.Lines), AllocString(i-LineStart));
         

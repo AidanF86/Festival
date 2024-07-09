@@ -288,7 +288,7 @@ AdjustView(program_state *ProgramState, view *View)
     rect CursorTargetRect = View->CursorTargetRect;
     b32 MovedCursorUpOrDown = false;
     
-    if(ProgramState->UserMovedCursor)
+    if(ProgramState->UserMovedCursor && &ProgramState->Views[ProgramState->SelectedViewIndex] == View)
     { // Adjust based on cursor
         if(CursorTargetRect.y < TargetY)
         {
@@ -341,6 +341,11 @@ LoadFont(program_state *ProgramState, int Size, const char *FileName)
     
     u32 FontFileSize = 0;
     u8 *FontFileData = LoadFileData(FileName, &FontFileSize);
+    if(FontFileData == NULL)
+    {
+        printerror("Couldn't load font file '%s'", FileName);
+        return {0};
+    }
     
     Font *RLoadedFont = &(LoadedFont.RFont);
     
@@ -348,7 +353,14 @@ LoadFont(program_state *ProgramState, int Size, const char *FileName)
     //RLoadedFont->glyphCount = 95;
     int GlyphCount = 250;
     RLoadedFont->glyphCount = GlyphCount;
+    
     RLoadedFont->glyphs = LoadFontData(FontFileData, FontFileSize, RLoadedFont->baseSize, 0, GlyphCount, FONT_DEFAULT);
+    if(RLoadedFont->glyphs == NULL)
+    {
+        printerror("Font glyphs couldn't be loaded");
+        return {0};
+    }
+    
     Image Atlas = GenImageFontAtlas(RLoadedFont->glyphs, &RLoadedFont->recs, GlyphCount, RLoadedFont->baseSize, 4, 0);
     RLoadedFont->texture = LoadTextureFromImage(Atlas);
     
@@ -375,9 +387,9 @@ LoadFont(program_state *ProgramState, int Size, const char *FileName)
 void
 LoadFonts(program_state *ProgramState)
 {
-    ProgramState->FontMonospace = LoadFont(ProgramState, ProgramState->FontSize, "LiberationMono-Regular.ttf");
-    ProgramState->FontSerif = LoadFont(ProgramState, ProgramState->FontSize, "Georgia.ttf");
-    ProgramState->FontSans = LoadFont(ProgramState, ProgramState->FontSize, "HelveticaNeue-Regular.otf");
+    ProgramState->FontMonospace = LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/LiberationMono-Regular.ttf");
+    ProgramState->FontSerif = LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/Georgia.ttf");
+    ProgramState->FontSans = LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/HelveticaNeue-Regular.otf");
 }
 
 inline int
@@ -658,7 +670,7 @@ MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
 {
     ProgramState->UserMovedCursor = true;
     View->CursorPos += dPos;
-    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View));
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View) - 1);
     View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
     
     if(ProgramState->ShouldChangeIdealCursorCol)
@@ -884,17 +896,9 @@ SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
     View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
 }
 
-
 void
-SplitViewHorizontal(program_state *ProgramState)
+SplitView(program_state *ProgramState, view_spawn_location Location)
 {
-    ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Right));
-    printf("splitting view horizontally\n");
+    buffer *BufferToUse = ProgramState->Views.Data[ProgramState->SelectedViewIndex].Buffer;
+    ListAdd(&ProgramState->Views, View(ProgramState, BufferToUse, ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location));
 }
-void
-SplitViewVertical(program_state *ProgramState)
-{
-    ListAdd(&ProgramState->Views, View(ProgramState, &ProgramState->Buffers[0], ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location_Below));
-    printf("splitting view vertically\n");
-}
-

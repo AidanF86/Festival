@@ -40,7 +40,8 @@ DrawChar(program_state *ProgramState, u32 Codepoint, v2 Pos, color BGColor, colo
     }
     else
     {
-        DrawRectangleLinesEx(R(DestRect), 1, BLACK);
+        rect DrawRect = Rect(DestRect.x + 2, DestRect.y + 2, DestRect.w - 4, DestRect.h - 4);
+        DrawRectangleLinesEx(R(DrawRect), 1, BLACK);
     }
     return DestRect;
 }
@@ -185,7 +186,10 @@ DrawView(program_state *ProgramState, view *View)
     {
         case InputMode_Nav:
         {
-            DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+            if(&ProgramState->Views[ProgramState->SelectedViewIndex] == View)
+                DrawRectangleRec(R(CursorDrawRect), ProgramState->CursorBGColor);
+            else
+                DrawRectangleLinesEx(R(CursorDrawRect), 1, ProgramState->CursorBGColor);
         }
         break; case InputMode_Select:
         {
@@ -195,9 +199,12 @@ DrawView(program_state *ProgramState, view *View)
         }
         break; case InputMode_Insert:
         {
-            DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
-                                    CursorDrawRect.w/3, CursorDrawRect.h)),
-                             ProgramState->CursorBGColor);
+            if(&ProgramState->Views[ProgramState->SelectedViewIndex] == View)
+                DrawRectangleRec(R(Rect(CursorDrawRect.x, CursorDrawRect.y,
+                                        CursorDrawRect.w/3, CursorDrawRect.h)),
+                                 ProgramState->CursorBGColor);
+            else
+                DrawRectangleLinesEx(R(CursorDrawRect), 1, ProgramState->CursorBGColor);
         }
         break; case InputMode_EntryBar:
         {
@@ -215,10 +222,17 @@ DrawView(program_state *ProgramState, view *View)
     {
         line_data LineData = LineDataAt(View, l);
         int LineY = LineData.LineRect.y;
+        
         if(LineY - View->Y > View->TextRect.y + View->TextRect.h)
+        {
             break;
-        if(LineRect(View, l).y + LineRect(View, l).h - View->Y < View->TextRect.y)
+        }
+        //if(LineRect(View, l).y + LineRect(View, l).h - View->Y < View->TextRect.y)
+        if(LineRect(View, l).y + LineRect(View, l).h - View->Y < 0)
+        {
+            // TODO: it's this
             continue;
+        }
         
         BeginScissorMode(LineNumbersRect.x, LineNumbersRect.y,
                          LineNumbersRect.w, LineNumbersRect.h);
@@ -231,7 +245,8 @@ DrawView(program_state *ProgramState, view *View)
         BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
         for(int c = 0; c < LineData.CharRects.Length; c++)
         {
-            rect Rect = ScreenRectAt(View, l, c);
+            
+            rect ScreenCharRect = ScreenRectAt(View, l, c);
             
             color CharColor = ProgramState->FGColor;
             if(ViewIsSelected && BufferPos(l, c) == View->CursorPos && ProgramState->InputMode != InputMode_Insert)
@@ -252,7 +267,8 @@ DrawView(program_state *ProgramState, view *View)
                 CharBGColor = ORANGE;
             }
             
-            DrawChar(ProgramState, CharAt(View, l, c), V2(Rect), CharBGColor, CharColor);
+            DrawChar(ProgramState, CharAt(View, l, c), V2(ScreenCharRect), CharBGColor, CharColor);
+            
         }
         EndScissorMode();
     }
@@ -323,6 +339,7 @@ DrawView(program_state *ProgramState, view *View)
     }
     
     EndScissorMode();
+    DrawRectangleLinesEx(R(View->TextRect), 2, ORANGE);
 }
 
 
@@ -338,13 +355,20 @@ DrawSuperDebugMenu(program_state *ProgramState)
     int Y = -ProgramState->SuperDebugMenuY + Margin;
     int X = Margin;
     
-    Y += DrawString(ProgramState, TempString("Super Debug Menu"), V2(X, Y), BLACK).y;
-    Y += ProgramState->FontSize;
+    Y += 2 * DrawString(ProgramState, TempString("Super Debug Menu"), V2(X, Y), BLACK).y;
+    
     Y += DrawString(ProgramState, TempString("Buffers"), V2(X, Y), BLACK, Style_Underline).y;
     for(int i = 0; i < ProgramState->Buffers.Length; i++)
     {
-        Y += DrawString(ProgramState, ProgramState->Buffers[i].FileName, V2(X, Y), BLACK).y;
-        Y += DrawString(ProgramState, ProgramState->Buffers[i].DirPath, V2(X + 20, Y), BLACK).y;
+        buffer *Buffer = &ProgramState->Buffers[i];
+        Y += DrawString(ProgramState, TempString("%S%S", Buffer->DirPath, Buffer->FileName), V2(X, Y), BLACK).y;
+    }
+    
+    Y += DrawString(ProgramState, TempString("Views"), V2(X, Y), BLACK, Style_Underline).y;
+    for(int i = 0; i < ProgramState->Views.Length; i++)
+    {
+        view *View = &ProgramState->Views[i];
+        Y += DrawString(ProgramState, TempString("%d, parent=%d,", View->Id, View->ParentId), V2(X, Y), BLACK).y;
     }
     
 #if 0
