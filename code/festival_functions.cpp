@@ -19,17 +19,6 @@ v2 GetCharDim(program_state *ProgramState, int Size)
     return V2(MeasureTextEx(ProgramState->FontMain.RFont, "_", Size, 0));
 }
 */
-v2 GetCharDim(program_state *ProgramState, font_type FontType)
-{
-    int Size = ProgramState->FontSize;
-    return V2(MeasureTextEx(ProgramState->FontMonospace.RFont, "_", Size, 0));
-    //return GetCharDim(ProgramState, ProgramState->FontSize);
-}
-v2 GetCharDim(program_state *ProgramState)
-{
-    return GetCharDim(ProgramState, FontType_Monospace);
-}
-
 line_data
 LineData() {
     line_data Result = {0};
@@ -280,7 +269,7 @@ ClosestBufferPos(view *View, rect Rect)
 void
 AdjustView(program_state *ProgramState, view *View)
 {
-    int CharHeight = ProgramState->FontSize;
+    int CharHeight = ProgramState->Font.Size;
     buffer_pos CursorPos = View->CursorPos;
     int Y = View->Y;
     int TargetY = View->TargetY;
@@ -331,94 +320,6 @@ AdjustView(program_state *ProgramState, view *View)
         View->CursorPos.c += Diff;
     }
 #endif
-}
-
-
-font
-LoadFont(program_state *ProgramState, int Size, const char *FileName)
-{
-    font LoadedFont = {0};
-    
-    u32 FontFileSize = 0;
-    u8 *FontFileData = LoadFileData(FileName, &FontFileSize);
-    if(FontFileData == NULL)
-    {
-        printerror("Couldn't load font file '%s'", FileName);
-        return {0};
-    }
-    
-    Font *RLoadedFont = &(LoadedFont.RFont);
-    
-    RLoadedFont->baseSize = Size;
-    //RLoadedFont->glyphCount = 95;
-    int GlyphCount = 250;
-    RLoadedFont->glyphCount = GlyphCount;
-    
-    RLoadedFont->glyphs = LoadFontData(FontFileData, FontFileSize, RLoadedFont->baseSize, 0, GlyphCount, FONT_DEFAULT);
-    if(RLoadedFont->glyphs == NULL)
-    {
-        printerror("Font glyphs couldn't be loaded");
-        return {0};
-    }
-    
-    Image Atlas = GenImageFontAtlas(RLoadedFont->glyphs, &RLoadedFont->recs, GlyphCount, RLoadedFont->baseSize, 4, 0);
-    RLoadedFont->texture = LoadTextureFromImage(Atlas);
-    
-    UnloadImage(Atlas);
-    UnloadFileData(FontFileData);
-    
-    
-    int GlyphIndex = 0;
-    for(int i = 0; i < 256; i++)
-    {
-        for(int a = 0; a < RLoadedFont->glyphCount; a++)
-        {
-            if(RLoadedFont->glyphs[a].value == i)
-            {
-                LoadedFont.AsciiGlyphIndexes[i] = a;
-                break;
-            }
-        }
-    }
-    
-    return LoadedFont;
-}
-
-void
-LoadFonts(program_state *ProgramState)
-{
-    ProgramState->FontMonospace = LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/LiberationMono-Regular.ttf");
-    ProgramState->FontSerif = LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/Georgia.ttf");
-    ProgramState->FontSans = LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/HelveticaNeue-Regular.otf");
-}
-
-inline int
-CodepointIndex(font *Font, u32 Codepoint)
-{
-    if(Codepoint < 256)
-    {
-        return Font->AsciiGlyphIndexes[Codepoint];
-    }
-    else
-    {
-        // TODO: make more efficient! Hash map?
-        //Print("Searching for non-ascii char index (%d)", Codepoint);
-        int GlyphIndex = -1;
-        //Codepoint = Codepoint << 3 * 8;
-        //Codepoint = Codepoint >> 3 * 8;
-        
-        if(Codepoint == 32)
-            return 0;
-        for(int i = 0; i < Font->RFont.glyphCount; i++)
-        {
-            if(Font->RFont.glyphs[i].value == Codepoint)
-            {
-                GlyphIndex = i;
-                break;
-            }
-        }
-        return GlyphIndex;
-    }
 }
 
 view
@@ -597,15 +498,7 @@ FillLineData(view *View, program_state *ProgramState)
     *DataList = LineDataList();
     
     int y = 0;
-    font *Font = &ProgramState->FontMonospace;
-    if(ProgramState->FontType == FontType_Sans)
-    {
-        Font = &ProgramState->FontSans;
-    }
-    else if(ProgramState->FontType == FontType_Serif)
-    {
-        Font = &ProgramState->FontSerif;
-    }
+    font *Font = &ProgramState->Font;
     
     int CharsProcessed = 0;
     for(int l = 0; l < LineCount(View); l++)
@@ -627,21 +520,25 @@ FillLineData(view *View, program_state *ProgramState)
             // so when drawing, offset by textrect.x and textrect.y
             // as well as buffer viewpos
             
-            int GlyphIndex = CodepointIndex(Font, CharAt(View, BufferPos(l, c)));
+            GlyphInfo Info = GetCharDrawInfo(Font, CharAt(View, l, c)).Glyph;
+            
+            if(x+Info.advanceX >= WrapPoint)
+            {
+                x = SubLineOffset*CharWidth;
+                y += CharHeight;
+                RectData->DisplayLines++;
+            }
+            
+            ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
+            
+            x += Info.advanceX;
+            
+#if 0
+            GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
             if(GlyphIndex >= 0)
             {
-                GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
                 
-                if(x+Info.advanceX >= WrapPoint)
-                {
-                    x = SubLineOffset*CharWidth;
-                    y += CharHeight;
-                    RectData->DisplayLines++;
-                }
                 
-                ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
-                
-                x += Info.advanceX;
             }
             else
             {
@@ -656,6 +553,7 @@ FillLineData(view *View, program_state *ProgramState)
                 
                 x += CharWidth;
             }
+#endif
         }
         RectData->EndLineRect = Rect(x, y, CharWidth, CharHeight);
         

@@ -219,7 +219,8 @@ ExecLister(program_state *ProgramState, view *View)
                 break;
             }
             
-            ProgramState->FontType = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].FontType;
+            printwarning("TODO: re-implement this!");
+            //ProgramState->FontType = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].FontType;
             
         } break;
         case ListerPurpose_RunCommand: {

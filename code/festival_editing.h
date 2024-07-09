@@ -522,7 +522,7 @@ HandleInput_SuperDebugMenu(program_state *ProgramState)
         ProgramState->ShowSuperDebugMenu = false;
     }
     
-    int ScrollAmount = ProgramState->FontSize * 3;
+    int ScrollAmount = ProgramState->Font.Size * 3;
     ProgramState->SuperDebugMenuY += GetMouseWheelMove() * ScrollAmount * -1;
     ProgramState->SuperDebugMenuY = Clamp(ProgramState->SuperDebugMenuY,
                                           0, ProgramState->SuperDebugMenuH - 100);
@@ -558,7 +558,7 @@ HandleInput(program_state *ProgramState)
     
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
     
-    int ScrollAmount = ProgramState->FontSize * 3;
+    int ScrollAmount = ProgramState->Font.Size * 3;
     if(GetMouseWheelMoveV().y < 0)
         View->TargetY += ScrollAmount;
     else if(GetMouseWheelMoveV().y > 0)
@@ -566,9 +566,12 @@ HandleInput(program_state *ProgramState)
     
     if(IsAnyControlKeyDown)
     {
-        ProgramState->FontSize += GetMouseWheelMove();
-        if(ProgramState->FontSize < 6) ProgramState->FontSize = 6;
-        if(ProgramState->FontSize > 100) ProgramState->FontSize = 100;
+        // TODO: implement font size changing
+        /*
+                ProgramState->Font.Size += GetMouseWheelMove();
+                if(ProgramState->Font.Size < 6) ProgramState->Font.Size = 6;
+                if(ProgramState->Font.Size > 100) ProgramState->Font.Size = 100;
+        */
     }
     
     

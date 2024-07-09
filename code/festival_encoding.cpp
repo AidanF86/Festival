@@ -23,7 +23,7 @@ GetTextEncodingType(char *Data)
         } break;
     }
     
-    printf ("encoding: %s, confidence: %f\n", DetectObject->encoding, DetectObject->confidence);
+    //printf ("encoding: %s, confidence: %f\n", DetectObject->encoding, DetectObject->confidence);
     
     int ResultLength = strlen(DetectObject->encoding) + 1;
     char *Result = (char *)TryMalloc(ResultLength * sizeof(char));
@@ -38,15 +38,14 @@ GetTextEncodingType(char *Data)
 u32 *
 ConvertTextToUTF32(char *Data, char *Encoding, u64 *FinalCharCount)
 {
-    print("Converting text from %s to UTF-32");
-    print(Data);
+    printf("Converting text from %s to UTF-32...");
     iconv_t cd = iconv_open("UTF32", Encoding);
     if(cd == (iconv_t) -1)
     {
         if(errno == EINVAL)
             printerror("Conversion from %s to UTF32 not available", Encoding);
         else
-            printerror("iconv_open");
+            printerror("unknown iconv_open issue");
         return NULL;
     }
     
@@ -76,7 +75,7 @@ ConvertTextToUTF32(char *Data, char *Encoding, u64 *FinalCharCount)
             }
             else
             {
-                printerror("iconv unknown issue");
+                printerror("unknown iconv issue");
             }
         }
     }
@@ -86,20 +85,10 @@ ConvertTextToUTF32(char *Data, char *Encoding, u64 *FinalCharCount)
     
     size_t FinalSize = OutputBufferSize - OutBytesLeft;
     
-    if(Result[0] == 65279)
-    {
-        Result += 4;
-        FinalSize -= 4;
-    }
-    
     *FinalCharCount = (u64)(FinalSize / 4);
     u32 *FinalResult = (u32 *)TryRealloc(Result, FinalSize);
     
-    for(int i = 0; i < FinalSize / 4; i++)
-    {
-        if(FinalResult[i] > 255)
-            Print("Large codepoint %d at %d", FinalResult[i], i);
-    }
+    print(AnsiColor_Green "Success" AnsiColor_Reset);
     
     return FinalResult;
 }

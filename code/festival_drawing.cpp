@@ -2,13 +2,37 @@
 rect
 DrawChar(program_state *ProgramState, u32 Codepoint, v2 Pos, color BGColor, color FGColor)
 {
-    font *Font = &ProgramState->FontMonospace;
-    if(ProgramState->FontType == FontType_Sans)
-        Font = &ProgramState->FontSans;
-    else if(ProgramState->FontType == FontType_Serif)
-        Font = &ProgramState->FontSerif;
+    font *Font = &ProgramState->Font;
     
-    GlyphInfo Info = {0};
+    char_draw_info DrawInfo = GetCharDrawInfo(Font, Codepoint);
+    
+    rect DestRect = Rect(Pos.x + DrawInfo.Glyph.offsetX, Pos.y + DrawInfo.Glyph.offsetY,
+                         DrawInfo.SrcRect.width,
+                         DrawInfo.SrcRect.height);
+    
+    if(BGColor.a != 0)
+    {
+        rect BGRect = Rect(Pos.x, Pos.y,
+                           Font->Size/2,
+                           Font->Size);
+        if(DrawInfo.Glyph.advanceX > Font->Size/2)
+            BGRect.w = DrawInfo.Glyph.advanceX;
+        DrawRectangleRec(R(BGRect), BGColor);
+    }
+    
+    if(DrawInfo.IsValid)
+    {
+        DrawTexturePro(DrawInfo.GlyphGroup->RaylibFont.texture,
+                       DrawInfo.SrcRect,
+                       R(DestRect),
+                       {0, 0}, 0, FGColor);
+    }
+    else
+    {
+        DrawRectangleLinesEx(R(DestRect), 1, FGColor);
+    }
+    
+#if 0
     int GlyphIndex = CodepointIndex(Font, Codepoint);
     
     rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
@@ -16,33 +40,14 @@ DrawChar(program_state *ProgramState, u32 Codepoint, v2 Pos, color BGColor, colo
                          ProgramState->FontSize);
     if(GlyphIndex >= 0)
     {
-        Info = Font->RFont.glyphs[GlyphIndex];
         
-        DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
-                        Font->RFont.recs[GlyphIndex].width,
-                        Font->RFont.recs[GlyphIndex].height);
-        
-        if(BGColor.a != 0)
-        {
-            rect BGRect = Rect(Pos.x, Pos.y,
-                               ProgramState->FontSize/2,
-                               ProgramState->FontSize);
-            //if(Font->RFont.recs[GlyphIndex].width > ProgramState->FontSize/2)
-            if(Info.advanceX > ProgramState->FontSize/2)
-                BGRect.w = Info.advanceX;
-            DrawRectangleRec(R(BGRect), BGColor);
-        }
-        
-        DrawTexturePro(Font->RFont.texture,
-                       Font->RFont.recs[GlyphIndex],
-                       R(DestRect),
-                       {0, 0}, 0, FGColor);
     }
     else
     {
         rect DrawRect = Rect(DestRect.x + 2, DestRect.y + 2, DestRect.w - 4, DestRect.h - 4);
         DrawRectangleLinesEx(R(DrawRect), 1, BLACK);
     }
+#endif
     return DestRect;
 }
 
@@ -58,28 +63,26 @@ DrawChar(program_state *ProgramState, int Char, v2 Pos, color FGColor)
 v2
 DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, color FGColor, int Style)
 {
-    font *Font = &ProgramState->FontMonospace;
-    if(ProgramState->FontType == FontType_Sans)
-        Font = &ProgramState->FontSans;
-    else if(ProgramState->FontType == FontType_Serif)
-        Font = &ProgramState->FontSerif;
+    font *Font = &ProgramState->Font;
     
     v2 OriginalPos = Pos;
     
     for(int i = 0; i < String.Length; i++)
     {
-        DrawChar(ProgramState, String[i], Pos, BGColor, FGColor);
+        Pos.x += DrawChar(ProgramState, String[i], Pos, BGColor, FGColor).x;
         
-        int GlyphIndex = CodepointIndex(Font, String[i]);
-        GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
-        Pos.x += Info.advanceX;
+        /*
+                int GlyphIndex = CodepointIndex(Font, String[i]);
+                GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
+                Pos.x += Info.advanceX;
+        */
     }
     if(Style & Style_Underline)
     {
-        v2 YDiff = V2(0, ProgramState->FontSize - 3);
+        v2 YDiff = V2(0, Font->Size - 3);
         DrawLineEx(V(OriginalPos + YDiff), V(Pos + YDiff), 2, FGColor);
     }
-    return V2(Pos.x - OriginalPos.x, Pos.y + ProgramState->FontSize - OriginalPos.y);
+    return V2(Pos.x - OriginalPos.x, Pos.y + Font->Size - OriginalPos.y);
 }
 
 v2
@@ -159,20 +162,10 @@ DrawView(program_state *ProgramState, view *View)
     // draw cursor
     rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
     
-    font *Font = &ProgramState->FontMonospace;
-    if(ProgramState->FontType == FontType_Sans)
-        Font = &ProgramState->FontSans;
-    else if(ProgramState->FontType == FontType_Serif)
-        Font = &ProgramState->FontSerif;
+    font *Font = &ProgramState->Font;
     
-    GlyphInfo Info = {0};
-    int GlyphIndex = CodepointIndex(Font, CharAt(View, View->CursorPos));
-    Info = Font->RFont.glyphs[GlyphIndex];
-    
-    if(GlyphIndex >= 0)
-        CursorDrawRect.w = Info.advanceX;
-    else
-        CursorDrawRect.w = ProgramState->FontSize/2;
+    GlyphInfo Glyph = GetCharDrawInfo(Font, CharAt(View, View->CursorPos)).Glyph;
+    CursorDrawRect.w = Glyph.advanceX;
     
     color CursorColor = ProgramState->CursorBGColor;
     color SelectionAreaColor = ORANGE;
@@ -370,20 +363,16 @@ DrawSuperDebugMenu(program_state *ProgramState)
         Y += DrawString(ProgramState, TempString("%d, parent=%d,", View->Id, View->ParentId), V2(X, Y), BLACK).y;
     }
     
-#if 0
-    Y += DrawString(ProgramState, String, v2 Pos, color FGColor).y;
-    Y += DrawString(ProgramState, String, v2 Pos, color FGColor).y;
-#endif
-    
     Y += 20;
     Y += DrawString(ProgramState, TempString("Font Texture"), V2(X, Y), BLACK, Style_Underline).y;
-    DrawTexture(ProgramState->FontMonospace.RFont.texture, X, Y, BLACK);
-    DrawTexture(ProgramState->FontMonospace.RFont.texture, X, Y, BLACK);
-    DrawRectangleLinesEx(R(Rect(X, Y,
-                                ProgramState->FontMonospace.RFont.texture.width,
-                                ProgramState->FontMonospace.RFont.texture.height)),
-                         3, BLACK);
-    Y += ProgramState->FontMonospace.RFont.texture.height;
+    /*
+        DrawTexture(ProgramState->Font.RFont.texture, X, Y, BLACK);
+        DrawRectangleLinesEx(R(Rect(X, Y,
+                                    ProgramState->Font.RFont.texture.width,
+                                    ProgramState->Font.RFont.texture.height)),
+                             3, BLACK);
+        Y += ProgramState->Font.RFont.texture.height;
+    */
     
     ProgramState->SuperDebugMenuH = Y + ProgramState->SuperDebugMenuY;
 }

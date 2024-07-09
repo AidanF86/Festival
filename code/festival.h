@@ -97,13 +97,6 @@ enum input_mode
     InputMode_EntryBar,
 };
 
-
-struct font
-{
-    Font RFont;
-    int AsciiGlyphIndexes[256];
-};
-
 #define MAX_BUFFERS 50
 struct program_state
 {
@@ -114,13 +107,13 @@ struct program_state
     f32 KeyFirstRepeatTime;
     f32 KeyRepeatSpeed = 1;
     
-    font FontMonospace;
-    font FontSans;
-    font FontSerif;
-    font_type FontType;
+    font Font;
+    //char *FontMonospaceFileName;
+    //char *FontSansFileName;
+    //char *FontSerifFileName;
     
-    int FontSize;
-    int PrevFontSize;
+    //int FontSize;
+    //int PrevFontSize;
     int CharsPerVirtualLine;
     int SubLineOffset;
     int MarginLeft;

@@ -176,6 +176,11 @@ LoadFileToBuffer(const char *RawPath)
         ListAdd(&Buffer.Lines, String(""));
     }
     
+    if((Buffer.Lines[0])[0] == 65279)
+    {
+        Buffer.Lines[0].RemoveChar(0);
+    }
+    
     UnloadFileText(FileData);
     
     

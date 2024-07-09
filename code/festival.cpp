@@ -18,8 +18,10 @@
 #include "festival_actions.h"
 #include "festival_encoding.h"
 #include "festival_encoding.cpp"
+#include "festival_font.h"
 #include "festival.h"
 #include "festival_filesystem.h"
+#include "festival_font.cpp"
 
 #include "festival_functions.cpp"
 #include "festival_profiling.h"
@@ -65,6 +67,19 @@ extern "C"
             Memory->Initialized = true;
             ProgramState->ShouldExit = false;
             
+            u32 LargestSize = 0;
+            const char *LargestName = "None";
+            for(int i = 0; i < sizeof(UnicodeGroups) / sizeof(unicode_group); i++)
+            {
+                u32 Size = UnicodeGroups[i].End - UnicodeGroups[i].Start;
+                if(Size > LargestSize)
+                {
+                    LargestSize = Size;
+                    LargestName = UnicodeGroups[i].Name;
+                }
+            }
+            Print("Largest Unicode group is %s, with %D items", LargestName, LargestSize);
+            
             for(int i = 0; i < MAX_BUFFERS; i++) {
                 Buffers[i] = {0};
             };
@@ -74,16 +89,17 @@ extern "C"
             ListAdd(Buffers, LoadFileToBuffer("./data/testing_files/utf-8.txt"));
             
             
-            ProgramState->FontSize = 18;
-            LoadFonts(ProgramState);
-            ProgramState->FontType = FontType_Monospace;
+            //LoadFonts(ProgramState);
+            //LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/LiberationMono-Regular.ttf");
+            ProgramState->Font = {0};
+            ProgramState->Font.Path = String("./data/fonts/LiberationMono-Regular.ttf");
+            ProgramState->Font.Size = 18;
             
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;
             
             FillKeyData(&ProgramState->Input);
             
-            ProgramState->PrevFontSize = ProgramState->FontSize;
             ProgramState->CharsPerVirtualLine = 10;
             ProgramState->SubLineOffset = 4;
             ProgramState->MarginLeft = 10;
@@ -131,9 +147,10 @@ extern "C"
         
         
         // Re-load fonts if needed
-        if(ProgramState->PrevFontSize != ProgramState->FontSize)
-            LoadFonts(ProgramState);
-        ProgramState->PrevFontSize = ProgramState->FontSize;
+        // TODO: reimplement
+        //if(ProgramState->PrevFontSize != ProgramState->FontSize)
+        //LoadFonts(ProgramState);
+        //ProgramState->PrevFontSize = ProgramState->FontSize;
         
         StartProfiling();
         StartProfile(Total);
@@ -421,6 +438,8 @@ extern "C"
             }
         }
         
+        
+#if 0
         view *CurrentView = &ProgramState->Views[ProgramState->SelectedViewIndex];
         u32 CurrentCodepoint = CharAt(CurrentView, CurrentView->CursorPos);
         string CPBitString = String("");
@@ -433,12 +452,6 @@ extern "C"
                    V2(CharToScreenSpace(CurrentView, CurrentView->CursorRect)) + V2(0, ProgramState->FontSize), BLACK, ORANGE, 0);
         CPBitString.Free();
         
-#if 0
-        for(int i = 0; i < 32; i++)
-        {
-            printf("%c", IsolateBitInU32(10, i) ? '1' : '0');
-        }
-        printf("\n");
 #endif
         
 #if 0

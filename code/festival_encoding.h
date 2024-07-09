@@ -11,4 +11,5 @@ enum file_encoding
     FileEncoding_ASCII,
 };
 
+
 #endif //FESTIVAL_ENCODING_H
