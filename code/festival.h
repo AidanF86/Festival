@@ -23,13 +23,12 @@ struct buffer
 {
     string FileName;
     string DirPath;
-    
-    file_encoding FileEncoding;
-    
-    string_list Lines;
+    char *FileEncoding;
     
     int ActionIndex;
     action_list ActionStack;
+    
+    string_list Lines;
 };
 DefineList(buffer, Buffer)
 

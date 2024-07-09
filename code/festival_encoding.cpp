@@ -1,4 +1,4 @@
-file_encoding
+char *
 GetTextEncodingType(char *Data)
 {
     DetectObj *DetectObject;
@@ -7,7 +7,7 @@ GetTextEncodingType(char *Data)
     if(DetectObject == NULL)
     {
         printerror("Failed to allocate libchardet DetectObj");
-        return FileEncoding_Error;
+        return NULL;
     }
     
     switch(detect_r(Data, strlen(Data), &DetectObject))
@@ -15,22 +15,82 @@ GetTextEncodingType(char *Data)
         case CHARDET_OUT_OF_MEMORY : {
             printerror("On handle processing, occured out of memory");
             detect_obj_free (&DetectObject);
-            return FileEncoding_Error;
+            return NULL;
         } break;
         case CHARDET_NULL_OBJECT : {
             printerror("2st argument of chardet() is must memory allocation with detect_obj_init API");
-            return FileEncoding_Error;
+            return NULL;
         } break;
     }
     
     printf ("encoding: %s, confidence: %f\n", DetectObject->encoding, DetectObject->confidence);
     
+    int ResultLength = strlen(DetectObject->encoding) + 1;
+    char *Result = (char *)TryMalloc(ResultLength * sizeof(char));
+    Result[ResultLength - 1] = 0;
+    strcpy(Result, DetectObject->encoding);
+    
     detect_obj_free(&DetectObject);
     
-    // Default: UTF-8
-    return FileEncoding_UTF8;
+    return Result;
 }
 
+#if 1
+u32 *
+ConvertTextToUTF32(char *Data, char *Encoding)
+{
+    print("Converting text from %s to UTF-32");
+    print(Data);
+    iconv_t cd = iconv_open("UTF32", Encoding);
+    if(cd == (iconv_t) -1)
+    {
+        if(errno == EINVAL)
+            printerror("Conversion from %s to UTF32 not available", Encoding);
+        else
+            printerror("iconv_open");
+        return NULL;
+    }
+    
+    int DataLength = strlen(Data);
+    int OutputBufferSize = DataLength * sizeof(u32);
+    char *Result = (char *)TryMalloc(OutputBufferSize);
+    
+    size_t InBytesLeft = DataLength;
+    size_t OutBytesLeft = OutputBufferSize;
+    
+    print("InBytes: %ld", InBytesLeft);
+    print("OutBytes: %ld", OutBytesLeft);
+    
+    for(int i = 0; i < OutputBufferSize; i++)
+    {
+        Result[i] = 0;
+    }
+    
+    char *OutBuffer = Result;
+    
+    while(InBytesLeft > 0)
+    {
+        size_t nconv = iconv(cd, &Data, &InBytesLeft, &OutBuffer, &OutBytesLeft);
+        
+        if(nconv == (size_t) -1)
+        {
+            if(errno == EINVAL)
+            {
+                printerror("iconv EINVAL");
+            }
+            else
+            {
+                printerror("iconv unknown issue");
+            }
+        }
+    }
+    
+    iconv_close(cd);
+    
+    return (u32 *)Result;
+}
+
+#else
 inline char
 GetUTF8CodePointByteCount(char FirstByte)
 {
@@ -115,3 +175,4 @@ ConvertUTF32ToUTF8(char *Data)
 {
     return NULL;
 }
+#endif

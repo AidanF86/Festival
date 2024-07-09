@@ -391,7 +391,9 @@ CodepointIndex(font *Font, u32 Codepoint)
     {
         // TODO: make more efficient! Hash map?
         //Print("Searching for non-ascii char index (%d)", Codepoint);
-        int GlyphIndex = 0;
+        int GlyphIndex = -1;
+        if(Codepoint == 32)
+            return 0;
         for(int i = 0; i < Font->RFont.glyphCount; i++)
         {
             if(Font->RFont.glyphs[i].value == Codepoint)
@@ -611,18 +613,34 @@ FillLineData(view *View, program_state *ProgramState)
             // as well as buffer viewpos
             
             int GlyphIndex = CodepointIndex(Font, CharAt(View, BufferPos(l, c)));
-            GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
-            
-            if(x+Info.advanceX >= WrapPoint)
+            if(GlyphIndex >= 0)
             {
-                x = SubLineOffset*CharWidth;
-                y += CharHeight;
-                RectData->DisplayLines++;
+                GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
+                
+                if(x+Info.advanceX >= WrapPoint)
+                {
+                    x = SubLineOffset*CharWidth;
+                    y += CharHeight;
+                    RectData->DisplayLines++;
+                }
+                
+                ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
+                
+                x += Info.advanceX;
             }
-            
-            ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
-            
-            x += Info.advanceX;
+            else
+            {
+                if(x+CharWidth >= WrapPoint)
+                {
+                    x = SubLineOffset*CharWidth;
+                    y += CharHeight;
+                    RectData->DisplayLines++;
+                }
+                
+                ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
+                
+                x += CharWidth;
+            }
         }
         RectData->EndLineRect = Rect(x, y, CharWidth, CharHeight);
         

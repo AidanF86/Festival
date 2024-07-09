@@ -46,7 +46,6 @@ struct string
         
         if(Length + 5 >= ArraySize)
         {
-            printf("Reallocating string\n");
             ArraySize = ArraySize+64;
             Data = (u32 *)TryRealloc(Data, sizeof(u32) * ArraySize);
         }

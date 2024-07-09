@@ -3,6 +3,9 @@
 #include "raylib.h"
 #include "chardet.h"
 #include <sys/stat.h>
+#include <iconv.h>
+#include <errno.h>
+#include <wchar.h>
 
 #include "festival_base.h"
 #include "festival_platform.h"

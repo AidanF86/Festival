@@ -34,33 +34,34 @@ typedef Color color;
 #define AnsiColor_Cyan    "\x1b[36m"
 #define AnsiColor_Reset   "\x1b[0m"
 
-#define _Assert(X) if(!X) {\
+#define _Assert(X) { if(!X) {\
 char *NullAddr = (char *) 0; *NullAddr = 0;\
-}
+} }
 
 b32 Logging_StopOnWarning = 1;
 b32 Logging_StopOnError = 1;
 
-#define printwarning(...) \
+#define printwarning(...) ({ \
 printf("%s", AnsiColor_Yellow);\
 printf("WARNING (%s, %s, line %d): ", __FILE__, __func__, __LINE__);\
 printf(__VA_ARGS__);\
 printf("%s\n", AnsiColor_Reset);\
-if(Logging_StopOnWarning) { _Assert(false); }
+if(Logging_StopOnWarning) { _Assert(false); } })
 
-#define printerror(...) \
+#define printerror(...) ({ \
 printf("%s", AnsiColor_Red);\
 printf("ERROR (%s, %s, line %d): ", __FILE__, __func__, __LINE__);\
 printf(__VA_ARGS__);\
 printf("%s\n", AnsiColor_Reset);\
-if(Logging_StopOnError) { _Assert(false); }
+if(Logging_StopOnError) { _Assert(false); } })
+
+#define print(...) ({ printf(__VA_ARGS__); printf("\n"); })
 
 
-
-#define Assert(X) if(!X) {\
+#define Assert(X) { if(!X) {\
 printerror("Assert Called by: %s, %s, line %d", __FILE__, __func__, __LINE__);\
 _Assert(X)\
-}
+} }
 
 
 

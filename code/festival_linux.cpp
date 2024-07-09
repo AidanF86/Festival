@@ -28,15 +28,16 @@ LinuxGetFileLastWriteTime(const char *FileName)
 void
 LinuxUnloadProgramCode(linux_program_code *ProgramCode)
 {
+    printf("Unloading program code... ");
     if(ProgramCode->Code)
     {
-        printf("CLOSING CODE\n");
         dlclose(ProgramCode->Code);
         ProgramCode->Code = 0;
+        print(AnsiColor_Green "Success" AnsiColor_Reset);
     }
     else
     {
-        printf("CODE WAS NULL\n");
+        printerror("Program code was null");
     }
     ProgramCode->UpdateAndRender = 0;
     ProgramCode->IsValid = false;
@@ -45,6 +46,7 @@ LinuxUnloadProgramCode(linux_program_code *ProgramCode)
 linux_program_code
 LinuxLoadProgramCode(const char *FileName)
 {
+    printf("Loading program code... ");
     linux_program_code Result;
     Result.IsValid = true;
     Result.Code = dlopen(FileName, RTLD_NOW);
@@ -53,8 +55,7 @@ LinuxLoadProgramCode(const char *FileName)
     if(Error)
     {
         Result.IsValid = false;
-        printf("dlopen ERROR!\n");
-        printf("    %s\n\n", Error);
+        printerror("dlopen failed: %s", Error);
     }
     else 
     {
@@ -68,24 +69,28 @@ LinuxLoadProgramCode(const char *FileName)
         {
             Result.UpdateAndRender = 0;
             Result.IsValid = false;
-            printf("dlsym ERROR!\n");
-            printf("    %s\n\n", Error);
+            printerror("dlsym failed: %s", Error);
         }
         
         //dlclose(Result.Code);
     }
     
+    print(AnsiColor_Green "Success" AnsiColor_Reset);
     return Result;
 }
 
 int main()
 {
+    //printf(AnsiColor_Green, "STARTING PROGRAM\n\n", AnsiColor_Reset);
+    
     linux_program_code ProgramCode = LinuxLoadProgramCode(SO_FILE_NAME);
     if(!ProgramCode.IsValid)
     {
-        printf("Invalid program code - Exiting.");
+        print(AnsiColor_Red, "Invalid program code - Exiting", AnsiColor_Reset);
         return 1;
     }
+    
+    printf("Initializing memory... ");
     
     program_memory Memory;
     Memory.Initialized = false;
@@ -95,7 +100,9 @@ int main()
     Memory.WindowWidth = 800;
     Memory.IsRunning = true;
     
-    printf("Initialized memory");
+    print(AnsiColor_Green "Success" AnsiColor_Reset);
+    
+    SetTraceLogLevel(LOG_ERROR);
     
     InitWindow(Memory.WindowWidth, Memory.WindowHeight, "Festival");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
@@ -111,34 +118,26 @@ int main()
             LinuxUnloadProgramCode(&ProgramCode);
             sleep(1);
             ProgramCode = LinuxLoadProgramCode(SO_FILE_NAME);
-            if(ProgramCode.IsValid)
-            {
-                printf("Program code reloaded.\n");
-            }
-            else
-            {
-                printf("[ERROR] Failed to reload program code");
-            }
+            if(!ProgramCode.IsValid)
+                printerror("Failed to reload program code");
         }
-#endif
-#if 0
-        
+#else
         if(IsKeyPressed(KEY_U))
         {
             if(ProgramCode.Code)
             {
                 LinuxUnloadProgramCode(&ProgramCode);
-                printf("Unloading code\n");
+                print("Unloading program code");
             }
             else
             {
-                printf("Code is already unloaded!\n");
+                print("Code is already unloaded");
             }
         }
         if(IsKeyPressed(KEY_L))
         {
             ProgramCode = LinuxLoadProgramCode(SO_FILE_NAME);
-            printf("Loading code\n");
+            print("Loading code");
         }
 #endif
         
@@ -151,10 +150,7 @@ int main()
         }
         else
         {
-            printf("UpdateAndRender is NULL!");
-            //BeginDrawing();
-            //ClearBackground(WHITE);
-            //EndDrawing();
+            print("UpdateAndRender is Null");
         }
     }
     

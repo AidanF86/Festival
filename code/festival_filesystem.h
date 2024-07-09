@@ -27,7 +27,6 @@ CleanUpPath(string *Path)
 void
 AbsolutizePath(string *Path)
 {
-    Print("ABSOLUTIZING");
     CleanUpPath(Path);
     
     // If Path doesn't start with '/', we assume it's relative to the working directory
@@ -37,13 +36,7 @@ AbsolutizePath(string *Path)
         
         string DirStr = String(GetWorkingDirectory());
         
-        Print(*Path);
-        Print("AAAA");
-        Print(DirStr);
-        
         Path->PrependString(DirStr);
-        
-        Print(*Path);
         
         DirStr.Free();
     }
@@ -132,12 +125,11 @@ LoadFileToBuffer(const char *RawPath)
     CleanUpPath(&FileName);
     
     string Path = String(RawPath);
-    Print(Path);
     AbsolutizePath(&Path);
     
     char *FullRawPath = RawString(Path);
     
-    Print("(LoadFileBuffer): Loading file %s", FullRawPath);
+    printf("Loading file '%s'... ", RawPath);
     // TODO: check if file exists and is readable, etc
     if(!FileExists(FullRawPath))
     {
@@ -145,8 +137,9 @@ LoadFileToBuffer(const char *RawPath)
         return {};
     }
     
+    print(AnsiColor_Green "Success" AnsiColor_Reset);
+    
     u32 FileSize = (u32)GetFileLength(FullRawPath);
-    Print("\tFile load successful. Total size: %d", (int)FileSize);
     
     char *FileData = LoadFileText(FullRawPath);
     
@@ -161,7 +154,8 @@ LoadFileToBuffer(const char *RawPath)
     // TODO: convert to fixed-width 32-bit unicode based on encoding
     
     Buffer.FileEncoding = GetTextEncodingType(FileData);
-    u32 *FileDataUTF32 = ConvertUTF8ToUTF32(FileData);
+    u32 *FileDataUTF32 = ConvertTextToUTF32(FileData, Buffer.FileEncoding);
+    //u32 *FileDataUTF32 = ConvertUTF8ToUTF32(FileData);
     
     Buffer.Lines = StringList();
     for(int i = 0; i < FileSize; i++)
@@ -186,8 +180,6 @@ LoadFileToBuffer(const char *RawPath)
     }
     
     UnloadFileText(FileData);
-    
-    Print("\tFile buffer successfully set up");
     
     return Buffer;
 }

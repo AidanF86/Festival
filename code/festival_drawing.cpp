@@ -10,29 +10,38 @@ DrawChar(program_state *ProgramState, u32 Codepoint, v2 Pos, color BGColor, colo
     
     GlyphInfo Info = {0};
     int GlyphIndex = CodepointIndex(Font, Codepoint);
-    Info = Font->RFont.glyphs[GlyphIndex];
-    
-    
     
     rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
-                         Font->RFont.recs[GlyphIndex].width,
-                         Font->RFont.recs[GlyphIndex].height);
-    
-    if(BGColor.a != 0)
+                         ProgramState->FontSize / 2,
+                         ProgramState->FontSize);
+    if(GlyphIndex >= 0)
     {
-        rect BGRect = Rect(Pos.x, Pos.y,
-                           ProgramState->FontSize/2,
-                           ProgramState->FontSize);
-        //if(Font->RFont.recs[GlyphIndex].width > ProgramState->FontSize/2)
-        if(Info.advanceX > ProgramState->FontSize/2)
-            BGRect.w = Info.advanceX;
-        DrawRectangleRec(R(BGRect), BGColor);
+        Info = Font->RFont.glyphs[GlyphIndex];
+        
+        DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
+                        Font->RFont.recs[GlyphIndex].width,
+                        Font->RFont.recs[GlyphIndex].height);
+        
+        if(BGColor.a != 0)
+        {
+            rect BGRect = Rect(Pos.x, Pos.y,
+                               ProgramState->FontSize/2,
+                               ProgramState->FontSize);
+            //if(Font->RFont.recs[GlyphIndex].width > ProgramState->FontSize/2)
+            if(Info.advanceX > ProgramState->FontSize/2)
+                BGRect.w = Info.advanceX;
+            DrawRectangleRec(R(BGRect), BGColor);
+        }
+        
+        DrawTexturePro(Font->RFont.texture,
+                       Font->RFont.recs[GlyphIndex],
+                       R(DestRect),
+                       {0, 0}, 0, FGColor);
     }
-    
-    DrawTexturePro(Font->RFont.texture,
-                   Font->RFont.recs[GlyphIndex],
-                   R(DestRect),
-                   {0, 0}, 0, FGColor);
+    else
+    {
+        DrawRectangleLinesEx(R(DestRect), 1, BLACK);
+    }
     return DestRect;
 }
 
@@ -144,7 +153,6 @@ DrawView(program_state *ProgramState, view *View)
         FreeString(TitleString);
     }
     
-    
     BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
     // TODO: Cross-view cursor interpolation
     // draw cursor
@@ -160,7 +168,10 @@ DrawView(program_state *ProgramState, view *View)
     int GlyphIndex = CodepointIndex(Font, CharAt(View, View->CursorPos));
     Info = Font->RFont.glyphs[GlyphIndex];
     
-    CursorDrawRect.w = Info.advanceX;
+    if(GlyphIndex >= 0)
+        CursorDrawRect.w = Info.advanceX;
+    else
+        CursorDrawRect.w = ProgramState->FontSize/2;
     
     color CursorColor = ProgramState->CursorBGColor;
     color SelectionAreaColor = ORANGE;
