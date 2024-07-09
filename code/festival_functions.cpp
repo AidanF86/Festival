@@ -138,7 +138,7 @@ ScreenRectAt(view *View, buffer_pos Pos)
     return ScreenRectAt(View, Pos.l, Pos.c);
 }
 
-char
+u32
 CharAt(buffer *Buffer, int l, int c)
 {
     if(l < 0 || l >= Buffer->Lines.Length)
@@ -154,7 +154,7 @@ CharAt(buffer *Buffer, int l, int c)
         return 0;
     return Buffer->Lines[l].Data[c];
 }
-char
+u32
 CharAt(view *View, int l, int c)
 {
     if(!View->Buffer)
@@ -164,12 +164,12 @@ CharAt(view *View, int l, int c)
     }
     return CharAt(View->Buffer, l, c);
 }
-char
+u32
 CharAt(buffer *Buffer, buffer_pos Pos)
 {
     return CharAt(Buffer, Pos.l, Pos.c);
 }
-char
+u32
 CharAt(view *View, buffer_pos Pos)
 {
     return CharAt(View, Pos.l, Pos.c);
@@ -404,6 +404,9 @@ CodepointIndex(font *Font, u32 Codepoint)
         // TODO: make more efficient! Hash map?
         //Print("Searching for non-ascii char index (%d)", Codepoint);
         int GlyphIndex = -1;
+        //Codepoint = Codepoint << 3 * 8;
+        //Codepoint = Codepoint >> 3 * 8;
+        
         if(Codepoint == 32)
             return 0;
         for(int i = 0; i < Font->RFont.glyphCount; i++)

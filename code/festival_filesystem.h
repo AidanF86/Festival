@@ -151,12 +151,9 @@ LoadFileToBuffer(const char *RawPath)
     Buffer.ActionIndex = -1;
     Buffer.ActionStack = ActionList();
     
-    // TODO: convert to fixed-width 32-bit unicode based on encoding
-    
     Buffer.FileEncoding = GetTextEncodingType(FileData);
     u64 CharCount = 0;
     u32 *FileDataUTF32 = ConvertTextToUTF32(FileData, Buffer.FileEncoding, &CharCount);
-    //u32 *FileDataUTF32 = ConvertUTF8ToUTF32(FileData);
     
     Buffer.Lines = StringList();
     for(int i = 0; i < CharCount; i++)
@@ -167,12 +164,11 @@ LoadFileToBuffer(const char *RawPath)
         
         ListAdd(&(Buffer.Lines), AllocString(i-LineStart));
         
-        int InLine = 0;
+        int IndexInLine = 0;
         for(int a = LineStart; a < i; a++)
         {
-            //Buffer.Lines[Buffer.Lines.Length-1].SetChar(InLine, FileData[a]);
-            Buffer.Lines[Buffer.Lines.Length-1].SetChar(InLine, FileDataUTF32[a]);
-            InLine++;
+            Buffer.Lines[Buffer.Lines.Length-1].SetChar(IndexInLine, FileDataUTF32[a]);
+            IndexInLine++;
         }
     }
     if(Buffer.Lines.Length == 0)
@@ -181,6 +177,7 @@ LoadFileToBuffer(const char *RawPath)
     }
     
     UnloadFileText(FileData);
+    
     
     return Buffer;
 }

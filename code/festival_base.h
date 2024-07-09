@@ -4,6 +4,7 @@
 #define CCC_BASE_H
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -108,13 +109,25 @@ _TryFree(void *Data, const char *CalledByFunction, int CalledByLine, const char 
 
 // 0 is left (highest), 7 is right (highest)
 // endianness :(
-inline char
+inline int
 IsolateBitInByte(char Byte, int BitIndex)
 {
     if(BitIndex < 0 || BitIndex > 7)
         return Byte;
     char mask = 1 << (7 - BitIndex);
     char val = Byte & mask;
+    if(val)
+        return 1;
+    else
+        return 0;
+}
+inline int
+IsolateBitInU32(u32 A, int BitIndex)
+{
+    if(BitIndex < 0 || BitIndex > 31)
+        return A;
+    u32 mask = 1 << (31 - BitIndex);
+    u32 val = A & mask;
     if(val)
         return 1;
     else

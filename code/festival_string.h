@@ -18,8 +18,7 @@ struct string
     {
         if(Index < 0 || Index >= Length)
         {
-            // TODO: warning logging?
-            printerror("Attempting to access out-of-bounds index");
+            printwarning("Attempting to access out-of-bounds index");
             return 0;
         }
         return Data[Index];
@@ -28,8 +27,7 @@ struct string
     {
         if(Index < 0 || Index >= Length)
         {
-            // TODO: warning logging?
-            printerror("Attempting to set out-of-bounds index");
+            printwarning("Attempting to set out-of-bounds index");
             return;
         }
         Data[Index] = NewChar;
@@ -39,8 +37,7 @@ struct string
     {
         if(Index < 0 || Index > Length)
         {
-            // TODO: warning logging?
-            printerror("Trying to insert at an out-of-bounds index: %d", Index);
+            printwarning("Trying to insert at an out-of-bounds index: %d", Index);
             return;
         }
         
@@ -341,8 +338,8 @@ _String(const char *Format, va_list Args)
                     }break;
                     case 'D':
                     {
-                        int Var = va_arg(Args, u32);
-                        Length = Sprintf(StringVarBuffer, "%ud", Var);
+                        u32 Var = va_arg(Args, u32);
+                        Length = Sprintf(StringVarBuffer, "%" PRIu32, Var);
                     }break;
                     case 'f':
                     {

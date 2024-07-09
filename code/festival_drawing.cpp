@@ -339,7 +339,6 @@ DrawView(program_state *ProgramState, view *View)
     }
     
     EndScissorMode();
-    DrawRectangleLinesEx(R(View->TextRect), 2, ORANGE);
 }
 
 

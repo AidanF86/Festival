@@ -51,14 +51,11 @@ ConvertTextToUTF32(char *Data, char *Encoding, u64 *FinalCharCount)
     }
     
     int DataLength = strlen(Data);
-    int OutputBufferSize = DataLength * sizeof(u32);
+    int OutputBufferSize = (DataLength + 10) * sizeof(u32);
     char *Result = (char *)TryMalloc(OutputBufferSize);
     
     size_t InBytesLeft = DataLength;
     size_t OutBytesLeft = OutputBufferSize;
-    
-    print("InBytes: %ld", InBytesLeft);
-    print("OutBytes: %ld", OutBytesLeft);
     
     for(int i = 0; i < OutputBufferSize; i++)
     {
@@ -86,11 +83,23 @@ ConvertTextToUTF32(char *Data, char *Encoding, u64 *FinalCharCount)
     
     iconv_close(cd);
     
+    
     size_t FinalSize = OutputBufferSize - OutBytesLeft;
+    
+    if(Result[0] == 65279)
+    {
+        Result += 4;
+        FinalSize -= 4;
+    }
+    
     *FinalCharCount = (u64)(FinalSize / 4);
-    //print("%ld vs %ld", OutputBufferSize, FinalSize);
-    // TODO: we're assuming this size aligns with 4 bytes, but we should probably check
     u32 *FinalResult = (u32 *)TryRealloc(Result, FinalSize);
+    
+    for(int i = 0; i < FinalSize / 4; i++)
+    {
+        if(FinalResult[i] > 255)
+            Print("Large codepoint %d at %d", FinalResult[i], i);
+    }
     
     return FinalResult;
 }

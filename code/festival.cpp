@@ -30,6 +30,24 @@
 #include "festival_drawing.cpp"
 #include "festival_editing.h"
 
+#if 0
+void
+CheckBufferForHugeChars(program_state *ProgramState)
+{
+    buffer Buffer = ProgramState->Buffers[0];
+    for(int l = 0; l < Buffer.Lines.Length; l++)
+    {
+        for(int c = 0; c < Buffer.Lines[l].Length; c++)
+        {
+            u32 Codepoint = (Buffer.Lines[l])[c];
+            if(Codepoint > 255 && Codepoint != 65279)
+            {
+                printwarning("Huge char detected at %d,%d", l, c);
+            }
+        }
+    }
+}
+#endif
 
 extern "C"
 {
@@ -362,7 +380,6 @@ extern "C"
         View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View)-1);
         View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
         
-        
         StartProfile(FillLineData);
         for(int i = 0; i < Views->Length; i++)
         {
@@ -403,6 +420,26 @@ extern "C"
                 }
             }
         }
+        
+        view *CurrentView = &ProgramState->Views[ProgramState->SelectedViewIndex];
+        u32 CurrentCodepoint = CharAt(CurrentView, CurrentView->CursorPos);
+        string CPBitString = String("");
+        for(int i = 0; i < 32; i++)
+        {
+            CPBitString.AppendChar(IsolateBitInU32(CurrentCodepoint, i) ? '1' : '0');
+        }
+        DrawString(ProgramState, CPBitString, V2(CharToScreenSpace(CurrentView, CurrentView->CursorRect)), BLACK, ORANGE, 0);
+        DrawString(ProgramState, TempString("%D", CurrentCodepoint),
+                   V2(CharToScreenSpace(CurrentView, CurrentView->CursorRect)) + V2(0, ProgramState->FontSize), BLACK, ORANGE, 0);
+        CPBitString.Free();
+        
+#if 0
+        for(int i = 0; i < 32; i++)
+        {
+            printf("%c", IsolateBitInU32(10, i) ? '1' : '0');
+        }
+        printf("\n");
+#endif
         
 #if 0
         int Y = 300;
