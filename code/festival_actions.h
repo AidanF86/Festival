@@ -15,7 +15,7 @@ struct action
     
     b32 Add;
     buffer_pos AddPos;
-    string AddContent;
+    string_list AddContent;
     b32 AddLineBelow;
 };
 

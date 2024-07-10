@@ -782,3 +782,4 @@ SplitView(program_state *ProgramState, view_spawn_location Location)
     buffer *BufferToUse = ProgramState->Views.Data[ProgramState->SelectedViewIndex].Buffer;
     ListAdd(&ProgramState->Views, View(ProgramState, BufferToUse, ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location));
 }
+

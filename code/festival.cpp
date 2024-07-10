@@ -431,7 +431,7 @@ extern "C"
                 }
                 else if(A.Add)
                 {
-                    DrawString(ProgramState, TempString("Add %S", A.AddContent), V2(X, Y+=20), BLACK, YELLOW);
+                    DrawString(ProgramState, TempString("Add string"), V2(X, Y+=20), BLACK, YELLOW);
                 }
             }
         }

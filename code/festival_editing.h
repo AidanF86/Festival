@@ -4,6 +4,46 @@
 #define FESTIVAL_EDITING_H
 
 void
+PasteFromClipboard(program_state *ProgramState, view *View)
+{
+    // TODO: Is it ok to cast from const char* to char*?
+    char *ClipboardText = (char *)GetClipboardText();
+    if(strlen(ClipboardText) == 0)
+        return;
+    
+    Print("Pasting text: '%s'", ClipboardText);
+    u64 TextLength = 0;
+    u32 *Text = ConvertTextToUTF32(ClipboardText, GetTextEncodingType(ClipboardText), &TextLength);
+    
+    // TODO: add conversion function to string
+    //string TextString = String("");
+    
+    string_list TextStringList = StringList();
+    TextStringList.Add(String(""));
+    int StringIndex = 0;
+    
+    for(int i = 0; i < TextLength; i++)
+    {
+        if((char)Text[i] == '\n')
+        {
+            StringIndex++;
+            TextStringList.Add(String(""));
+        }
+        else
+        {
+            TextStringList[StringIndex].AppendChar(Text[i]);
+        }
+    }
+    
+    AddAndDoAction(ProgramState, View->Buffer,
+                   ActionForInsertStringList(View->CursorPos,
+                                             TextStringList,
+                                             /* TODO: split text if it has newline */ false));
+    
+    FreeStringList(TextStringList);
+}
+
+void
 SwitchInputMode(program_state *ProgramState, input_mode NewMode)
 {
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
@@ -11,10 +51,13 @@ SwitchInputMode(program_state *ProgramState, input_mode NewMode)
     {
         if(View->InsertModeString.Length > 0)
         {
+            string_list List = StringList();
+            List.Add(CopyString(View->InsertModeString));
             AddAction(View->Buffer,
-                      ActionForInsertString(View->InsertModeStartPos,
-                                            View->InsertModeString,
-                                            View->InsertModeLineBelow));
+                      ActionForInsertStringList(View->InsertModeStartPos,
+                                                List,
+                                                View->InsertModeLineBelow));
+            FreeStringList(List);
         }
         View->InsertModeString.Free();
         // check adlinebelow
@@ -435,6 +478,11 @@ HandleInput_Nav(program_state *ProgramState)
         {
             SplitView(ProgramState, Location_Right);
         }
+    }
+    
+    if(KeyShouldExecute(Input->VKey))
+    {
+        PasteFromClipboard(ProgramState, View);
     }
     
     if(KeyShouldExecute(Input->YKey))

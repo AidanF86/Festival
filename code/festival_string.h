@@ -538,6 +538,16 @@ CopyStringList(string_list A)
     return Result;
 }
 
+void
+FreeStringList(string_list A)
+{
+    for(int i = 0; i < A.Length; i++)
+    {
+        A[i].Free();
+    }
+    A.Free();
+}
+
 string_list
 CopyStringListRange(string_list A, int StartRow, int StartCol, int EndRow, int EndCol)
 {

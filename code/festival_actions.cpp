@@ -45,14 +45,14 @@ ActionForDeleteLine(buffer *Buffer, int Line)
 }
 
 action
-ActionForInsertString(buffer_pos Pos, string Text, b32 LineBelow)
+ActionForInsertStringList(buffer_pos Pos, string_list List, b32 LineBelow)
 {
     action Result;
     
     Result.Delete = false;
     Result.Add = true;
     Result.AddPos = Pos;
-    Result.AddContent = CopyString(Text);
+    Result.AddContent = CopyStringList(List);
     Result.AddLineBelow = LineBelow;
     
     return Result;
@@ -64,6 +64,36 @@ AddAction(buffer *Buffer, action Action)
     Buffer->ActionStack.Length = Buffer->ActionIndex + 1;
     ListAdd(&(Buffer->ActionStack), Action);
     Buffer->ActionIndex++;
+}
+
+void
+BufferDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
+{
+    Print("");
+    
+    // delete in-between lines
+    for(int i = Start.l + 1; i < End.l; i++)
+    {
+        ListRemoveAt(&Buffer->Lines, i);
+        End.l--;
+        i--;
+    }
+    
+    // slice and join next line
+    if(End.l > Start.l)
+    {
+        if(Buffer->Lines[Start.l].Length > 0)
+            Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
+        if(Buffer->Lines[End.l].Length > 0)
+            Buffer->Lines[End.l].RemoveRange(0, End.c);
+        Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
+        ListRemoveAt(&Buffer->Lines, End.l);
+    }
+    else
+    {
+        if(Buffer->Lines[Start.l].Length > 0)
+            Buffer->Lines[Start.l].RemoveRange(Start.c, End.c);
+    }
 }
 
 void
@@ -87,8 +117,12 @@ UndoAction(program_state *ProgramState, buffer *Buffer, action A)
     }
     if(A.Add)
     {
-        Buffer->Lines[A.AddPos.l].RemoveRange(A.AddPos.c, A.AddPos.c + A.AddContent.Length);
+        //Buffer->Lines[A.AddPos.l].RemoveRange(A.AddPos.c, A.AddPos.c + A.AddContent.Length);
         // TODO: move cursor
+        buffer_pos End = BufferPos(A.AddPos.l + A.AddContent.Length-1,
+                                   A.AddContent[A.AddContent.Length-1].Length);
+        BufferDeleteRange(Buffer, A.AddPos, End);
+        
         ProgramState->ShouldChangeIdealCursorCol = true;
         SetCursorPos(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex], A.AddPos);
     }
@@ -106,6 +140,8 @@ DoAction(program_state *ProgramState, buffer *Buffer, action A)
         }
         else
         {
+            BufferDeleteRange(Buffer, A.DeleteStart, A.DeleteEnd);
+#if 0
             buffer_pos Start = A.DeleteStart;
             buffer_pos End = A.DeleteEnd;
             
@@ -144,13 +180,22 @@ DoAction(program_state *ProgramState, buffer *Buffer, action A)
                 if(Buffer->Lines[Start.l].Length > 0)
                     Buffer->Lines[Start.l].RemoveRange(Start.c, End.c);
             }
+#endif
         }
     }
     
     if(A.Add)
     {
-        // TODO
-        Buffer->Lines[A.AddPos.l].InsertString(A.AddPos.c, A.AddContent);
+        // TODO: does this work
+#if 0
+        for(int i = 0; i < A.AddContent.Length; i++)
+        {
+            int Col = Clamp(0, A.AddPos.c, LineLength(Buffer, A.AddPos.l + i) - 1);
+            Buffer->Lines[A.AddPos.l + i].InsertString(Col, A.AddContent[i]);
+            Buffer->Lines.Insert(A.AddPos.l + i + 1, String(""));
+        }
+#endif
+        InsertStringList(&Buffer->Lines, A.AddContent, A.AddPos.l, A.AddPos.c);
         // TODO: move cursor
         ProgramState->ShouldChangeIdealCursorCol = true;
         SetCursorPos(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex],
