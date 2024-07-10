@@ -175,8 +175,9 @@ GetRectForCodepoint(font *Font, u32 Codepoint)
 }
 #endif
 
-v2 GetCharDim(program_state *ProgramState)
+inline v2 GetCharDim(program_state *ProgramState)
 {
     return V2(ProgramState->Font.Size / 2, ProgramState->Font.Size);
+    //return V2(MeasureTextEx(ProgramState->Font.GlyphGroups[0].RaylibFont, "_", ProgramState->Font.Size, 0));
 }
 

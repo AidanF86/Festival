@@ -1,4 +1,3 @@
-#include <stdio.h>
 
 #include "raylib.h"
 #include "chardet.h"
@@ -89,10 +88,9 @@ extern "C"
             ListAdd(Buffers, LoadFileToBuffer("./data/testing_files/utf-8.txt"));
             
             
-            //LoadFonts(ProgramState);
-            //LoadFont(ProgramState, ProgramState->FontSize, "./data/fonts/LiberationMono-Regular.ttf");
             ProgramState->Font = {0};
-            ProgramState->Font.Path = String("./data/fonts/LiberationMono-Regular.ttf");
+            //ProgramState->Font.Path = String("./data/fonts/LiberationMono-Regular.ttf");
+            ProgramState->Font.Path = String("./data/fonts/HelveticaNeue-Regular.otf");
             ProgramState->Font.Size = 18;
             
             ProgramState->KeyFirstRepeatTime = 0.4f;

@@ -29,25 +29,12 @@ DrawChar(program_state *ProgramState, u32 Codepoint, v2 Pos, color BGColor, colo
     }
     else
     {
-        DrawRectangleLinesEx(R(DestRect), 1, FGColor);
-    }
-    
-#if 0
-    int GlyphIndex = CodepointIndex(Font, Codepoint);
-    
-    rect DestRect = Rect(Pos.x + Info.offsetX, Pos.y + Info.offsetY,
-                         ProgramState->FontSize / 2,
-                         ProgramState->FontSize);
-    if(GlyphIndex >= 0)
-    {
-        
-    }
-    else
-    {
+        v2 CharDim = GetCharDim(ProgramState);
+        DestRect = Rect(Pos.x, Pos.y, CharDim.x, CharDim.y);
         rect DrawRect = Rect(DestRect.x + 2, DestRect.y + 2, DestRect.w - 4, DestRect.h - 4);
-        DrawRectangleLinesEx(R(DrawRect), 1, BLACK);
+        //DrawRectangleLinesEx(R(DrawRect), 1, FGColor);
     }
-#endif
+    
     return DestRect;
 }
 
@@ -69,7 +56,9 @@ DrawString(program_state *ProgramState, string String, v2 Pos, color BGColor, co
     
     for(int i = 0; i < String.Length; i++)
     {
-        Pos.x += DrawChar(ProgramState, String[i], Pos, BGColor, FGColor).x;
+        DrawChar(ProgramState, String[i], Pos, BGColor, FGColor).w;
+        Pos.x += GetCharDrawInfo(Font, String[i]).Glyph.advanceX;
+        //Print("%d", AdvanceX);
         
         /*
                 int GlyphIndex = CodepointIndex(Font, String[i]);
@@ -164,8 +153,9 @@ DrawView(program_state *ProgramState, view *View)
     
     font *Font = &ProgramState->Font;
     
-    GlyphInfo Glyph = GetCharDrawInfo(Font, CharAt(View, View->CursorPos)).Glyph;
-    CursorDrawRect.w = Glyph.advanceX;
+    char_draw_info CursorCharInfo = GetCharDrawInfo(Font, CharAt(View, View->CursorPos));
+    if(CursorCharInfo.IsValid)
+        CursorDrawRect.w = CursorCharInfo.Glyph.advanceX;
     
     color CursorColor = ProgramState->CursorBGColor;
     color SelectionAreaColor = ORANGE;

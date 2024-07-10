@@ -469,7 +469,7 @@ FillLineData(view *View, program_state *ProgramState)
     int MarginLeft = ProgramState->MarginLeft;
     int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
     int NumbersWidth = ProgramState->NumbersWidth;
-    int SubLineOffset = ProgramState->SubLineOffset;
+    int SubLineOffset = 0;//ProgramState->SubLineOffset;
     v2 CharDim = GetCharDim(ProgramState);
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
@@ -533,27 +533,6 @@ FillLineData(view *View, program_state *ProgramState)
             
             x += Info.advanceX;
             
-#if 0
-            GlyphInfo Info = Font->RFont.glyphs[GlyphIndex];
-            if(GlyphIndex >= 0)
-            {
-                
-                
-            }
-            else
-            {
-                if(x+CharWidth >= WrapPoint)
-                {
-                    x = SubLineOffset*CharWidth;
-                    y += CharHeight;
-                    RectData->DisplayLines++;
-                }
-                
-                ListAdd(&(RectData->CharRects), Rect(x, y, CharWidth, CharHeight));
-                
-                x += CharWidth;
-            }
-#endif
         }
         RectData->EndLineRect = Rect(x, y, CharWidth, CharHeight);
         
