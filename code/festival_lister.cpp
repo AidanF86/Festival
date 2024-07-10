@@ -112,32 +112,40 @@ OpenSwitchFontTypeLister(program_state *ProgramState, view *View)
     View->Lister = Lister(ListerType_FontType);
     lister *Lister = &View->Lister;
     
-    Lister->InputLabel = String("Run Command: ");
+    Lister->InputLabel = String("Open Font File: ");
+    //Lister->Input = String("./data/fonts/");
     Lister->Input = String("");
+    //AbsolutizePath(&Lister->Input);
     Lister->Purpose = ListerPurpose_SwitchFontType;
     
-    lister_entry NewEntry;
-    NewEntry.FontType = FontType_Monospace;
-    NewEntry.Name = String("Monospace");
-    ListAdd(&Lister->Entries, NewEntry);
-    ListAdd(&Lister->MatchingEntries, 0);
-    
-    NewEntry.FontType = FontType_Sans;
-    NewEntry.Name = String("Sans");
-    ListAdd(&Lister->Entries, NewEntry);
-    ListAdd(&Lister->MatchingEntries, 1);
-    
-    NewEntry.FontType = FontType_Serif;
-    NewEntry.Name = String("Serif");
-    ListAdd(&Lister->Entries, NewEntry);
-    ListAdd(&Lister->MatchingEntries, 2);
-    
-    ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
-    ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
-    ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+    FilePathList FilesInDir = LoadDirectoryFiles("./data/fonts/");
+    for(int i = 0; i < FilesInDir.count; i++)
+    {
+        b32 IsDirectory = false;
+        
+        lister_entry NewEntry;
+        NewEntry.String = String(FilesInDir.paths[i]);
+        AbsolutizePath(&NewEntry.String);
+        if(DirectoryExists(TempRawString(NewEntry.String)))
+        {
+            IsDirectory = true;
+            NewEntry.String.AppendChar('/');
+        }
+        
+        string Path = String(FilesInDir.paths[i]);
+        AbsolutizePath(&Path);
+        NewEntry.Name = GetFileName(Path);
+        Path.Free();
+        
+        ListAdd(&Lister->Entries, NewEntry);
+        ListAdd(&Lister->Rects, Rect(0, 0, 0, 0));
+        ListAdd(&Lister->MatchingEntries, i);
+    }
+    UnloadDirectoryFiles(FilesInDir);
     
     View->ListerIsOpen = true;
     Lister->ShouldExecute = false;
+    
 }
 
 
@@ -219,9 +227,7 @@ ExecLister(program_state *ProgramState, view *View)
                 break;
             }
             
-            printwarning("TODO: re-implement this!");
-            //ProgramState->FontType = Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].FontType;
-            
+            SetNewFont(&ProgramState->Font, Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
         } break;
         case ListerPurpose_RunCommand: {
             if(Lister->Type != ListerType_Command) {

@@ -55,12 +55,14 @@ DONE better path handling
 DONE touch up edit file lister
 DONE selection delete
 
+DONE find file encoding type and convert to 32-bit fixed-width
+
 Current Goal: insert (add) action // Done?
 				Heap issue might be due to deleting when file is empty
 Undoing and redoing
 
-Temporary Detour: find file encoding type and convert to 32-bit fixed-width
-	Issue: font loading often crashes
+Temporary Detour: 
+	Load glyphs by unicode group when necessary
 	Scroll bar
 
 Copy and pasting

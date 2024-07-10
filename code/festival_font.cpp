@@ -1,59 +1,7 @@
-#if 0
-void
-LoadFont(font *Font, int Size, const char *Path)
+inline v2 GetCharDim(program_state *ProgramState)
 {
-    string FileName = GetFileName(TempString(Path));
-    printf("Loading font '%S'...", FileName);
-    FileName.Free();
-    
-    font LoadedFont = {0};
-    
-    u32 FontFileSize = 0;
-    u8 *FontFileData = LoadFileData(Path, &FontFileSize);
-    if(FontFileData == NULL)
-    {
-        printerror("Couldn't load font file '%s'", Path);
-        return;
-    }
-    
-    Font *RLoadedFont = &(LoadedFont.RFont);
-    
-    RLoadedFont->baseSize = Size;
-    int GlyphCount = 255;
-    RLoadedFont->glyphCount = GlyphCount;
-    
-    RLoadedFont->glyphs = LoadFontData(FontFileData, FontFileSize, RLoadedFont->baseSize, 0, GlyphCount, FONT_DEFAULT);
-    if(RLoadedFont->glyphs == NULL)
-    {
-        printerror("Font glyphs couldn't be loaded");
-        return;
-    }
-    
-    Image Atlas = GenImageFontAtlas(RLoadedFont->glyphs, &RLoadedFont->recs, GlyphCount, RLoadedFont->baseSize, 4, 0);
-    RLoadedFont->texture = LoadTextureFromImage(Atlas);
-    
-    UnloadImage(Atlas);
-    UnloadFileData(FontFileData);
-    
-    
-    int GlyphIndex = 0;
-    for(int i = 0; i < 256; i++)
-    {
-        for(int a = 0; a < RLoadedFont->glyphCount; a++)
-        {
-            if(RLoadedFont->glyphs[a].value == i)
-            {
-                LoadedFont.AsciiGlyphIndexes[i] = a;
-                break;
-            }
-        }
-    }
-    
-    *Font = LoadedFont;
-    
-    print(AnsiColor_Green "Success" AnsiColor_Reset);
+    return V2(ProgramState->Font.Size / 2, ProgramState->Font.Size);
 }
-#endif
 
 void
 LoadGlyphGroup(font *Font, int Index)
@@ -98,6 +46,8 @@ GetCharDrawInfo(font *Font, u32 Codepoint)
             break;
         }
     }
+    
+    
     if(GroupIndex == -1)
     {
         char_draw_info Result = {0};
@@ -121,63 +71,21 @@ GetCharDrawInfo(font *Font, u32 Codepoint)
     Result.Glyph = Font->GlyphGroups[GroupIndex].RaylibFont.glyphs[Index];
     Result.SrcRect = Font->GlyphGroups[GroupIndex].RaylibFont.recs[Index];
     
+    if(Result.Glyph.value != Codepoint)
+    {
+        Print("Codepoint wasn't correct!");
+    }
+    
     return Result;
 }
 
-
-
-
-
-#if 0
-GlyphInfo
-GetGlyphForCodepoint(font *Font, u32 Codepoint)
+void
+SetNewFont(font *Font, string Path)
 {
-    // TODO: optimize
-    int GroupIndex = 0;
-    for(int i = 0; i < sizeof(UnicodeGroups) / sizeof(unicode_group); i++)
+    Font->Path.Free();
+    for(int i = 0; i < sizeof(Font->GlyphGroups) / sizeof(glyph_group); i++)
     {
-        unicode_group Group = UnicodeGroups[i];
-        if(Codepoint > Group.Start && Codepoint < Group.End)
-        {
-            GroupIndex = i;
-            break;
-        }
+        Font->GlyphGroups[i].Loaded = false;
     }
-    
-    if(!Font->GlyphGroups[GroupIndex].Loaded)
-    {
-        LoadGlyphGroup(Font, GroupIndex);
-    }
-    
-    return Font->GlyphGroups[GroupIndex].RaylibFont.glyphs[Codepoint - UnicodeGroups[GroupIndex].Start];
+    Font->Path = CopyString(Path);
 }
-
-Rectangle
-GetRectForCodepoint(font *Font, u32 Codepoint)
-{
-    int GroupIndex = 0;
-    for(int i = 0; i < sizeof(UnicodeGroups) / sizeof(unicode_group); i++)
-    {
-        unicode_group Group = UnicodeGroups[i];
-        if(Codepoint > Group.Start && Codepoint < Group.End)
-        {
-            GroupIndex = i;
-            break;
-        }
-    }
-    
-    if(!Font->GlyphGroups[GroupIndex].Loaded)
-    {
-        LoadGlyphGroup(Font, GroupIndex);
-    }
-    
-    return Font->GlyphGroups[GroupIndex].RaylibFont.recs[Codepoint - UnicodeGroups[GroupIndex].Start];
-}
-#endif
-
-inline v2 GetCharDim(program_state *ProgramState)
-{
-    return V2(ProgramState->Font.Size / 2, ProgramState->Font.Size);
-    //return V2(MeasureTextEx(ProgramState->Font.GlyphGroups[0].RaylibFont, "_", ProgramState->Font.Size, 0));
-}
-
