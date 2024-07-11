@@ -44,6 +44,36 @@ PasteFromClipboard(program_state *ProgramState, view *View)
 }
 
 void
+CopyToClipboard(program_state *ProgramState, view *View, buffer_pos Start, buffer_pos End, bool AddNewline)
+{
+    string StringToCopy = String("");
+    for(int l = Start.l; l <= End.l; l++)
+    {
+        if(l > Start.l)
+            StringToCopy.AppendChar('\n');
+        
+        int EndColumn = LineLength(View, l) - 1;
+        if(l == End.l)
+            EndColumn = End.c;
+        
+        for(int c = Start.c; c <= EndColumn; c++)
+        {
+            StringToCopy.AppendChar(CharAt(View, BufferPos(l, c)));
+        }
+    }
+    if(AddNewline)
+        StringToCopy.AppendChar('\n');
+    
+    u64 CharCount;
+    char *StringToCopyUTF8 = ConvertUTF32StringToEncoding(StringToCopy, "UTF8", &CharCount);
+    
+    SetClipboardText(StringToCopyUTF8);
+    
+    TryFree(StringToCopyUTF8);
+    StringToCopy.Free();
+}
+
+void
 SwitchInputMode(program_state *ProgramState, input_mode NewMode)
 {
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
@@ -463,6 +493,13 @@ HandleInput_Nav(program_state *ProgramState)
     
     ProcessNavMovement(ProgramState);
     
+    if(KeyShouldExecute(Input->CKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
+    {
+        buffer_pos Start = BufferPos(View->CursorPos.l, 0);
+        buffer_pos End = BufferPos(View->CursorPos.l, LineLength(View, View->CursorPos.l));
+        CopyToClipboard(ProgramState, View, Start, End, true);
+    }
+    
     if(KeyShouldExecute(Input->Slash_Key) && IsAnyShiftKeyDown)
     {
         ProgramState->ShowSuperDebugMenu = true;
@@ -550,6 +587,15 @@ HandleInput_Select(program_state *ProgramState)
     }
     
     ProcessNavMovement(ProgramState);
+    
+    if(KeyShouldExecute(Input->CKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
+    {
+        b32 AddNewLine = (View->CursorPos.c == LineLength(View, View->CursorPos.l));
+        buffer_pos Start = SmallerBufferPos(View->SelectionStartPos, View->CursorPos);
+        buffer_pos End = LargerBufferPos(View->SelectionStartPos, View->CursorPos);
+        CopyToClipboard(ProgramState, View, Start, End, AddNewLine);
+        SwitchInputMode(ProgramState, InputMode_Nav);
+    }
     
     if(KeyShouldExecute(Input->XKey))
     {

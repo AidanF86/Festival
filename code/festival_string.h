@@ -232,6 +232,7 @@ FreeString(string String)
 char *
 RawString(string String)
 {
+    // TODO: rename to RawCharString
     char *Result = (char *)TryMalloc(sizeof(char) * (String.Length + 1));
     for(int i = 0; i < String.Length; i++)
     {
@@ -240,21 +241,6 @@ RawString(string String)
     Result[String.Length] = 0;
     return Result;
 }
-
-#if 0
-string
-_String(const char *Contents)
-{
-    string Result = AllocString(NullTerminatedStringLength(Contents));
-    
-    for(int i = 0; i < Result.Length; i++)
-    {
-        Result.Data[i] = (u32)(Contents[i]);
-    }
-    
-    return Result;
-}
-#endif
 
 string
 __String(u32 *Contents)

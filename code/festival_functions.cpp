@@ -783,3 +783,16 @@ SplitView(program_state *ProgramState, view_spawn_location Location)
     ListAdd(&ProgramState->Views, View(ProgramState, BufferToUse, ProgramState->Views.Data[ProgramState->SelectedViewIndex].Id, Location));
 }
 
+inline buffer_pos
+LargerBufferPos(buffer_pos A, buffer_pos B)
+{
+    if(A.l == B.l) return A.c > B.c ? A : B;
+    return A.l > B.l ? A : B;
+}
+
+inline buffer_pos
+SmallerBufferPos(buffer_pos A, buffer_pos B)
+{
+    if(A.l == B.l) return A.c < B.c ? A : B;
+    return A.l < B.l ? A : B;
+}

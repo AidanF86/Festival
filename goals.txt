@@ -57,15 +57,17 @@ DONE selection delete
 
 DONE find file encoding type and convert to 32-bit fixed-width
 
+DONE Load glyphs by unicode group when necessary
+
 Current Goal: insert (add) action // Done?
 				Heap issue might be due to deleting when file is empty
 Undoing and redoing
 
 Temporary Detour: 
-	Load glyphs by unicode group when necessary
+	Copy and pasting
 	Scroll bar
 
-Copy and pasting
+Fix: String formatter can't do big strings
 
 Better lister matching
 
