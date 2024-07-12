@@ -122,6 +122,8 @@ extern "C"
             
             ProgramState->ShowViewInfo = false;
             ProgramState->ShowViewRects = false;
+            ProgramState->ScrollbarWidth = 15;
+            
             ProgramState->ShowSuperDebugMenu = false;
             ProgramState->SuperDebugMenuY = 0;
             

@@ -59,13 +59,12 @@ DONE find file encoding type and convert to 32-bit fixed-width
 
 DONE Load glyphs by unicode group when necessary
 
+DONE Copy and pasting
+DONE Scroll bar
+
 Current Goal: insert (add) action // Done?
 				Heap issue might be due to deleting when file is empty
 Undoing and redoing
-
-Temporary Detour: 
-	Copy and pasting
-	Scroll bar
 
 Fix: String formatter can't do big strings
 

@@ -133,6 +133,7 @@ struct program_state
     
     b32 ShowViewInfo;
     b32 ShowViewRects;
+    u32 ScrollbarWidth;
     
     b32 ShowSuperDebugMenu;
     int SuperDebugMenuY;

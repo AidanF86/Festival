@@ -110,6 +110,34 @@ void DrawProfiles(program_state *ProgramState) {
 }
 
 void
+DrawScrollbar(program_state *ProgramState, view *View)
+{
+    // TODO: create function to work out all view geometry
+    rect ViewRect = View->Rect;
+    rect TextRect = View->TextRect;
+    
+    v2 TopLeft = V2(ViewRect.x+ViewRect.w - ProgramState->ScrollbarWidth, TextRect.y);
+    v2 Dim = V2(ProgramState->ScrollbarWidth, TextRect.h);
+    
+    DrawRectangle(TopLeft.x, TopLeft.y, Dim.w, Dim.h, LIGHTGRAY);
+    
+    int ViewportH = View->TextRect.h;
+    line_data LineData = View->LineDataList[LineCount(View) - 1];
+    
+    int TotalH = LineData.LineRect.y + (ViewportH);
+    int AdditionalH = LineData.LineRect.h / LineData.DisplayLines * (LineData.DisplayLines - 1);
+    TotalH += AdditionalH;
+    
+    f32 BarYPortion = (f32)View->Y / (f32)TotalH;
+    int BarH = ((f32)ViewportH / (f32)TotalH) * (f32)Dim.h + 1;
+    
+    Print("%d", TotalH);
+    Print("%f, %d", BarYPortion, BarH);
+    
+    DrawRectangle(TopLeft.x, TopLeft.y + BarYPortion * (Dim.h), Dim.w, BarH, BLACK);
+}
+
+void
 DrawView(program_state *ProgramState, view *View)
 {
     v2 CharDim = GetCharDim(ProgramState);
@@ -322,6 +350,8 @@ DrawView(program_state *ProgramState, view *View)
     }
     
     EndScissorMode();
+    
+    DrawScrollbar(ProgramState, View);
 }
 
 
