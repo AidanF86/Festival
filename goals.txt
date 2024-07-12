@@ -66,6 +66,8 @@ Current Goal: insert (add) action // Done?
 				Heap issue might be due to deleting when file is empty
 Undoing and redoing
 
+Add scrollbar dragging
+
 Fix: String formatter can't do big strings
 
 Better lister matching

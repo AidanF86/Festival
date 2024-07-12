@@ -227,7 +227,7 @@ ExecLister(program_state *ProgramState, view *View)
                 break;
             }
             
-            SetNewFont(&ProgramState->Font, Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
+            SetNewFont(&(ProgramState->Settings.Font), Lister->Entries[Lister->MatchingEntries[Lister->SelectedIndex]].String);
         } break;
         case ListerPurpose_RunCommand: {
             if(Lister->Type != ListerType_Command) {

@@ -18,37 +18,24 @@
 #include "festival_encoding.h"
 #include "festival_encoding.cpp"
 #include "festival_font.h"
+#include "festival_commands.h"
+#include "festival_buffer.h"
+#include "festival_lister.h"
+#include "festival_view.h"
 #include "festival.h"
-#include "festival_filesystem.h"
 #include "festival_font.cpp"
+#include "festival_buffer.cpp"
+#include "festival_view.cpp"
+#include "festival_filesystem.h"
 
 #include "festival_functions.cpp"
 #include "festival_profiling.h"
-#include "festival_commands.h"
 #include "festival_lister.cpp"
 #include "festival_actions.cpp"
 #include "festival_commands.cpp"
 #include "festival_drawing.cpp"
 #include "festival_editing.h"
 
-#if 0
-void
-CheckBufferForHugeChars(program_state *ProgramState)
-{
-    buffer Buffer = ProgramState->Buffers[0];
-    for(int l = 0; l < Buffer.Lines.Length; l++)
-    {
-        for(int c = 0; c < Buffer.Lines[l].Length; c++)
-        {
-            u32 Codepoint = (Buffer.Lines[l])[c];
-            if(Codepoint > 255 && Codepoint != 65279)
-            {
-                printwarning("Huge char detected at %d,%d", l, c);
-            }
-        }
-    }
-}
-#endif
 
 extern "C"
 {
@@ -57,9 +44,11 @@ extern "C"
         program_state *ProgramState = (program_state *)Memory->Data;
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
-        buffer_list *Buffers = &ProgramState->Buffers;
-        view_list *Views = &ProgramState->Views;
-        buffer *Buffer = &ProgramState->Buffers[0];
+        buffer_list *Buffers = &(ProgramState->Buffers);
+        view_list *Views = &(ProgramState->Views);
+        buffer *Buffer = &(ProgramState->Buffers[0]);
+        settings *Settings = &(ProgramState->Settings);
+        font *Font = &(Settings->Font);
         
         if(!Memory->Initialized)
         {
@@ -87,29 +76,35 @@ extern "C"
             ProgramState->Buffers = BufferList();
             ListAdd(Buffers, LoadFileToBuffer("./data/testing_files/utf-8.txt"));
             
-            
-            ProgramState->Font = {0};
-            //ProgramState->Font.Path = String("./data/fonts/LiberationMono-Regular.ttf");
-            ProgramState->Font.Path = String("./data/fonts/HelveticaNeue-Regular.otf");
-            ProgramState->Font.Size = 18;
-            
             ProgramState->KeyFirstRepeatTime = 0.4f;
             ProgramState->KeyRepeatSpeed = 0.02f;
             
             FillKeyData(&ProgramState->Input);
             
-            ProgramState->CharsPerVirtualLine = 10;
-            ProgramState->SubLineOffset = 4;
-            ProgramState->MarginLeft = 10;
-            ProgramState->NumbersWidth = 4;
+            Settings->TextSubLineOffset = 4;
+            Settings->TextMarginLeft = 10;
+            Settings->LineNumberWidth = 4;
+            Settings->ScrollbarWidth = 15;
+            
+            *Font = {0};
+            //Settings->Font.Path = String("./data/fonts/LiberationMono-Regular.ttf");
+            Font->Path = String("./data/fonts/HelveticaNeue-Regular.otf");
+            Font->Size = 18;
             
             {// Colors
-                ProgramState->BGColor = RGB(255, 255, 255);
-                ProgramState->FGColor = RGB(0, 0, 0);
-                ProgramState->LineNumberBGColor = LIGHTGRAY;
-                ProgramState->LineNumberFGColor = GRAY;
-                ProgramState->CursorBGColor = ProgramState->FGColor;
-                ProgramState->CursorFGColor = ProgramState->BGColor;
+                Settings->Colors.ViewBG = RGB(255, 255, 255);
+                Settings->Colors.TextBG = RGBA(0, 0, 0, 0);
+                Settings->Colors.TextFG = RGB(0, 0, 0);
+                Settings->Colors.LineNumberBG = LIGHTGRAY;
+                Settings->Colors.LineNumberFG = GRAY;
+                Settings->Colors.CursorActiveBG = Settings->Colors.TextFG;
+                Settings->Colors.CursorActiveFG = Settings->Colors.TextBG;
+                Settings->Colors.CursorInactiveBG = Settings->Colors.TextFG;
+                Settings->Colors.CursorInactiveFG = Settings->Colors.TextFG;
+                Settings->Colors.SelectionAreaActiveBG = ORANGE;
+                Settings->Colors.SelectionAreaActiveFG = BLACK;
+                Settings->Colors.SelectionAreaInactiveBG = ORANGE;
+                Settings->Colors.SelectionAreaInactiveFG = BLACK;
             }
             
             ProgramState->ScreenHeight = Memory->WindowHeight;
@@ -122,12 +117,11 @@ extern "C"
             
             ProgramState->ShowViewInfo = false;
             ProgramState->ShowViewRects = false;
-            ProgramState->ScrollbarWidth = 15;
             
             ProgramState->ShowSuperDebugMenu = false;
             ProgramState->SuperDebugMenuY = 0;
             
-            FillLineData(&ProgramState->Views[0], ProgramState);
+            FillLineData(&ProgramState->Views[0], Settings);
             
             DefineProfile(FillLineData);
             DefineProfile(Rendering);
@@ -162,12 +156,7 @@ extern "C"
         ProgramState->ScreenWidth = Memory->WindowWidth;
         ProgramState->ScreenHeight = Memory->WindowHeight;
         
-        int CharsPerVirtualLine = ProgramState->CharsPerVirtualLine;
-        int SubLineOffset = ProgramState->SubLineOffset;
-        int MarginLeft = ProgramState->MarginLeft;
-        int NumbersWidth = ProgramState->NumbersWidth;
-        
-        v2 CharDim = GetCharDim(ProgramState);
+        v2 CharDim = GetCharDim(Font);
         int CharWidth = CharDim.x;
         int CharHeight = CharDim.y;
         
@@ -204,7 +193,7 @@ extern "C"
         RootView->Rect.y = 0;
         RootView->Rect.w = ProgramState->ScreenWidth;
         RootView->Rect.h = ProgramState->ScreenHeight;
-        ComputeTextRect(ProgramState, RootView);
+        ComputeTextRect(Settings, RootView);
         RootView->ComputedFromParentThisFrame = true;
         
         for(int ViewIndex = 0; ViewIndex < Views->Length; ViewIndex++)
@@ -271,8 +260,8 @@ extern "C"
                     Parent->Rect.h = Parent->Rect.h * (1.0f-Ratio);
                 }
                 
-                ComputeTextRect(ProgramState, Child);
-                ComputeTextRect(ProgramState, Parent);
+                ComputeTextRect(Settings, Child);
+                ComputeTextRect(Settings, Parent);
                 
                 NextChild->ComputedFromParentThisFrame = true;
             }
@@ -401,7 +390,7 @@ extern "C"
         for(int i = 0; i < Views->Length; i++)
         {
             view *View = &Views->Data[i];
-            FillLineData(View, ProgramState);
+            FillLineData(View, Settings);
             
             View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
             View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
@@ -422,18 +411,18 @@ extern "C"
         {
             int X = ProgramState->ScreenWidth - 200;
             int Y = 20;
-            DrawString(ProgramState, TempString("%d Actions", View->Buffer->ActionStack.Length), V2(X, Y+=20), BLACK, PURPLE);
+            DrawString(Settings, TempString("%d Actions", View->Buffer->ActionStack.Length), V2(X, Y+=20), BLACK, PURPLE);
             for(int i = 0; i < View->Buffer->ActionStack.Length; i++)
             {
                 action A = View->Buffer->ActionStack[i];
                 
                 if(A.Delete)
                 {
-                    DrawString(ProgramState, TempString("Delete %d,%d to %d,%d", A.DeleteStart.l, A.DeleteStart.c, A.DeleteEnd.l, A.DeleteEnd.c), V2(X, Y+=20), BLACK, YELLOW);
+                    DrawString(Settings, TempString("Delete %d,%d to %d,%d", A.DeleteStart.l, A.DeleteStart.c, A.DeleteEnd.l, A.DeleteEnd.c), V2(X, Y+=20), BLACK, YELLOW);
                 }
                 else if(A.Add)
                 {
-                    DrawString(ProgramState, TempString("Add string"), V2(X, Y+=20), BLACK, YELLOW);
+                    DrawString(Settings, TempString("Add string"), V2(X, Y+=20), BLACK, YELLOW);
                 }
             }
         }

@@ -3,91 +3,34 @@
 #ifndef FESTIVAL_H
 #define FESTIVAL_H
 
-
-struct program_state;
-struct view;
-
-struct line_data
+struct colors
 {
-    rect_list CharRects;
-    color_list CharColors;
-    // TODO: merge EndLineRect into CharRects?
-    rect EndLineRect;
-    rect LineRect;
-    
-    int DisplayLines;
+    color ViewBG;
+    color TextBG;
+    color TextFG;
+    color LineNumberBG;
+    color LineNumberFG;
+    color CursorActiveBG;
+    color CursorActiveFG;
+    color CursorInactiveBG;
+    color CursorInactiveFG;
+    color SelectionAreaActiveBG;
+    color SelectionAreaActiveFG;
+    color SelectionAreaInactiveBG;
+    color SelectionAreaInactiveFG;
 };
-DefineList(line_data, LineData)
 
-struct buffer
+struct settings
 {
-    string FileName;
-    string DirPath;
-    char *FileEncoding;
+    u32 TextSubLineOffset;
+    u32 TextMarginLeft;
+    u32 LineNumberWidth;
+    u32 ScrollbarWidth;
     
-    int ActionIndex;
-    action_list ActionStack;
+    font Font;
     
-    string_list Lines;
+    colors Colors;
 };
-DefineList(buffer, Buffer)
-
-typedef int (*command_function)(program_state*, view*);
-struct command
-{
-    command_function Function;
-    const char *Name;
-};
-
-enum font_type
-{
-    FontType_Monospace,
-    FontType_Sans,
-    FontType_Serif,
-};
-
-#include "festival_lister.h"
-
-enum view_spawn_location {
-    Location_Below,
-    Location_Right,
-};
-
-struct view
-{
-    buffer *Buffer;
-    
-    int Id;
-    int ParentId; // -1 means this is root view
-    view_spawn_location SpawnLocation;
-    int BirthOrdinal; // [this]-th child. Determines placement and parental succession
-    f32 Area; // fraction of parent
-    b32 ComputedFromParentThisFrame;
-    
-    rect Rect;
-    rect TextRect;
-    
-    buffer_pos CursorPos;
-    int IdealCursorCol;
-    
-    b32 Selecting;
-    buffer_pos SelectionStartPos;
-    
-    string InsertModeString;
-    buffer_pos InsertModeStartPos;
-    b32 InsertModeLineBelow;
-    
-    int Y;
-    int TargetY;
-    rect CursorRect;
-    rect CursorTargetRect;
-    
-    line_data_list LineDataList;
-    
-    b32 ListerIsOpen;
-    lister Lister;
-};
-DefineList(view, View)
 
 enum input_mode
 {
@@ -107,18 +50,6 @@ struct program_state
     f32 KeyFirstRepeatTime;
     f32 KeyRepeatSpeed = 1;
     
-    font Font;
-    //char *FontMonospaceFileName;
-    //char *FontSansFileName;
-    //char *FontSerifFileName;
-    
-    //int FontSize;
-    //int PrevFontSize;
-    int CharsPerVirtualLine;
-    int SubLineOffset;
-    int MarginLeft;
-    int NumbersWidth;
-    
     buffer_list Buffers;
     
     view_list Views;
@@ -127,30 +58,18 @@ struct program_state
     b32 UserMovedCursor;
     b32 UserMovedView;
     
-    //b32 UserMovedVertical;
     b32 ShouldChangeIdealCursorCol;
-    
     
     b32 ShowViewInfo;
     b32 ShowViewRects;
-    u32 ScrollbarWidth;
     
     b32 ShowSuperDebugMenu;
     int SuperDebugMenuY;
     int SuperDebugMenuH;
     
-    // modal system
     input_mode InputMode;
     
-    struct
-    {
-        color BGColor;
-        color FGColor;
-        color LineNumberBGColor;
-        color LineNumberFGColor;
-        color CursorBGColor;
-        color CursorFGColor;
-    };
+    settings Settings;
     
     RenderTexture2D CharTextures[256];
     b32 CharTexturesExist[256];

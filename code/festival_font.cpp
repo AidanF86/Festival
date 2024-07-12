@@ -1,6 +1,16 @@
+#if 0
 inline v2 GetCharDim(program_state *ProgramState)
 {
     return V2(ProgramState->Font.Size / 2, ProgramState->Font.Size);
+}
+#endif
+inline v2 GetCharDim(font *Font)
+{
+    return V2(Font->Size / 2, Font->Size);
+}
+inline v2 GetCharDim(settings *Settings)
+{
+    return GetCharDim(&(Settings->Font));
 }
 
 void

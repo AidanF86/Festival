@@ -3,14 +3,15 @@
 #ifndef FESTIVAL_COMMANDS_H
 #define FESTIVAL_COMMANDS_H
 
-//typedef int (*command_function)(program_state*, view*);
-#if 0
+struct program_state;
+struct view;
+
+typedef int (*command_function)(program_state*, view*);
 struct command
 {
     command_function Function;
     const char *Name;
 };
-#endif
 
 command
 Command(command_function Function, const char *Name)

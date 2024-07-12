@@ -616,7 +616,7 @@ HandleInput_SuperDebugMenu(program_state *ProgramState)
         ProgramState->ShowSuperDebugMenu = false;
     }
     
-    int ScrollAmount = ProgramState->Font.Size * 3;
+    int ScrollAmount = ProgramState->Settings.Font.Size * 3;
     ProgramState->SuperDebugMenuY += GetMouseWheelMove() * ScrollAmount * -1;
     ProgramState->SuperDebugMenuY = Clamp(ProgramState->SuperDebugMenuY,
                                           0, ProgramState->SuperDebugMenuH - 100);
@@ -652,7 +652,7 @@ HandleInput(program_state *ProgramState)
     
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
     
-    int ScrollAmount = ProgramState->Font.Size * 3;
+    int ScrollAmount = ProgramState->Settings.Font.Size * 3;
     if(GetMouseWheelMoveV().y < 0)
         View->TargetY += ScrollAmount;
     else if(GetMouseWheelMoveV().y > 0)

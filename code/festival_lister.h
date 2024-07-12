@@ -31,9 +31,6 @@ struct lister_entry
         struct {
             command Command;
         };
-        struct {
-            font_type FontType;
-        };
     };
 };
 DefineList(lister_entry, ListerEntry)
