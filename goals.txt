@@ -96,7 +96,6 @@ Have multiple windows (split screen)
 Modal: like my modal scheme in 4coder (but better hopefully)
 Select & copy/cut & paste
 
-*shudder*
 Syntax highlighting
 Auto-indenting, preferably automatic like 4coder
 // Look into tree-sitter
@@ -107,7 +106,6 @@ LS: c/c++ (probably no advanced stuff)
 
 Less important
 --------------------
-Unicode
 Have a nice system for switching between buffers, unlike every other text editor (no just entering the name)
 // Like maybe show a preview?
 Nice highlighting for file (and buffer?) lists
@@ -117,12 +115,11 @@ Macro recording/replaying
 
 LS: html, css, js, python, bash
 
-*shudder*
 Terminal integration, mainly for building. A pop-up build window like 4coder
 Better error display, jump-to-line, and showing errors at the line they occur on
 
 
-Watchlist-warranting
+Very out there
 --------------------
 Interactive chatbot w/ face that helps with stuff (integrate cheat.sh?) and shows emotions. Cute mascot?!?
 It could have its own buffer and a little pop-up interface?
