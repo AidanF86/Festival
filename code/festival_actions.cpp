@@ -7,7 +7,7 @@ ActionForDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
     buffer_pos ActualStart = Start.l < End.l || (Start.l == End.l && Start.c < End.c) ? Start : End;
     buffer_pos ActualEnd = ActualStart == Start ? End : Start;
     ActualEnd.c++;
-    ActualEnd.c = Clamp(ActualEnd.c, 0, LineLength(Buffer, ActualEnd.l));
+    ActualEnd.c = Clamp(ActualEnd.c, 0, Buffer->LineLength(ActualEnd.l));
     
     action Result;
     
@@ -67,36 +67,6 @@ AddAction(buffer *Buffer, action Action)
 }
 
 void
-BufferDeleteRange(buffer *Buffer, buffer_pos Start, buffer_pos End)
-{
-    Print("");
-    
-    // delete in-between lines
-    for(int i = Start.l + 1; i < End.l; i++)
-    {
-        ListRemoveAt(&Buffer->Lines, i);
-        End.l--;
-        i--;
-    }
-    
-    // slice and join next line
-    if(End.l > Start.l)
-    {
-        if(Buffer->Lines[Start.l].Length > 0)
-            Buffer->Lines[Start.l].RemoveRange(Start.c, Buffer->Lines[Start.l].Length);
-        if(Buffer->Lines[End.l].Length > 0)
-            Buffer->Lines[End.l].RemoveRange(0, End.c);
-        Buffer->Lines[Start.l].AppendString(Buffer->Lines[End.l]);
-        ListRemoveAt(&Buffer->Lines, End.l);
-    }
-    else
-    {
-        if(Buffer->Lines[Start.l].Length > 0)
-            Buffer->Lines[Start.l].RemoveRange(Start.c, End.c);
-    }
-}
-
-void
 UndoAction(program_state *ProgramState, buffer *Buffer, action A)
 {
     if(A.Delete)
@@ -121,7 +91,7 @@ UndoAction(program_state *ProgramState, buffer *Buffer, action A)
         // TODO: move cursor
         buffer_pos End = BufferPos(A.AddPos.l + A.AddContent.Length-1,
                                    A.AddContent[A.AddContent.Length-1].Length);
-        BufferDeleteRange(Buffer, A.AddPos, End);
+        Buffer->DeleteRange(A.AddPos, End);
         
         ProgramState->ShouldChangeIdealCursorCol = true;
         SetCursorPos(ProgramState, &ProgramState->Views[ProgramState->SelectedViewIndex], A.AddPos);
@@ -140,7 +110,7 @@ DoAction(program_state *ProgramState, buffer *Buffer, action A)
         }
         else
         {
-            BufferDeleteRange(Buffer, A.DeleteStart, A.DeleteEnd);
+            Buffer->DeleteRange(A.DeleteStart, A.DeleteEnd);
 #if 0
             buffer_pos Start = A.DeleteStart;
             buffer_pos End = A.DeleteEnd;

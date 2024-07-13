@@ -6,158 +6,13 @@ LineData() {
     return Result;
 };
 
-line_data
-LineDataAt(view *View, int l)
-{
-    if(l < 0 || l >= LineCount(View))
-    {
-        printerror("Line index out of bounds");
-        return {0};
-    }
-    return View->LineDataList[l];
-}
-
-int
-YToLine(view *View, int Y)
-{
-    int l;
-    int PrevLineY = LineDataAt(View, 0).LineRect.y;
-    for(l = 0; l < LineCount(View); l++)
-    {
-        line_data LineData = LineDataAt(View, l);
-        int LineY = LineData.LineRect.y;
-        
-        if(LineY > Y)
-        {
-            if(l > 0)
-                l--;
-            break;
-        }
-    }
-    
-    if(l >= LineCount(View))
-        return LineCount(View)-1;
-    
-    return l;
-}
-
-int
-ColAt(settings *Settings, view *View, buffer_pos P)
-{
-    int Col = 0;
-    int PrevY = CharRectAt(View, BufferPos(P.l, 0)).y;
-    
-    for(int c = 1; c < LineLength(View, P.l) && c <= P.c; c++)
-    {
-        Col++;
-        if(CharRectAt(View, BufferPos(P.l, c)).y > PrevY)
-        {
-            Col = Settings->TextSubLineOffset;
-        }
-        PrevY = CharRectAt(View, BufferPos(P.l, c)).y;
-    }
-    
-    return Col;
-}
-
-
-buffer_pos
-ClosestBufferPos(view *View, v2 P)
-{ // P is in char space
-    int l = YToLine(View, P.y);
-    
-    buffer_pos ClosestBufferP = BufferPos(l, 0);
-    rect ClosestRect = CharRectAt(View, ClosestBufferP);
-    v2 ClosestP = V2(ClosestRect.x+ClosestRect.w/2, ClosestRect.y+ClosestRect.h/2);
-    
-    for(int c = 0; c <= View->LineDataList[l].CharRects.Length; c++)
-    {
-        rect TestRect = CharRectAt(View, l, c);
-        v2 TestP = V2(TestRect.x+TestRect.w/2, TestRect.y+TestRect.h/2);
-        
-        v2 Diff = TestP - P;
-        v2 CompareDiff = ClosestP - P;
-        if(abs(Diff.y) < abs(CompareDiff.y) ||
-           ( !(abs(Diff.y) > abs(CompareDiff.y)) && abs(Diff.x) < abs(CompareDiff.x) )
-           )
-        {
-            ClosestP = TestP;
-            ClosestBufferP = BufferPos(l, c);
-        }
-    }
-    
-    return ClosestBufferP;
-}
-
-buffer_pos
-ClosestBufferPos(view *View, rect Rect)
-{
-    return ClosestBufferPos(View, V2(Rect.x+Rect.w/2, Rect.y+Rect.h/2));
-}
-
-void
-SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
+// TODO: move UserMovedCursor into view?
+void SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
 {
     ProgramState->UserMovedCursor = true;
     View->CursorPos = Pos;
-    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View));
-    View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-}
-
-void
-AdjustView(program_state *ProgramState, view *View)
-{
-    int CharHeight = ProgramState->Settings.Font.Size;
-    buffer_pos CursorPos = View->CursorPos;
-    int Y = View->Y;
-    int TargetY = View->TargetY;
-    
-    rect CursorTargetRect = View->CursorTargetRect;
-    b32 MovedCursorUpOrDown = false;
-    
-    if(ProgramState->UserMovedCursor && &ProgramState->Views[ProgramState->SelectedViewIndex] == View)
-    { // Adjust based on cursor
-        if(CursorTargetRect.y < TargetY)
-        {
-            TargetY = CursorTargetRect.y;
-        }
-        else if(CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
-        {
-            TargetY = CursorTargetRect.y - View->TextRect.h + CharHeight;
-        }
-    }
-    else
-    { // Adjust based on view
-        if(View->CursorTargetRect.y < TargetY)
-        {
-            View->CursorPos.l = YToLine(View, TargetY) + 2;
-            MovedCursorUpOrDown = true;
-        }
-        else if(View->CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
-        {
-            View->CursorPos.l = YToLine(View, 
-                                        TargetY + View->TextRect.h) - 2;
-            MovedCursorUpOrDown = true;
-        }
-    }
-    
-    View->TargetY = TargetY;
-    
-    View->TargetY = Clamp(View->TargetY, 0, LineDataAt(View, LineCount(View)-1).EndLineRect.y);
-    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View)-1);
-    View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
-    
-    
-#if 0
-    if(MovedCursorUpOrDown && ColAt(ProgramState, View, View->CursorPos) < View->IdealCursorCol)
-    {
-        int Diff = View->IdealCursorCol - ColAt(ProgramState, View, View->CursorPos);
-        int DistToEnd = LineLength(View, View->CursorPos.l) - View->CursorPos.c;
-        if(Diff > DistToEnd)
-            Diff = DistToEnd;
-        View->CursorPos.c += Diff;
-    }
-#endif
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, View->LineCount());
+    View->CursorPos.c = Clamp(View->CursorPos.c, 0, View->LineLength(View->CursorPos.l));
 }
 
 view
@@ -173,7 +28,7 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
     
     if(ParentId == -1)
     {
-        // TODO(cheryl): check if there are any views in existence (there shouldn't be)
+        // TODO: check if there are any views in existence (there shouldn't be)
         View.Id = 0;
         View.Area = 1;
         View.SpawnLocation = Location_Below;
@@ -181,7 +36,7 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
     }
     else
     {
-        // TODO(cheryl): test :3
+        // TODO: test
         
         // Get a unique Id
         int Id = 0;
@@ -218,6 +73,62 @@ view View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_
 {
     return View(ProgramState, Buffer, ParentId, SpawnLocation, 0.5f);
 }
+
+
+void
+AdjustView(program_state *ProgramState, view *View)
+{
+    int CharHeight = ProgramState->Settings.Font.Size;
+    buffer_pos CursorPos = View->CursorPos;
+    int Y = View->Y;
+    int TargetY = View->TargetY;
+    
+    rect CursorTargetRect = View->CursorTargetRect;
+    b32 MovedCursorUpOrDown = false;
+    
+    if(ProgramState->UserMovedCursor && &ProgramState->Views[ProgramState->SelectedViewIndex] == View)
+    { // Adjust based on cursor
+        if(CursorTargetRect.y < TargetY)
+        {
+            TargetY = CursorTargetRect.y;
+        }
+        else if(CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
+        {
+            TargetY = CursorTargetRect.y - View->TextRect.h + CharHeight;
+        }
+    }
+    else
+    { // Adjust based on view
+        if(View->CursorTargetRect.y < TargetY)
+        {
+            View->CursorPos.l = View->YToLine(TargetY) + 2;
+            MovedCursorUpOrDown = true;
+        }
+        else if(View->CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
+        {
+            View->CursorPos.l = View->YToLine(TargetY + View->TextRect.h) - 2;
+            MovedCursorUpOrDown = true;
+        }
+    }
+    
+    View->TargetY = TargetY;
+    
+    View->TargetY = Clamp(View->TargetY, 0, View->LineDataAt(View->LineCount()-1).EndLineRect.y);
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, View->LineCount()-1);
+    View->CursorPos.c = Clamp(View->CursorPos.c, 0, View->LineLength(View->CursorPos.l));
+    
+#if 0
+    if(MovedCursorUpOrDown && ColAt(ProgramState, View, View->CursorPos) < View->IdealCursorCol)
+    {
+        int Diff = View->IdealCursorCol - ColAt(ProgramState, View, View->CursorPos);
+        int DistToEnd = LineLength(View, View->CursorPos.l) - View->CursorPos.c;
+        if(Diff > DistToEnd)
+            Diff = DistToEnd;
+        View->CursorPos.c += Diff;
+    }
+#endif
+}
+
 
 void
 RemoveView(program_state *ProgramState, int Index)
@@ -294,8 +205,8 @@ MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
 {
     ProgramState->UserMovedCursor = true;
     View->CursorPos += dPos;
-    View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View) - 1);
-    View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, View->LineCount() - 1);
+    View->CursorPos.c = Clamp(View->CursorPos.c, 0, View->LineLength(View->CursorPos.l));
     
     if(ProgramState->ShouldChangeIdealCursorCol)
     {
@@ -314,17 +225,20 @@ void
 MoveBackNonWhitespace(program_state *ProgramState, view *View)
 {
     b32 StartedAtSpace = false;
-    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos - BufferPos(0, 1)) == ' ')
+    if(View->CharAt(View->CursorPos) == ' ' ||
+       View->CharAt(View->CursorPos - BufferPos(0, 1)) == ' ')
+    {
         StartedAtSpace = true;
+    }
     
     if(StartedAtSpace)
     {
         do {
             View->CursorPos -= BufferPos(0, 1);
-        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c > 0);
+        }while(View->CharAt(View->CursorPos) == ' ' && View->CursorPos.c > 0);
     }
     
-    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c > 0)
+    while(View->CharAt(View->CursorPos) != ' ' && View->CursorPos.c > 0)
     {
         View->CursorPos -= BufferPos(0, 1);
     }
@@ -334,18 +248,21 @@ void
 MoveForwardNonWhitespace(program_state *ProgramState, view *View)
 {
     b32 StartedAtSpace = false;
-    if(CharAt(View, View->CursorPos) == ' ' || CharAt(View, View->CursorPos + BufferPos(0, 1)) == ' ')
+    if(View->CharAt(View->CursorPos) == ' ' ||
+       View->CharAt(View->CursorPos + BufferPos(0, 1)) == ' ')
+    {
         StartedAtSpace = true;
+    }
     
     if(StartedAtSpace)
     {
         do {
             //View->CursorPos += BufferPos(0, 1);
             MoveCursorPos(ProgramState, View, BufferPos(0, 1));
-        }while(CharAt(View, View->CursorPos) == ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l));
+        }while(View->CharAt(View->CursorPos) == ' ' && View->CursorPos.c < View->LineLength(View->CursorPos.l));
     }
     
-    while(CharAt(View, View->CursorPos) != ' ' && View->CursorPos.c < LineLength(View, View->CursorPos.l))
+    while(View->CharAt(View->CursorPos) != ' ' && View->CursorPos.c < View->LineLength(View->CursorPos.l))
     {
         //View->CursorPos += BufferPos(0, 1);
         MoveCursorPos(ProgramState, View, BufferPos(0, 1));
@@ -356,21 +273,21 @@ buffer_pos
 SeekBackBorder(view *View, buffer_pos From)
 {
     buffer_pos Result = From;
-    if(CharAt(View, Result) == 0)
+    if(View->CharAt(Result) == 0)
         Result.c--;
     if(Result.c <= 0 || (Result.c == 0 && Result.l == 0))
         return From;
     
     b32 StartedAtSpace = false;
     // TODO: go to prev line
-    if(CharAt(View, Result + BufferPos(0, -1)) == ' ')
+    if(View->CharAt(Result + BufferPos(0, -1)) == ' ')
         StartedAtSpace = true;
     
     if(StartedAtSpace)
     {
         Print("Started at space");
         Result.c--;
-        while(Result.c > 0 && CharAt(View, BufferPos(Result.l, Result.c - 1)))
+        while(Result.c > 0 && View->CharAt(BufferPos(Result.l, Result.c - 1)))
         {
             Result.c--;
         }
@@ -379,7 +296,7 @@ SeekBackBorder(view *View, buffer_pos From)
     }
     
     b32 StartedAtSpecial = false;
-    if(!IsNonSpecial(CharAt(View, Result)))
+    if(!IsNonSpecial(View->CharAt(Result)))
     {
         Print("Special");
         StartedAtSpecial = true;
@@ -387,18 +304,18 @@ SeekBackBorder(view *View, buffer_pos From)
     
     if(StartedAtSpecial)
     {
-        while(!IsNonSpecial(CharAt(View, Result)) && 
-              Result.c < LineLength(View, Result.l))
+        while(!IsNonSpecial(View->CharAt(Result)) && 
+              Result.c < View->LineLength(Result.l))
             Result.c--;
         return Result;
     }
     
-    char c = CharAt(View, Result);
+    char c = View->CharAt(Result);
     while(( c != ' ' && (IsNonSpecial(c)) )
-          && Result.c < LineLength(View, Result.l))
+          && Result.c < View->LineLength(Result.l))
     {
         Result.c--;
-        c = CharAt(View, Result);
+        c = View->CharAt(Result);
     }
     
     return Result;
@@ -409,42 +326,42 @@ SeekForwardBorder(view *View, buffer_pos From)
 {
     buffer_pos Result = From;
     
-    if(Result.c == LineLength(View->Buffer, Result.l))
+    if(Result.c == View->LineLength(Result.l))
         return From;
     
     b32 StartedAtSpace = false;
-    if(CharAt(View, Result) == ' ' || CharAt(View, Result + BufferPos(0, 1)) == ' ')
+    if(View->CharAt(Result) == ' ' || View->CharAt(Result + BufferPos(0, 1)) == ' ')
         StartedAtSpace = true;
     
     if(StartedAtSpace)
     {
         do {
             Result.c++;
-        }while(CharAt(View, Result) == ' ' && Result.c < LineLength(View, Result.l));
+        }while(View->CharAt(Result) == ' ' && Result.c < View->LineLength(Result.l));
         
         return Result;
     }
     
     b32 StartedAtSpecial = false;
-    if(!IsNonSpecial(CharAt(View, Result)))
+    if(!IsNonSpecial(View->CharAt(Result)))
     {
         StartedAtSpecial = true;
     }
     
     if(StartedAtSpecial)
     {
-        while(!IsNonSpecial(CharAt(View, Result))
-              && Result.c < LineLength(View, Result.l))
+        while(!IsNonSpecial(View->CharAt(Result))
+              && Result.c < View->LineLength(Result.l))
             Result.c++;
         return Result;
     }
     
-    char c = CharAt(View, Result);
+    char c = View->CharAt(Result);
     while(( c != ' ' && (IsNonSpecial(c)) )
-          && Result.c < LineLength(View, Result.l))
+          && Result.c < View->LineLength(Result.l))
     {
         Result.c++;
-        c = CharAt(View, Result);
+        c = View->CharAt(Result);
     }
     
     return Result;
@@ -459,7 +376,7 @@ AtLineBeginning(view *View, buffer_pos Pos)
 b32
 AtLineEnd(view *View, buffer_pos Pos)
 {
-    return Pos.c == LineLength(View, Pos.l);
+    return Pos.c == View->LineLength(Pos.l);
 }
 
 buffer_pos
@@ -470,7 +387,7 @@ SeekLineBeginning(view *View, int L)
 buffer_pos
 SeekLineEnd(view *View, int L)
 {
-    return BufferPos(L, LineLength(View, L));
+    return BufferPos(L, View->LineLength(L));
 }
 
 buffer_pos
@@ -478,17 +395,17 @@ SeekPrevEmptyLine(view *View, int L)
 {
     int ResultLine = L;
     
-    while(LineLength(View, ResultLine) == 0 && ResultLine > 0)
+    while(View->LineLength(ResultLine) == 0 && ResultLine > 0)
     {
         ResultLine--;
-        if(LineLength(View, ResultLine) != 0)
+        if(View->LineLength(ResultLine) != 0)
             break;
     }
     
     while(ResultLine > 0)
     {
         ResultLine--;
-        if(LineLength(View, ResultLine) == 0)
+        if(View->LineLength(ResultLine) == 0)
             break;
     }
     return BufferPos(ResultLine, 0);
@@ -498,18 +415,18 @@ SeekNextEmptyLine(view *View, int L)
 {
     int ResultLine = L;
     
-    while(LineLength(View, ResultLine) == 0 && ResultLine < LineCount(View) - 1)
+    while(View->LineLength(ResultLine) == 0 && ResultLine < View->LineCount() - 1)
     {
         ResultLine++;
     }
     
-    while(ResultLine < LineCount(View) - 1)
+    while(ResultLine < View->LineCount() - 1)
     {
         ResultLine++;
-        if(LineLength(View, ResultLine) == 0)
+        if(View->LineLength(ResultLine) == 0)
             break;
     }
-    return BufferPos(ResultLine, LineLength(View, ResultLine));
+    return BufferPos(ResultLine, View->LineLength(ResultLine));
 }
 
 
@@ -562,7 +479,7 @@ FillLineData(view *View, settings *Settings)
     
     int y = 0;
     int CharsProcessed = 0;
-    for(int l = 0; l < LineCount(View); l++)
+    for(int l = 0; l < View->LineCount(); l++)
     {
         ListAdd(DataList, LineData());
         
@@ -574,14 +491,14 @@ FillLineData(view *View, settings *Settings)
         RectData->LineRect.w = View->TextRect.w;
         RectData->DisplayLines = 1;
         
-        for(int c = 0; c < LineLength(View, l); c++)
+        for(int c = 0; c < View->LineLength(l); c++)
         {
             CharsProcessed++;
             // Rect is within the space of textrect
             // so when drawing, offset by textrect.x and textrect.y
             // as well as buffer viewpos
             
-            GlyphInfo Info = GetCharDrawInfo(Font, CharAt(View, l, c)).Glyph;
+            GlyphInfo Info = GetCharDrawInfo(Font, View->CharAt(l, c)).Glyph;
             
             if(x+Info.advanceX >= WrapPoint)
             {
@@ -621,3 +538,6 @@ ComputeViewGeometry(program_state *ProgramState, view *View)
 {
     // TODO
 }
+
+
+

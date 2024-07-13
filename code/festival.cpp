@@ -14,10 +14,11 @@
 #include "festival_string.h"
 #include "festival_input.h"
 
+#include "festival_font.h"
+#include "festival_settings.h"
 #include "festival_actions.h"
 #include "festival_encoding.h"
 #include "festival_encoding.cpp"
-#include "festival_font.h"
 #include "festival_commands.h"
 #include "festival_buffer.h"
 #include "festival_lister.h"
@@ -377,14 +378,14 @@ extern "C"
         {
             v2 MousePos = V2(GetMousePosition());
             
-            buffer_pos MouseBufferPos = ClosestBufferPos(View, ScreenToCharSpace(View, MousePos));
+            buffer_pos MouseBufferPos = View->ClosestBufferPos(View->ScreenPosToCharPos(MousePos));
             View->CursorPos = MouseBufferPos;
             View->IdealCursorCol = View->CursorPos.c;
         }
         
         
-        View->CursorPos.l = Clamp(View->CursorPos.l, 0, LineCount(View)-1);
-        View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+        View->CursorPos.l = Clamp(View->CursorPos.l, 0, View->LineCount()-1);
+        View->CursorPos.c = Clamp(View->CursorPos.c, 0, View->LineLength(View->CursorPos.l));
         
         StartProfile(FillLineData);
         for(int i = 0; i < Views->Length; i++)
@@ -392,7 +393,7 @@ extern "C"
             view *View = &Views->Data[i];
             FillLineData(View, Settings);
             
-            View->CursorTargetRect = CharRectAt(View, View->CursorPos.l, View->CursorPos.c);
+            View->CursorTargetRect = View->CharRectAt(View->CursorPos.l, View->CursorPos.c);
             View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
             
             AdjustView(ProgramState, View);

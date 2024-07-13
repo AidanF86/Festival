@@ -3,7 +3,6 @@
 #ifndef FESTIVAL_VIEW_H
 #define FESTIVAL_VIEW_H
 
-
 struct line_data
 {
     rect_list CharRects;
@@ -55,6 +54,189 @@ struct view
     
     b32 ListerIsOpen;
     lister Lister;
+    
+    u32 CharAt(int l, int c)
+    {
+        if(!Buffer)
+        {
+            printwarning("View doesn't have a buffer");
+            return 0;
+        }
+        return Buffer->CharAt(l, c);
+    }
+    u32 CharAt(buffer_pos Pos)
+    {
+        return CharAt(Pos.l, Pos.c);
+    }
+    
+    int LineCount()
+    {
+        if(!Buffer)
+        {
+            printwarning("View doesn't have a buffer");
+            return 0;
+        }
+        return Buffer->LineCount();
+    }
+    int LineLength(int l)
+    {
+        if(!Buffer)
+        {
+            printwarning("View doesn't have a buffer");
+            return 0;
+        }
+        return Buffer->LineLength(l);
+    }
+    
+    line_data LineDataAt(int l)
+    {
+        if(l < 0 || l >= LineCount())
+        {
+            printerror("Line %d out of bounds", l);
+            return {0};
+        }
+        return LineDataList[l];
+    }
+    rect CharRectAt(int l, int c)
+    {
+        if(c < 0 || c > LineLength(l))
+        {
+            printwarning("Col %d out of range", l);
+            return {0};
+        }
+        
+        // TODO: merge EndLineRect into CharRects (mentioned in view.h)
+        if(c == LineLength(l))
+            return LineDataAt(l).EndLineRect;
+        return LineDataAt(l).CharRects[c];
+    }
+    rect CharRectAt(buffer_pos Pos)
+    {
+        return CharRectAt(Pos.l, Pos.c);
+    }
+    rect LineRectAt(int l)
+    {
+        return LineDataAt(l).LineRect;
+    }
+    
+    v2 CharPosToScreenPos(v2 Pos)
+    {
+        v2 Result = Pos;
+        Result.x += TextRect.x;
+        Result.y += TextRect.y;
+        Result.y -= Y;
+        return Result;
+    }
+    v2 ScreenPosToCharPos(v2 Pos)
+    {
+        v2 Result = Pos;
+        Result.y += Y;
+        Result.y -= TextRect.y;
+        Result.x -= TextRect.x;
+        return Result;
+    }
+    rect CharRectToScreenRect(rect A)
+    {
+        rect Result = A;
+        Result.x += TextRect.x;
+        Result.y += TextRect.y;
+        Result.y -= Y;
+        return Result;
+    }
+    rect ScreenRectToCharRect(rect A)
+    {
+        rect Result = A;
+        Result.y += Y;
+        Result.y -= TextRect.y;
+        Result.x -= TextRect.x;
+        return Result;
+    }
+    
+    rect ScreenRectAt(int l, int c)
+    {
+        return CharRectToScreenRect(CharRectAt(l, c));
+    }
+    rect ScreenRectAt(buffer_pos Pos)
+    {
+        return ScreenRectAt(Pos.l, Pos.c);
+    }
+    
+    int YToLine(int Y)
+    {
+        int l;
+        int PrevLineY = LineRectAt(0).y;
+        // TODO: this is inefficient, maybe do a binary search
+        for(l = 0; l < LineCount(); l++)
+        {
+            rect LineRect = LineRectAt(l);
+            int LineY = LineRect.y;
+            
+            if(LineY > Y)
+            {
+                if(l > 0)
+                    l--;
+                break;
+            }
+        }
+        
+        if(l >= LineCount())
+            return LineCount()-1;
+        
+        return l;
+    }
+    
+    int ColAt(settings *Settings, buffer_pos P)
+    {
+        int Col = 0;
+        int PrevY = CharRectAt(BufferPos(P.l, 0)).y;
+        
+        for(int c = 1; c < LineLength(P.l) && c <= P.c; c++)
+        {
+            Col++;
+            if(CharRectAt(BufferPos(P.l, c)).y > PrevY)
+            {
+                Col = Settings->TextSubLineOffset;
+            }
+            PrevY = CharRectAt(BufferPos(P.l, c)).y;
+        }
+        
+        return Col;
+    }
+    
+    
+    buffer_pos ClosestBufferPos(v2 P)
+    { // P is in char space
+        int l = YToLine(P.y);
+        
+        buffer_pos ClosestBufferP = BufferPos(l, 0);
+        rect ClosestRect = CharRectAt(ClosestBufferP);
+        v2 ClosestP = V2(ClosestRect.x+ClosestRect.w/2, ClosestRect.y+ClosestRect.h/2);
+        
+        for(int c = 0; c <= LineLength(l); c++)
+        {
+            rect TestRect = CharRectAt(l, c);
+            v2 TestP = V2(TestRect.x+TestRect.w/2, TestRect.y+TestRect.h/2);
+            
+            v2 Diff = TestP - P;
+            v2 CompareDiff = ClosestP - P;
+            if(abs(Diff.y) < abs(CompareDiff.y) ||
+               ( !(abs(Diff.y) > abs(CompareDiff.y)) && abs(Diff.x) < abs(CompareDiff.x) )
+               )
+            {
+                ClosestP = TestP;
+                ClosestBufferP = BufferPos(l, c);
+            }
+        }
+        
+        return ClosestBufferP;
+    }
+    
+    buffer_pos ClosestBufferPos(rect Rect)
+    {
+        return ClosestBufferPos(V2(Rect.x+Rect.w/2, Rect.y+Rect.h/2));
+    }
+    
+    
 };
 DefineList(view, View)
 

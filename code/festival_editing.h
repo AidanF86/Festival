@@ -52,13 +52,13 @@ CopyToClipboard(program_state *ProgramState, view *View, buffer_pos Start, buffe
         if(l > Start.l)
             StringToCopy.AppendChar('\n');
         
-        int EndColumn = LineLength(View, l) - 1;
+        int EndColumn = View->LineLength(l) - 1;
         if(l == End.l)
             EndColumn = End.c;
         
         for(int c = Start.c; c <= EndColumn; c++)
         {
-            StringToCopy.AppendChar(CharAt(View, BufferPos(l, c)));
+            StringToCopy.AppendChar(View->CharAt(BufferPos(l, c)));
         }
     }
     if(AddNewline)
@@ -291,7 +291,7 @@ HandleInput_Insert(program_state *ProgramState)
             Buffer->Lines[View->CursorPos.l].RemoveChar(View->CursorPos.c-1);
 #endif
             View->CursorPos.c--;
-            View->CursorPos.c = Clamp(View->CursorPos.c, 0, LineLength(View, View->CursorPos.l));
+            View->CursorPos.c = Clamp(View->CursorPos.c, 0, View->LineLength(View->CursorPos.l));
             AddAndDoAction(ProgramState, View->Buffer,
                            ActionForDeleteRange(View->Buffer, View->CursorPos, View->CursorPos));
             SwitchInputMode(ProgramState, InputMode_Insert);
@@ -330,7 +330,7 @@ HandleInput_Insert(program_state *ProgramState)
     // TODO: improve key names
     if(KeyShouldExecute(Input->Return_Key))
     {
-        InsertLine(Buffer, View->CursorPos.l+1, CopyString(Buffer->Lines[View->CursorPos.l]));
+        Buffer->InsertLine(View->CursorPos.l+1, CopyString(Buffer->LineAt(View->CursorPos.l)));
         if(Buffer->Lines[View->CursorPos.l].Length != 0)
         {
             Buffer->Lines[View->CursorPos.l].Slice(0, View->CursorPos.c);
@@ -496,7 +496,7 @@ HandleInput_Nav(program_state *ProgramState)
     if(KeyShouldExecute(Input->CKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {
         buffer_pos Start = BufferPos(View->CursorPos.l, 0);
-        buffer_pos End = BufferPos(View->CursorPos.l, LineLength(View, View->CursorPos.l));
+        buffer_pos End = BufferPos(View->CursorPos.l, View->LineLength(View->CursorPos.l));
         CopyToClipboard(ProgramState, View, Start, End, true);
     }
     
@@ -590,7 +590,7 @@ HandleInput_Select(program_state *ProgramState)
     
     if(KeyShouldExecute(Input->CKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {
-        b32 AddNewLine = (View->CursorPos.c == LineLength(View, View->CursorPos.l));
+        b32 AddNewLine = (View->CursorPos.c == View->LineLength(View->CursorPos.l));
         buffer_pos Start = SmallerBufferPos(View->SelectionStartPos, View->CursorPos);
         buffer_pos End = LargerBufferPos(View->SelectionStartPos, View->CursorPos);
         CopyToClipboard(ProgramState, View, Start, End, AddNewLine);

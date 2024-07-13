@@ -122,7 +122,7 @@ DrawScrollbar(settings *Settings, view *View)
     DrawRectangle(TopLeft.x, TopLeft.y, Dim.w, Dim.h, LIGHTGRAY);
     
     int ViewportH = View->TextRect.h;
-    line_data LineData = View->LineDataList[LineCount(View) - 1];
+    line_data LineData = View->LineDataAt(View->LineCount()-1);
     
     int TotalH = LineData.LineRect.y + (ViewportH);
     int AdditionalH = LineData.LineRect.h / LineData.DisplayLines * (LineData.DisplayLines - 1);
@@ -176,9 +176,9 @@ DrawView(program_state *ProgramState, view *View)
     BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
     // TODO: Cross-view cursor interpolation
     // draw cursor
-    rect CursorDrawRect = CharToScreenSpace(View, View->CursorRect);
+    rect CursorDrawRect = View->CharRectToScreenRect(View->CursorRect);
     
-    char_draw_info CursorCharInfo = GetCharDrawInfo(Font, CharAt(View, View->CursorPos));
+    char_draw_info CursorCharInfo = GetCharDrawInfo(Font, View->CharAt(View->CursorPos));
     if(CursorCharInfo.IsValid)
         CursorDrawRect.w = CursorCharInfo.Glyph.advanceX;
     
@@ -203,7 +203,7 @@ DrawView(program_state *ProgramState, view *View)
         }
         break; case InputMode_Select:
         {
-            rect SelectionStartDrawRect = CharToScreenSpace(View, CharRectAt(View, View->SelectionStartPos));
+            rect SelectionStartDrawRect = View->CharRectToScreenRect(View->CharRectAt(View->SelectionStartPos));
             DrawRectangleRec(R(SelectionStartDrawRect), RED);
             DrawRectangleRec(R(CursorDrawRect), RED);
         }
@@ -228,9 +228,9 @@ DrawView(program_state *ProgramState, view *View)
     // Draw text
     EndScissorMode();
     
-    for(int l = 0; l < LineCount(View); l++)
+    for(int l = 0; l < View->LineCount(); l++)
     {
-        line_data LineData = LineDataAt(View, l);
+        line_data LineData = View->LineDataAt(l);
         int LineY = LineData.LineRect.y;
         
         if(LineY - View->Y > View->TextRect.y + View->TextRect.h)
@@ -238,7 +238,7 @@ DrawView(program_state *ProgramState, view *View)
             break;
         }
         //if(LineRect(View, l).y + LineRect(View, l).h - View->Y < View->TextRect.y)
-        if(LineRect(View, l).y + LineRect(View, l).h - View->Y < 0)
+        if(View->LineRectAt(l).y + View->LineRectAt(l).h - View->Y < 0)
         {
             // TODO: it's this
             continue;
@@ -256,7 +256,7 @@ DrawView(program_state *ProgramState, view *View)
         for(int c = 0; c < LineData.CharRects.Length; c++)
         {
             
-            rect ScreenCharRect = ScreenRectAt(View, l, c);
+            rect ScreenCharRect = View->ScreenRectAt(l, c);
             
             color CharColor = Settings->Colors.TextFG;
             if(ViewIsSelected && BufferPos(l, c) == View->CursorPos && ProgramState->InputMode != InputMode_Insert)
@@ -277,7 +277,7 @@ DrawView(program_state *ProgramState, view *View)
                 CharBGColor = ORANGE;
             }
             
-            DrawChar(Settings, CharAt(View, l, c), V2(ScreenCharRect), CharBGColor, CharColor);
+            DrawChar(Settings, View->CharAt(l, c), V2(ScreenCharRect), CharBGColor, CharColor);
             
         }
         EndScissorMode();
