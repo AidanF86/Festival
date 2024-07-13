@@ -5,9 +5,10 @@
 
 struct buffer
 {
+    b32 HasAssociatedFile;
     string FileName;
     string DirPath;
-    char *FileEncoding;
+    const char *FileEncoding;
     
     int ActionIndex;
     action_list ActionStack;

@@ -24,10 +24,10 @@
 #include "festival_lister.h"
 #include "festival_view.h"
 #include "festival.h"
+#include "festival_filesystem.cpp"
 #include "festival_font.cpp"
 #include "festival_buffer.cpp"
 #include "festival_view.cpp"
-#include "festival_filesystem.h"
 
 #include "festival_functions.cpp"
 #include "festival_profiling.h"

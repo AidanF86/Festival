@@ -624,4 +624,17 @@ InsertStringList(string_list *Bottom, string_list Top, int Row, int Col)
     Print("===================");
 }
 
+string
+StringListToString(string_list StrList)
+{
+    string Result = String("");
+    for(int i = 0; i < StrList.Length; i++)
+    {
+        if(i != 0)
+            Result.AppendChar((u32)'\n');
+        Result.AppendString(StrList[i]);
+    }
+    return Result;
+}
+
 #endif //FESTIVAL_STRING_H

@@ -478,6 +478,7 @@ void
 HandleInput_Nav(program_state *ProgramState)
 {
     view *View = &ProgramState->Views[ProgramState->SelectedViewIndex];
+    buffer *Buffer = View->Buffer;
     input *Input = &ProgramState->Input;
     
     if(KeyShouldExecute(Input->FKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
@@ -492,6 +493,14 @@ HandleInput_Nav(program_state *ProgramState)
     }
     
     ProcessNavMovement(ProgramState);
+    
+    if(KeyShouldExecute(Input->WKey))
+    {
+        if(Buffer->HasAssociatedFile)
+        {
+            WriteBufferToAssociatedFile(Buffer);
+        }
+    }
     
     if(KeyShouldExecute(Input->CKey) && !IsAnyShiftKeyDown && !IsAnyControlKeyDown)
     {

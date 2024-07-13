@@ -68,6 +68,8 @@ Undoing and redoing
 
 Add scrollbar dragging
 
+Font file loading based on which codepoints they have: fc-list ':charset=2713 2717'
+
 Fix: String formatter can't do big strings
 
 Better lister matching
@@ -119,10 +121,10 @@ Terminal integration, mainly for building. A pop-up build window like 4coder
 Better error display, jump-to-line, and showing errors at the line they occur on
 
 
-Very out there
+Out there
 --------------------
+Fine browser
 Interactive chatbot w/ face that helps with stuff (integrate cheat.sh?) and shows emotions. Cute mascot?!?
 It could have its own buffer and a little pop-up interface?
 Could be displayed with ascii art, as that would go well with the text editor vibe
 Look into integrating cheat.sh
-OpenCYC seems like a bust BUT we can get free WolframAlpha API calls so look into integrating that
