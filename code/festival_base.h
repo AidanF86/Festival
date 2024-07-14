@@ -152,6 +152,21 @@ struct v2
 struct rect
 {
     int x, y, w, h;
+    
+    v2 Pos()
+    {
+        v2 Result;
+        Result.x = x;
+        Result.y = y;
+        return Result;
+    }
+    v2 Dim()
+    {
+        v2 Result;
+        Result.w = w;
+        Result.h = h;
+        return Result;
+    }
 };
 
 Rectangle

@@ -26,6 +26,10 @@ struct program_state
     view_list Views;
     int SelectedViewIndex;
     
+    b32 HasTargetGlobalCursorPositionBeenSet;
+    rect GlobalCursor;
+    rect TargetGlobalCursor;
+    
     b32 UserMovedCursor;
     b32 UserMovedView;
     

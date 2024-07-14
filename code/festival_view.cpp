@@ -6,15 +6,6 @@ LineData() {
     return Result;
 };
 
-// TODO: move UserMovedCursor into view?
-void SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
-{
-    ProgramState->UserMovedCursor = true;
-    View->CursorPos = Pos;
-    View->CursorPos.l = Clamp(View->CursorPos.l, 0, View->LineCount());
-    View->CursorPos.c = Clamp(View->CursorPos.c, 0, View->LineLength(View->CursorPos.l));
-}
-
 view
 View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_location SpawnLocation, f32 Area)
 {
@@ -25,6 +16,7 @@ View(program_state *ProgramState, buffer *Buffer, int ParentId, view_spawn_locat
     View.Buffer = Buffer;
     View.ParentId = ParentId;
     View.LineDataList = {0};
+    View.HasComputedGeometry = false;
     
     if(ParentId == -1)
     {
@@ -92,9 +84,9 @@ AdjustView(program_state *ProgramState, view *View)
         {
             TargetY = CursorTargetRect.y;
         }
-        else if(CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
+        else if(CursorTargetRect.y > TargetY + View->BufferRect.h - CharHeight)
         {
-            TargetY = CursorTargetRect.y - View->TextRect.h + CharHeight;
+            TargetY = CursorTargetRect.y - View->BufferRect.h + CharHeight;
         }
     }
     else
@@ -104,9 +96,9 @@ AdjustView(program_state *ProgramState, view *View)
             View->CursorPos.l = View->YToLine(TargetY) + 2;
             MovedCursorUpOrDown = true;
         }
-        else if(View->CursorTargetRect.y > TargetY + View->TextRect.h - CharHeight)
+        else if(View->CursorTargetRect.y > TargetY + View->BufferRect.h - CharHeight)
         {
-            View->CursorPos.l = View->YToLine(TargetY + View->TextRect.h) - 2;
+            View->CursorPos.l = View->YToLine(TargetY + View->BufferRect.h) - 2;
             MovedCursorUpOrDown = true;
         }
     }
@@ -196,9 +188,14 @@ RemoveView(program_state *ProgramState, int Index)
 }
 
 
-
-
-
+// TODO: move UserMovedCursor into view?
+void SetCursorPos(program_state *ProgramState, view *View, buffer_pos Pos)
+{
+    ProgramState->UserMovedCursor = true;
+    View->CursorPos = Pos;
+    View->CursorPos.l = Clamp(View->CursorPos.l, 0, View->LineCount());
+    View->CursorPos.c = Clamp(View->CursorPos.c, 0, View->LineLength(View->CursorPos.l));
+}
 
 void
 MoveCursorPos(program_state *ProgramState, view *View, buffer_pos dPos)
@@ -454,7 +451,7 @@ FillLineData(view *View, settings *Settings)
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
     // TODO: formalize char-exclusion-zone (right-margin?)
-    int WrapPoint = View->TextRect.w - CharWidth;
+    int WrapPoint = View->BufferRect.w - CharWidth;
     
     // DeAllocation
     if(DataList->IsAllocated)
@@ -488,7 +485,7 @@ FillLineData(view *View, settings *Settings)
         
         RectData->LineRect.x = x;
         RectData->LineRect.y = y;
-        RectData->LineRect.w = View->TextRect.w;
+        RectData->LineRect.w = View->BufferRect.w;
         RectData->DisplayLines = 1;
         
         for(int c = 0; c < View->LineLength(l); c++)
@@ -522,21 +519,112 @@ FillLineData(view *View, settings *Settings)
 }
 
 
+#if 0
 void
-ComputeTextRect(settings *Settings, view *View)
+ComputeBufferRect(settings *Settings, view *View)
 {
-    v2 CharDim = GetCharDim(Settings);
     
-    View->TextRect.x = View->Rect.x + Settings->LineNumberWidth*CharDim.x + Settings->TextMarginLeft;
-    View->TextRect.y = View->Rect.y + CharDim.y;
-    View->TextRect.w = View->Rect.w - (View->TextRect.x - View->Rect.x);
-    View->TextRect.h = View->Rect.h - CharDim.y;
 }
+#endif
 
 void
-ComputeViewGeometry(program_state *ProgramState, view *View)
+ComputeAllViewRects(program_state *ProgramState)
 {
-    // TODO
+    view_list *Views = &(ProgramState->Views);
+    b32 FoundRootView;
+    view *RootView;
+    for(int i = 0; i < Views->Length; i++)
+    {
+        if(Views->Data[i].Id == 0)
+        {
+            FoundRootView = true;
+            RootView = &(Views->Data[i]);
+            break;
+        }
+    }
+    if(!FoundRootView)
+        printerror("can't find root view\n");
+    
+    
+    for(int i = 0; i < Views->Length; i++)
+    {
+        Views->Data[i].ComputedFromParentThisFrame = false;
+    }
+    
+    RootView->TotalRect.x = 0;
+    RootView->TotalRect.y = 0;
+    RootView->TotalRect.w = ProgramState->ScreenWidth;
+    RootView->TotalRect.h = ProgramState->ScreenHeight;
+    RootView->ComputedFromParentThisFrame = true;
+    
+    
+    for(int ViewIndex = 0; ViewIndex < Views->Length; ViewIndex++)
+    {
+        int Id = Views->Data[ViewIndex].Id;
+        // Compute child count
+        int ChildCount = 0;
+        for(int i = 0; i < Views->Length; i++)
+        {
+            if(Views->Data[i].ParentId == Id)
+                ChildCount++;
+        }
+        if(ChildCount == 0)
+            continue;
+        
+        // Compute children
+        
+        // Operate on children in birth order
+        for(int child = 0; child < ChildCount; child++)
+        {
+            view *NextChild = NULL;
+            int LowestBirthOrdinal = 1000000;
+            // get next child to operate on
+            for(int i = 0; i < Views->Length; i++)
+            {
+                view *TestView = &Views->Data[i];
+                if((NextChild == NULL && TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame) || (TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame && TestView->BirthOrdinal < LowestBirthOrdinal))
+                {
+                    NextChild = TestView;
+                    LowestBirthOrdinal = NextChild->BirthOrdinal;
+                }
+            }
+            if(NextChild == NULL)
+            {
+                printerror("Couldn't find next child view");
+                break;
+            }
+            
+            // Compute child
+            
+            view *Parent = &Views->Data[ViewIndex];
+            view *Child = NextChild;
+            f32 Ratio = Child->Area;
+            //Ratio = 0.5f;
+            //printf("id: %d\n", Child->Id);
+            //printf("%f\n", Ratio);
+            
+            if(Child->SpawnLocation == Location_Right)
+            {
+                // horizontal splitting
+                Child->TotalRect.x = Parent->TotalRect.x + Parent->TotalRect.w * (1.0f-Ratio);
+                Child->TotalRect.y = Parent->TotalRect.y;
+                Child->TotalRect.w = Parent->TotalRect.w * Ratio;
+                Child->TotalRect.h = Parent->TotalRect.h;
+                Parent->TotalRect.w = Parent->TotalRect.w * (1.0f-Ratio);
+            }
+            else
+            {
+                // vertical splitting
+                Child->TotalRect.x = Parent->TotalRect.x;
+                Child->TotalRect.y = Parent->TotalRect.y + Parent->TotalRect.h * (1.0f-Ratio);
+                Child->TotalRect.w = Parent->TotalRect.w;
+                Child->TotalRect.h = Parent->TotalRect.h * Ratio;
+                Parent->TotalRect.h = Parent->TotalRect.h * (1.0f-Ratio);
+            }
+            
+            NextChild->ComputedFromParentThisFrame = true;
+        }
+    }
 }
 
 

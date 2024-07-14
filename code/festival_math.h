@@ -260,5 +260,4 @@ RandomU32InRange(u32 Min, u32 Max)
     return (Max-Min)*RandF + Min;
 }
 
-
 #endif //FESTIVAL_MATH_H

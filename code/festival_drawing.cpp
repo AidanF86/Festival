@@ -110,28 +110,10 @@ void DrawProfiles(program_state *ProgramState) {
 }
 
 void
-DrawScrollbar(settings *Settings, view *View)
+DrawScrollbar(view *View)
 {
-    // TODO: create function to work out all view geometry
-    rect ViewRect = View->Rect;
-    rect TextRect = View->TextRect;
-    
-    v2 TopLeft = V2(ViewRect.x+ViewRect.w - Settings->ScrollbarWidth, TextRect.y);
-    v2 Dim = V2(Settings->ScrollbarWidth, TextRect.h);
-    
-    DrawRectangle(TopLeft.x, TopLeft.y, Dim.w, Dim.h, LIGHTGRAY);
-    
-    int ViewportH = View->TextRect.h;
-    line_data LineData = View->LineDataAt(View->LineCount()-1);
-    
-    int TotalH = LineData.LineRect.y + (ViewportH);
-    int AdditionalH = LineData.LineRect.h / LineData.DisplayLines * (LineData.DisplayLines - 1);
-    TotalH += AdditionalH;
-    
-    f32 BarYPortion = (f32)View->Y / (f32)TotalH;
-    int BarH = ((f32)ViewportH / (f32)TotalH) * (f32)Dim.h + 1;
-    
-    DrawRectangle(TopLeft.x, TopLeft.y + BarYPortion * (Dim.h), Dim.w, BarH, BLACK);
+    DrawRectangleRec(R(View->ScrollbarAreaRect), LIGHTGRAY);
+    DrawRectangleRec(R(View->ScrollbarRect), BLACK);
 }
 
 void
@@ -143,16 +125,16 @@ DrawView(program_state *ProgramState, view *View)
     int CharWidth = CharDim.x;
     int CharHeight = CharDim.y;
     b32 ViewIsSelected = View == &(ProgramState->Views[ProgramState->SelectedViewIndex]);
-    rect ViewRect = View->Rect;
-    rect TextRect = View->TextRect;
+    rect ViewRect = View->TotalRect;
+    rect BufferRect = View->BufferRect;
     
     BeginScissorMode(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h);
     
     // draw background
-    DrawRectangleRec(R(View->Rect), Settings->Colors.ViewBG);
+    DrawRectangleRec(R(View->TotalRect), Settings->Colors.ViewBG);
     
     // draw line numbers
-    rect LineNumbersRect = Rect(ViewRect.x, View->TextRect.y, 4*CharWidth, View->TextRect.h);
+    rect LineNumbersRect = Rect(ViewRect.x, View->BufferRect.y, 4*CharWidth, View->BufferRect.h);
     DrawRectangleRec(R(LineNumbersRect), Settings->Colors.LineNumberBG);
     
     // draw title bar
@@ -160,27 +142,28 @@ DrawView(program_state *ProgramState, view *View)
     if(View->ListerIsOpen)
     {
         lister *Lister = &View->Lister;
-        DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, BLUE);
-        int InputX = DrawString(Settings, Lister->InputLabel, V2(ViewRect.x, ViewRect.y), WHITE).x;
-        DrawString(Settings, Lister->Input, V2(InputX, ViewRect.y),
-                   WHITE);
+        DrawRectangleRec(R(View->TitlebarRect), BLUE);
+        int InputX = DrawString(Settings, Lister->InputLabel, View->TitlebarRect.Pos(), WHITE).x;
+        DrawString(Settings, Lister->Input, V2(InputX, View->TitlebarRect.y), WHITE);
     }
     else
     {
-        DrawRectangle(ViewRect.x, ViewRect.y, ViewRect.w, CharHeight, GRAY);
+        DrawRectangleRec(R(View->TitlebarRect), GRAY);
         string TitleString = String("%S   %d,%d", View->Buffer->FileName, View->CursorPos.l, View->CursorPos.c);
-        DrawString(Settings, TitleString, V2(ViewRect.x, ViewRect.y), BLACK);
-        FreeString(TitleString);
+        DrawString(Settings, TitleString, View->TitlebarRect.Pos(), BLACK);
+        TitleString.Free();
     }
     
-    BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
+    BeginScissorMode(BufferRect.x, BufferRect.y, BufferRect.w, BufferRect.h);
     // TODO: Cross-view cursor interpolation
     // draw cursor
-    rect CursorDrawRect = View->CharRectToScreenRect(View->CursorRect);
+    //rect CursorDrawRect = View->CharRectToScreenRect(View->CursorRect);
     
     char_draw_info CursorCharInfo = GetCharDrawInfo(Font, View->CharAt(View->CursorPos));
-    if(CursorCharInfo.IsValid)
-        CursorDrawRect.w = CursorCharInfo.Glyph.advanceX;
+    /*
+        if(CursorCharInfo.IsValid)
+            CursorDrawRect.w = CursorCharInfo.Glyph.advanceX;
+    */
     
     color CursorColor = Settings->Colors.CursorActiveBG;
     color SelectionAreaColor = Settings->Colors.SelectionAreaActiveBG;
@@ -190,6 +173,9 @@ DrawView(program_state *ProgramState, view *View)
         SelectionAreaColor = Settings->Colors.SelectionAreaInactiveBG;
     }
     
+    // TODO: modal
+    DrawRectangleRec(R(ProgramState->GlobalCursor), Settings->Colors.CursorActiveBG);
+#if 0
     switch(ProgramState->InputMode)
     {
         case InputMode_Nav:
@@ -223,6 +209,7 @@ DrawView(program_state *ProgramState, view *View)
         }
         break;
     }
+#endif
     EndScissorMode();
     
     // Draw text
@@ -233,11 +220,11 @@ DrawView(program_state *ProgramState, view *View)
         line_data LineData = View->LineDataAt(l);
         int LineY = LineData.LineRect.y;
         
-        if(LineY - View->Y > View->TextRect.y + View->TextRect.h)
+        if(LineY - View->Y > View->BufferRect.y + View->BufferRect.h)
         {
             break;
         }
-        //if(LineRect(View, l).y + LineRect(View, l).h - View->Y < View->TextRect.y)
+        //if(LineRect(View, l).y + LineRect(View, l).h - View->Y < View->BufferRect.y)
         if(View->LineRectAt(l).y + View->LineRectAt(l).h - View->Y < 0)
         {
             // TODO: it's this
@@ -247,12 +234,12 @@ DrawView(program_state *ProgramState, view *View)
         BeginScissorMode(LineNumbersRect.x, LineNumbersRect.y,
                          LineNumbersRect.w, LineNumbersRect.h);
         string NumberString = String("%d", l);
-        v2 LineNumberPos = V2(View->Rect.x, LineData.LineRect.y - View->Y + View->TextRect.y);
+        v2 LineNumberPos = V2(View->TotalRect.x, LineData.LineRect.y - View->Y + View->BufferRect.y);
         DrawString(Settings, NumberString, LineNumberPos, Settings->Colors.LineNumberFG);
         FreeString(NumberString);
         EndScissorMode();
         
-        BeginScissorMode(TextRect.x, TextRect.y, TextRect.w, TextRect.h);
+        BeginScissorMode(BufferRect.x, BufferRect.y, BufferRect.w, BufferRect.h);
         for(int c = 0; c < LineData.CharRects.Length; c++)
         {
             
@@ -286,9 +273,9 @@ DrawView(program_state *ProgramState, view *View)
     if(View->ListerIsOpen) {
         lister *Lister = &View->Lister;
         
-        DrawRectangle(ViewRect.x, TextRect.y, ViewRect.w, Lister->MatchingEntries.Length*CharHeight, GRAY);
+        DrawRectangle(ViewRect.x, BufferRect.y, ViewRect.w, Lister->MatchingEntries.Length*CharHeight, GRAY);
         
-        int Y = TextRect.y;
+        int Y = BufferRect.y;
         for(int i = 0; i < Lister->MatchingEntries.Length; i++) {
             Color BGColor = GRAY;
             Color FGColor = WHITE;
@@ -316,7 +303,7 @@ DrawView(program_state *ProgramState, view *View)
     BeginScissorMode(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h);
     if(ProgramState->ShowViewRects)
     {
-        DrawRectangleLinesEx(R(View->TextRect), 2, {159, 192, 123, 255});
+        DrawRectangleLinesEx(R(View->BufferRect), 2, {159, 192, 123, 255});
     }
     
     if(ProgramState->ShowViewInfo)
@@ -326,9 +313,9 @@ DrawView(program_state *ProgramState, view *View)
         int InfoCharWidth = GetCharDim(Font).x;
         int KeyValueDistance = KeyValueDistanceChars * InfoCharWidth;
         
-        DrawRectangleRec(R(View->Rect), {0, 0, 0, 200});
+        DrawRectangleRec(R(View->TotalRect), {0, 0, 0, 200});
         {
-            v2 TextPos = V2(View->Rect.x + 10, View->Rect.y + 10);
+            v2 TextPos = V2(View->TotalRect.x + 10, View->TotalRect.y + 10);
             DrawString(Settings, TempString("id"), TextPos, WHITE);
             DrawString(Settings, TempString("%d", View->Id), TextPos + V2(KeyValueDistance, 0), YELLOW);
             TextPos.y += InfoCharHeight;
@@ -345,12 +332,12 @@ DrawView(program_state *ProgramState, view *View)
     
     if(ProgramState->ShowViewRects)
     {
-        DrawRectangleLinesEx(R(View->Rect), 2, {216, 50, 10, 255});
+        DrawRectangleLinesEx(R(View->TotalRect), 2, {216, 50, 10, 255});
     }
     
     EndScissorMode();
     
-    DrawScrollbar(Settings, View);
+    DrawScrollbar(View);
 }
 
 

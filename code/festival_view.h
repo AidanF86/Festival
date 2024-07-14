@@ -32,8 +32,13 @@ struct view
     f32 Area; // fraction of parent
     b32 ComputedFromParentThisFrame;
     
-    rect Rect;
-    rect TextRect;
+    b32 HasComputedGeometry;
+    rect TotalRect;
+    rect BufferRect;
+    rect TitlebarRect;
+    rect LineNumberRect;
+    rect ScrollbarAreaRect;
+    rect ScrollbarRect;
     
     buffer_pos CursorPos;
     int IdealCursorCol;
@@ -122,8 +127,8 @@ struct view
     v2 CharPosToScreenPos(v2 Pos)
     {
         v2 Result = Pos;
-        Result.x += TextRect.x;
-        Result.y += TextRect.y;
+        Result.x += BufferRect.x;
+        Result.y += BufferRect.y;
         Result.y -= Y;
         return Result;
     }
@@ -131,15 +136,15 @@ struct view
     {
         v2 Result = Pos;
         Result.y += Y;
-        Result.y -= TextRect.y;
-        Result.x -= TextRect.x;
+        Result.y -= BufferRect.y;
+        Result.x -= BufferRect.x;
         return Result;
     }
     rect CharRectToScreenRect(rect A)
     {
         rect Result = A;
-        Result.x += TextRect.x;
-        Result.y += TextRect.y;
+        Result.x += BufferRect.x;
+        Result.y += BufferRect.y;
         Result.y -= Y;
         return Result;
     }
@@ -147,8 +152,8 @@ struct view
     {
         rect Result = A;
         Result.y += Y;
-        Result.y -= TextRect.y;
-        Result.x -= TextRect.x;
+        Result.y -= BufferRect.y;
+        Result.x -= BufferRect.x;
         return Result;
     }
     
@@ -234,6 +239,42 @@ struct view
     buffer_pos ClosestBufferPos(rect Rect)
     {
         return ClosestBufferPos(V2(Rect.x+Rect.w/2, Rect.y+Rect.h/2));
+    }
+    
+    
+    void ComputeInternalGeometry(settings *Settings)
+    {
+        HasComputedGeometry = true;
+        
+        v2 CharDim = GetCharDim(Settings);
+        
+        // Text area
+        BufferRect.x = TotalRect.x + Settings->LineNumberWidth*CharDim.x + Settings->TextMarginLeft;
+        BufferRect.y = TotalRect.y + CharDim.y;
+        BufferRect.w = TotalRect.w - (BufferRect.x - TotalRect.x);
+        BufferRect.h = TotalRect.h - CharDim.y;
+        
+        // Scrollbar
+        {
+            v2 TopLeft = V2(TotalRect.x+TotalRect.w - Settings->ScrollbarWidth, BufferRect.y);
+            v2 Dim = V2(Settings->ScrollbarWidth, BufferRect.h);
+            
+            int ViewportH = BufferRect.h;
+            line_data LineData = LineDataAt(LineCount()-1);
+            
+            int TotalH = LineData.LineRect.y + (ViewportH);
+            int AdditionalH = LineData.LineRect.h / LineData.DisplayLines * (LineData.DisplayLines - 1);
+            TotalH += AdditionalH;
+            
+            f32 BarYPortion = (f32)Y / (f32)TotalH;
+            int BarH = ((f32)ViewportH / (f32)TotalH) * (f32)Dim.h + 1;
+            
+            ScrollbarAreaRect = Rect(TopLeft.x, TopLeft.y, Dim.w, Dim.h);
+            ScrollbarRect = Rect(TopLeft.x, TopLeft.y + BarYPortion*Dim.h, Dim.w, BarH);
+        }
+        
+        // Titlebar
+        TitlebarRect = Rect(TotalRect.x, TotalRect.y, TotalRect.w, CharDim.y);
     }
     
     

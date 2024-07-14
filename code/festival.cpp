@@ -1,4 +1,3 @@
-
 #include "raylib.h"
 #include "chardet.h"
 #include <sys/stat.h>
@@ -16,6 +15,7 @@
 
 #include "festival_font.h"
 #include "festival_settings.h"
+#include "festival_font.cpp"
 #include "festival_actions.h"
 #include "festival_encoding.h"
 #include "festival_encoding.cpp"
@@ -25,7 +25,6 @@
 #include "festival_view.h"
 #include "festival.h"
 #include "festival_filesystem.cpp"
-#include "festival_font.cpp"
 #include "festival_buffer.cpp"
 #include "festival_view.cpp"
 
@@ -116,6 +115,10 @@ extern "C"
             
             ProgramState->SelectedViewIndex = 0;
             
+            ProgramState->HasTargetGlobalCursorPositionBeenSet = false;
+            ProgramState->GlobalCursor = Rect(0, 0, 0, 0);
+            ProgramState->TargetGlobalCursor = Rect(0, 0, 0, 0);
+            
             ProgramState->ShowViewInfo = false;
             ProgramState->ShowViewRects = false;
             
@@ -166,106 +169,11 @@ extern "C"
             Memory->IsRunning = false;
         }
         
-        // Compute view rects
+        ComputeAllViewRects(ProgramState);
         
-        // Root view is at top left
-        // Compute root view
-        b32 FoundRootView;
-        view *RootView;
-        for(int i = 0; i < Views->Length; i++)
+        for(int i = 0; i < ProgramState->Views.Length; i++)
         {
-            if(Views->Data[i].Id == 0)
-            {
-                FoundRootView = true;
-                RootView = &(Views->Data[i]);
-                break;
-            }
-        }
-        if(!FoundRootView)
-            printf("MAJOR ERROR: CAN'T FIND ROOT VIEW\n");
-        
-        
-        for(int i = 0; i < Views->Length; i++)
-        {
-            Views->Data[i].ComputedFromParentThisFrame = false;
-        }
-        
-        RootView->Rect.x = 0;
-        RootView->Rect.y = 0;
-        RootView->Rect.w = ProgramState->ScreenWidth;
-        RootView->Rect.h = ProgramState->ScreenHeight;
-        ComputeTextRect(Settings, RootView);
-        RootView->ComputedFromParentThisFrame = true;
-        
-        for(int ViewIndex = 0; ViewIndex < Views->Length; ViewIndex++)
-        {
-            int Id = Views->Data[ViewIndex].Id;
-            // Compute child count
-            int ChildCount = 0;
-            for(int i = 0; i < Views->Length; i++)
-            {
-                if(Views->Data[i].ParentId == Id)
-                    ChildCount++;
-            }
-            if(ChildCount == 0)
-                continue;
-            
-            // Compute children
-            
-            // Operate on children in birth order
-            for(int child = 0; child < ChildCount; child++)
-            {
-                view *NextChild = NULL;
-                int LowestBirthOrdinal = 1000000;
-                // get next child to operate on
-                for(int i = 0; i < Views->Length; i++)
-                {
-                    view *TestView = &Views->Data[i];
-                    if((NextChild == NULL && TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame) || (TestView->ParentId == Id && !TestView->ComputedFromParentThisFrame && TestView->BirthOrdinal < LowestBirthOrdinal))
-                    {
-                        NextChild = TestView;
-                        LowestBirthOrdinal = NextChild->BirthOrdinal;
-                    }
-                }
-                if(NextChild == NULL)
-                {
-                    printerror("Couldn't find next child view");
-                    break;
-                }
-                
-                // Compute child
-                
-                view *Parent = &Views->Data[ViewIndex];
-                view *Child = NextChild;
-                f32 Ratio = Child->Area;
-                //Ratio = 0.5f;
-                //printf("id: %d\n", Child->Id);
-                //printf("%f\n", Ratio);
-                
-                if(Child->SpawnLocation == Location_Right)
-                {
-                    // horizontal splitting
-                    Child->Rect.x = Parent->Rect.x + Parent->Rect.w * (1.0f-Ratio);
-                    Child->Rect.y = Parent->Rect.y;
-                    Child->Rect.w = Parent->Rect.w * Ratio;
-                    Child->Rect.h = Parent->Rect.h;
-                    Parent->Rect.w = Parent->Rect.w * (1.0f-Ratio);
-                }
-                else
-                {
-                    // vertical splitting
-                    Child->Rect.x = Parent->Rect.x;
-                    Child->Rect.y = Parent->Rect.y + Parent->Rect.h * (1.0f-Ratio);
-                    Child->Rect.w = Parent->Rect.w;
-                    Child->Rect.h = Parent->Rect.h * Ratio;
-                    Parent->Rect.h = Parent->Rect.h * (1.0f-Ratio);
-                }
-                
-                ComputeTextRect(Settings, Child);
-                ComputeTextRect(Settings, Parent);
-                
-                NextChild->ComputedFromParentThisFrame = true;
-            }
+            ProgramState->Views[i].ComputeInternalGeometry(Settings);
         }
         
         HandleInput(ProgramState);
@@ -335,7 +243,7 @@ extern "C"
             int NewViewIndex = 0;
             for(int i = 0; i < Views->Length; i++)
             {
-                rect Rect = Views->Data[i].Rect;
+                rect Rect = Views->Data[i].TotalRect;
                 if(MousePos.x >= Rect.x && MousePos.y >= Rect.y &&
                    MousePos.x <= Rect.x + Rect.w && MousePos.y <= Rect.y + Rect.h)
                 {
@@ -352,12 +260,12 @@ extern "C"
             if(View->ListerIsOpen)
             {
                 lister *Lister = &View->Lister;
-                int Y = View->TextRect.y;
+                int Y = View->BufferRect.y;
                 ListFree(&Lister->Rects);
                 Lister->Rects = RectList(Lister->MatchingEntries.Length);
                 for(int i = 0; i < Lister->MatchingEntries.Length; i++)
                 {
-                    ListAdd(&Lister->Rects, Rect(View->Rect.x, Y, View->Rect.w, CharHeight));
+                    ListAdd(&Lister->Rects, Rect(View->TotalRect.x, Y, View->TotalRect.w, CharHeight));
                     
                     Y += CharHeight;
                     if(CheckCollisionPointRec(V(MousePos), R(Lister->Rects[i])))
@@ -393,6 +301,7 @@ extern "C"
             view *View = &Views->Data[i];
             FillLineData(View, Settings);
             
+            // TODO: unnecessary to interpolate now?
             View->CursorTargetRect = View->CharRectAt(View->CursorPos.l, View->CursorPos.c);
             View->CursorRect = Interpolate(View->CursorRect, View->CursorTargetRect, 0.5f);
             
@@ -400,6 +309,16 @@ extern "C"
             View->Y = Interpolate(View->Y, View->TargetY, 0.4f);
         }
         EndProfile(FillLineData);
+        
+        ProgramState->TargetGlobalCursor = View->CharRectToScreenRect(View->CursorTargetRect);
+        if(!ProgramState->HasTargetGlobalCursorPositionBeenSet)
+        {
+            ProgramState->GlobalCursor = ProgramState->TargetGlobalCursor;
+            ProgramState->HasTargetGlobalCursorPositionBeenSet = true;
+        }
+        ProgramState->GlobalCursor = Interpolate(ProgramState->GlobalCursor,
+                                                 ProgramState->TargetGlobalCursor,
+                                                 0.5f);
         
         StartProfile(Rendering);
         BeginDrawing();
