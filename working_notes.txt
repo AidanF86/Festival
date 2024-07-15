@@ -1,12 +1,8 @@
 WORKING NOTES
 ========================================
+
 DONE be able to load a text file and display it (just ascii for now)
-	start: 11:30pm 10/4
-	end: 11:50pm
 DONE display with a proper font and with decent spacing 
-	progress (11:57): it works, but looks like ass
-	12:20: looking into SDFs
-	1:27: got SDFs working, took way too long because of a dumb typo
 DONE be able to scroll through the file.
 DONE don't allow scrolling past the end of the file
 
@@ -24,7 +20,7 @@ DONE cursor that follows view (and view follows it)
 DONE have view and cursor movement work nicely together
 	sub: change the system to make it more reliable (int rects) and easier to work with (easy view->bufferpos conversion)
 
-DONE SMOOTH CURSOR MOVEMENT!!!!
+DONE Smooth cursor movement
 
 DONE better cursor movement with keys
 DONE smooth view movement
@@ -46,7 +42,7 @@ DONE(hopefully) Solidify text rect and char rect concepts
 DONE Views & Multiple buffers
                 DONE sub: separate buffer into purely text/file data, move spatial data into view struct
 
-DONE (yippee! :smug:) rect spawn system :shiver:
+DONE rect spawn system
 
 DONE Basic Modal system
 DONE Adjust view based on cursor when typing and when scrolling
@@ -61,6 +57,8 @@ DONE Load glyphs by unicode group when necessary
 
 DONE Copy and pasting
 DONE Scroll bar
+
+DONE File writing
 
 Current Goal: insert (add) action // Done?
 				Heap issue might be due to deleting when file is empty
@@ -78,33 +76,10 @@ Fix: not rendering partially visible chars
 
 Add ctrl-backspace to lister and buffer
 
-File writing
+Better border seek
 
-Better border seek :cry:
-
-Colorscheme (comes after/with treesitter)
-
-TREE SITTERRRR
-
-INFO
-========================================
-A text editor
-
-Mission-critical
---------------------
-Read/write text files
-Insert strings
-Have multiple windows (split screen)
-Modal: like my modal scheme in 4coder (but better hopefully)
-Select & copy/cut & paste
-
-Syntax highlighting
-Auto-indenting, preferably automatic like 4coder
-// Look into tree-sitter
-//IMPORTANT: if we can integrate tree-sitter, we probably get free parsing for basically anything
-
-LS: c/c++ (probably no advanced stuff)
-
+Code formatting and highlighting (using treesitter probably)
+Colorschemes
 
 Less important
 --------------------
@@ -117,14 +92,15 @@ Macro recording/replaying
 
 LS: html, css, js, python, bash
 
-Terminal integration, mainly for building. A pop-up build window like 4coder
+Terminal integration, mainly for building. A pop-up build window like in 4coder
 Better error display, jump-to-line, and showing errors at the line they occur on
 
 
 Out there
 --------------------
-Fine browser
-Interactive chatbot w/ face that helps with stuff (integrate cheat.sh?) and shows emotions. Cute mascot?!?
+Image viewing
+File browser
+Interactive chatbot w/ face that helps with stuff (integrate cheat.sh?)
 It could have its own buffer and a little pop-up interface?
 Could be displayed with ascii art, as that would go well with the text editor vibe
 Look into integrating cheat.sh
