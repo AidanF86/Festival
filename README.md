@@ -1,4 +1,4 @@
-# Festival - (In-Progress) Modal Text Editor
+# (Discontinued Development)  Festival - Modal Text Editor
 
 ## Summary
 I have gripes with every text editor I've used and, although many have great customization options, I wanted the flexibility that comes with making one from scratch. The main goals of the editor are to be smooth, with interpolated animations and nice graphic design, as well as easy on the fingers, with a modal system inspired by [Vim](https://www.vim.org/) and [Xah Fly Keys](http://xahlee.info/emacs/misc/xah-fly-keys.html).
